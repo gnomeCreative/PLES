@@ -10,7 +10,7 @@
 
 #include <stdio.h>
 #include <iostream>
-#include <vector.h>
+#include <vector>
 #include <stdlib.h>
 #include <math.h>
 //

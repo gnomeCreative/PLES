@@ -28,7 +28,7 @@ FFLAGS	=  -fdefault-real-8 -fcheck=all -fbacktrace -finit-real=zero -J $(FMOD) -
 
 
 # Flag for C++ compiler
-CFLAGS	=  -O0 -Wall -fmessage-length=0
+CFLAGS	=  -O0 -Wall -Wsign-compare -fmessage-length=0
 
 # Used libraries
 LIBS	= -lmpi_mpifh -lgfortran -lm -lmpi -lmpi_usempi #-L/cineca/lib/mass -lmass
@@ -94,7 +94,7 @@ FOBJS   =  \
  $(FS)/stratiParticle.o
 
 # List of C++ code files 
-COBJS	= $(CS)/wrapper.o
+COBJS	= $(CS)/vector.o $(CS)/utils.o $(CS)/elmt.o $(CS)/IO.o $(CS)/DEM.o $(CS)/hybird.o $(CS)/wrapper.o
 
 OBJS	= $(FOBJS) $(COBJS) 
 
