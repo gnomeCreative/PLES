@@ -1,0 +1,56 @@
+comment: index to print plane and sonde 
+comment: (value; variable name; description)
+----------------------
+PLANE (i) 
+----------------------
+0     ;     npiani   ; number of plane to print
+----------------------
+comment: index i for each plane (j,k)
+----------------------
+1     ;     piano(npiani)          ;  index for the first plane
+10    ;
+20    ;
+30    ;
+Fine piani
+----------------------
+SONDE (i,j,k)
+----------------------
+0     ;     nsonde    ; number of sonde to print
+----------------------
+comment: sonda 1
+----------------------
+12    ;     sonde(1,nsonde)   ;index i
+1     ;     sonde(2,nsonde)   ;index j
+12    ;     sonde(3,nsonde)   ;index k
+----------------------
+comment: sonda 2
+----------------------
+12    ;     index i
+12    ;     index j
+12    ;     index k
+----------------------
+comment: sonda 3
+----------------------
+12    ;     index i
+24    ;     index j
+12    ;     index k
+----------------------
+comment: sonda 4
+----------------------
+12    ;     index i
+36    ;     index j
+12    ;     index k
+----------------------
+comment: sonda 5
+----------------------
+12    ;     index i
+48    ;     index j
+12    ;     index k
+----------------------
+comment: sonda 6
+----------------------
+12    ;     index i
+60    ;     index j
+12    ;     index k
+Fine sonde
+

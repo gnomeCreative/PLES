@@ -1,0 +1,29 @@
+comment: index to print plane and sonde 
+comment: (value; variable name; description)
+------------------------------------------------------------------------
+comment: prandtl number and sgs prandtl number for n scalar
+------------------------------------------------------------------------
+1       ;     re_analogy           ; =1 reynolds analogy on, = 0 off
+0.7     ;     pran(nscal)          ;  prandtl number scalar 1
+0.8     :     prsc(nscal)          ;  prandtls sgs scalar 1 used if re_analogy=1
+end scalars
+------------------------------------------------------------------------
+comment:  moisture
+------------------------------------------------------------------------
+0       ;     imoist               ;  moisture procedure (0=off; 1=on)
+------------------------------------------------------------------------
+comment: moisture parameter
+------------------------------------------------------------------------
+301.6   ;     Tref                 ;  reference value for temperature
+0.0     ;     Qref                 ;  reference value for humidity
+0.003   ;     betaT                ;  1/k, order 0.003 1/Tref
+0.608   ;     betaQ                ;  non-dim, if q-->0, (Ma/Mv)-1
+28.966  ;     Ma                   ;  molar mass dry air
+18.015  ;     Mv                   ;  molar mass water vapor
+2.4e6   ;     Lv                   ;  evaporation latent heat
+9.80e-3 ;     Gdry                 ; 
+286.9   ;     Rd                   ;  dry air constant
+1005.   ;     cpd                  ;  dry air specific heat J/K kg    
+
+			
+

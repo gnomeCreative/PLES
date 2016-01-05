@@ -1,0 +1,13 @@
+0     ifiltro: 1 eseguo il filtraggio, 0 niente filtraggio
+50    nfiltro: ogni quante itrazioni esegue il filtraggio del campo
+1     filtrou:  1 filtro la componente u,  0 niente
+1     filtrov:  1 filtro la componente v,  0 niente           
+1     filtrow:  1 filtro la componente w,  0 niente
+1     filtrorho:1 filtro la componente rho,0 niente
+1     filtrofi: 1 filtro la componente fi, 0 niente
+1      xstart: valore iniziale lungo i per filtrare
+100    xend:   valore finale lungo i per filtrare
+1      ystart: valore iniziale lungo i per filtrare
+100    yend:   valore finale lungo i per filtrare
+1      zstart: valore iniziale lungo i per filtrare
+100    zend:   valore finale lungo i per filtrare
