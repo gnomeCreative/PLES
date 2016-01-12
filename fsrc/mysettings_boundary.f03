@@ -3,12 +3,14 @@
 !***********************************************************************
 ! contains settings for boundary conditions at wall
 !-----------------------------------------------------------------------
-      integer iboun1,iboun2
-      integer iboun3,iboun4
-      integer iboun5,iboun6
+use iso_c_binding
 
-      integer ibodybuffer1,ibodybuffer2
-      integer ibodybuffer3,ibodybuffer4
-      integer ibodybuffer5,ibodybuffer6
+      integer,bind(C) :: iboun1,iboun2
+      integer,bind(C) :: iboun3,iboun4
+      integer,bind(C) :: iboun5,iboun6
+
+      integer,bind(C) :: ibodybuffer1,ibodybuffer2
+      integer,bind(C) :: ibodybuffer3,ibodybuffer4
+      integer,bind(C) :: ibodybuffer5,ibodybuffer6
       
       end module 

@@ -66,9 +66,11 @@ void DEM::discreteElementGet(GetPot& lbmCfgFile, GetPot& command_line){
             // see "On the Determination of the Damping Coefficient of Non-linear Spring-dashpot System to Model Hertz Contact for Simulation by Discrete Element Method"
             // Hu, Hu, Jian, Liu, Wan, Journal of Computers, 6 (2011) OR BETTER Antypov & Elliott
             sphereMat.dampCoeff=-1.0*sqrt(5)*log(sphereMat.restitution)/sqrt((log(sphereMat.restitution)*log(sphereMat.restitution)+M_PI*M_PI));
+            break;
         }
         case LINEAR: {
             sphereMat.dampCoeff=-1.0*log(sphereMat.restitution)/sqrt((log(sphereMat.restitution)*log(sphereMat.restitution)+M_PI*M_PI));
+            break;
         }
     }
 

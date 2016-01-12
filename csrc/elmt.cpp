@@ -1,6 +1,7 @@
 
-#include "vector.h"
 #include "elmt.h"
+
+#include "myvector.h"
 
 using namespace std;
 
@@ -48,7 +49,7 @@ void elmt::initialize(const double& partDensity, std::vector <vecList>& prototyp
     // inertia of single spheres
     I=size*2.0/5.0*singleMass*radius*radius*tVect(1.0,1.0,1.0);
     // transport components
-    for (int n=0; n<size; ++n) {
+    for (unsigned int n=0; n<size; ++n) {
         I+=singleMass*radius*radius*prototypes[size][n].transport();
     }
 

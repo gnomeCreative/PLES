@@ -1,6 +1,6 @@
 
 
-#include "vector.h"
+#include "myvector.h"
 
 using namespace std;
 
@@ -188,7 +188,7 @@ double tinyVector::isoparameterSphere(tVect center, double radius) const {
 // basic functions
 
 void quaternion::show() const {
-    cout<<" ("<<q0<<", "<<q1<<", "<<q2<<", "<<q3<<")";
+    std::cout<<" ("<<q0<<", "<<q1<<", "<<q2<<", "<<q3<<")";
 }
 
 // overloaded operators
@@ -285,10 +285,10 @@ tQuat quaternion::multiply(quaternion quat) const {
 // basic functions
 
 void tinyMatrix::show() const {
-    cout<<" (";
-    cout<<m00<<", "<<m01<<", "<<m02<<"; ";
-    cout<<m10<<", "<<m11<<", "<<m12<<"; ";
-    cout<<m20<<", "<<m21<<", "<<m22<<") ";
+    std::cout<<" (";
+    std::cout<<m00<<", "<<m01<<", "<<m02<<"; ";
+    std::cout<<m10<<", "<<m11<<", "<<m12<<"; ";
+    std::cout<<m20<<", "<<m21<<", "<<m22<<") ";
 }
 
 // overloaded operators
@@ -423,7 +423,7 @@ double tinyMatrix::magnitude() const {
 /////////////////////////////////////////////////////////////////////////////////////////*/
 
 tVect quat2vec(tQuat quat) {
-    if (abs(quat.q0)>0.001*abs(quat.q1)){
+    if (std::abs(quat.q0)>0.001*std::abs(quat.q1)){
 //    cout<<"transform error="<<quat.q0<<"\n";
     }
     return tVect(

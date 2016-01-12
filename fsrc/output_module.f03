@@ -3,6 +3,8 @@ module output_module
     !***********************************************************************
     !     contains arrays and settings for printing procedure
 
+    use iso_c_binding
+
     use mysending, only: kparaend,kparasta,myid,nproc,deepl,deepr
     !
     use scala3, only: jx,jy,jz,nscal,re,n1,n2,n3,dt
@@ -12,14 +14,8 @@ module output_module
     implicit none
 
     ! flags
-    integer print_iter_or_time
-    integer i_printfile
-    integer i_paraview
-    integer i_cumulative
-    integer iscrivo
-    integer iformat_newres
-    integer iformat_grid
-    integer ifolder
+    integer,bind(C) :: print_iter_or_time,i_printfile,i_paraview,ifolder
+    integer,bind(C) :: i_cumulative,iscrivo,iformat_newres,iformat_grid
 
     ! information output files
     integer,parameter  :: info_run_file=11
@@ -42,7 +38,7 @@ module output_module
 
     character(len=4) :: char_myid
 
-    real i_time
+    real,bind(C) :: i_time
     real ti_start
       
     ! variables for printing
@@ -50,13 +46,9 @@ module output_module
     real, allocatable :: uutau(:,:,:,:) !(1:n1,1:n2,kparasta:kparaend,7)
     real deltatempo
 
-    real,allocatable :: print_u(:,:,:)
-    real,allocatable :: print_v(:,:,:)
-    real,allocatable :: print_w(:,:,:)
+    real,allocatable :: print_u(:,:,:),print_v(:,:,:),print_w(:,:,:)
       
-    real,allocatable :: print_uc(:,:,:)
-    real,allocatable :: print_vc(:,:,:)
-    real,allocatable :: print_wc(:,:,:)
+    real,allocatable :: print_uc(:,:,:),print_vc(:,:,:),print_wc(:,:,:)
       
     real,allocatable :: print_fi(:,:,:)
     real,allocatable :: print_rhov(:,:,:,:)

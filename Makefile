@@ -6,9 +6,9 @@ LD	= $(CC)
 F77	= $(FC)
 RM	= /bin/rm -f
 #
-FCODE=../fsrc
-FS = ./fsrc
-CS = ./csrc
+FCODE=./fsrc
+FS = ./build/fsrc
+CS = ./build/csrc
 FMOD = $(FS)/modules
 #
 
@@ -27,8 +27,8 @@ FFLAGS	=  -fdefault-real-8 -fcheck=all -fbacktrace -finit-real=zero -J $(FMOD) -
 # Flag for large files (webSP4): -bmaxdata:0x70000000
 
 
-# Flag for C++ compiler
-CFLAGS	=  -O0 -Wall -Wsign-compare -fmessage-length=0
+# Flag for C++ compiler #-Wall
+CFLAGS	=  -O0 -fmessage-length=0
 
 # Used libraries
 LIBS	= -lmpi_mpifh -lgfortran -lm -lmpi -lmpi_usempi #-L/cineca/lib/mass -lmass
@@ -82,7 +82,7 @@ FOBJS   =  \
  $(FS)/periodic.o $(FS)/potenziale_ibm.o\
  $(FS)/prepare_nesting.o $(FS)/prolong.o \
  $(FS)/readflux.o $(FS)/readtau.o \
- $(FS)/read_simulation_setting.o $(FS)/redistribuzione.o $(FS)/resid_sndrcv.o $(FS)/resid_sndrcv_cart.o $(FS)/restart.o \
+ $(FS)/redistribuzione.o $(FS)/resid_sndrcv.o $(FS)/resid_sndrcv_cart.o $(FS)/restart.o \
  $(FS)/restrict_sndrcv.o $(FS)/rhostress.o $(FS)/rhs1_rho.o \
  $(FS)/sett.o $(FS)/set_transpose_implicit.o $(FS)/tridag.o \
  $(FS)/tridiag_trasp_para.o $(FS)/tridiag_trasp_para_rho.o \
@@ -94,11 +94,11 @@ FOBJS   =  \
  $(FS)/stratiParticle.o
 
 # List of C++ code files 
-COBJS	= $(CS)/vector.o $(CS)/utils.o $(CS)/elmt.o $(CS)/IO.o $(CS)/DEM.o $(CS)/hybird.o $(CS)/wrapper.o
+COBJS	= $(CS)/myvector.o $(CS)/utils.o $(CS)/elmt.o $(CS)/IO.o $(CS)/DEM.o $(CS)/wrapper.o
 
 OBJS	= $(FOBJS) $(COBJS) 
 
-EXEC	= ../strati_p.exe
+EXEC	= ./strati_p.exe
 
 # all Target 
 all: $(EXEC)
@@ -108,17 +108,18 @@ $(EXEC):	$(OBJS)
 
 # clean Target
 clean:
-	$(RM) $(EXEC) $(OBJS) *.lst *.mod ./$(FMOD)/*.mod
+	$(RM) $(EXEC) $(OBJS) *.lst *.mod $(FMOD)/*.mod
 
 .SUFFIXES: 
 	.o .F .c .f .f03 .cpp
 
 # Code in Fortran
-$(FS)/%.o: ../fsrc/%.f03
+$(FS)/%.o: ./fsrc/%.f03
 	$(FC) -c $(FFLAGS) -o "$@" "$<"
 
 # Code in c++
-$(CS)/%.o: ../csrc/%.cpp
+$(CS)/%.o: ./csrc/%.cpp
 	$(CC) -c $(CFLAGS) -o "$@" "$<"
+
 
 

@@ -1,11 +1,12 @@
 !***********************************************************************
 module multigrid_module
 
+    use iso_c_binding
 
-    integer jpos
-    integer islor
-    integer nlevmultimax
-    real omega
+    integer,bind(C) :: jpos
+    integer,bind(C) :: islor
+    integer,bind(C) :: nlevmultimax
+    real,bind(C) :: omega
 
     !***********************************************************************
     ! array for controvariant metric tensor for multigrid level 1,2,3,4
@@ -64,10 +65,6 @@ contains
         !     array declaration
         integer kstamg(4),kendmg(4),ncolprocmg(4)
         integer n12,n22,n32,n13,n23,n33,n14,n24,n34
-        integer nlevmultimax
-        parameter (n12=n1/2,n22=n2/2,n32=n3/2)
-        parameter (n13=n1/4,n23=n2/4,n33=n3/4)
-        parameter (n14=n1/8,n24=n2/8,n34=n3/8)
         !
         integer i,j,k,nlevel,n,ktime
         integer jxc(0:4),jyc(0:4),jzc(0:4)
@@ -115,7 +112,15 @@ contains
         !
         ! matrix initialization
         !
-
+        n12=n1/2
+        n22=n2/2
+        n32=n3/2
+        n13=n1/4
+        n23=n2/4
+        n33=n3/4
+        n14=n1/8
+        n24=n2/8
+        n34=n3/8
         !
         ! put pressure on support matrix pr1
         !
@@ -124,6 +129,7 @@ contains
         !     nlevel=1 is the first multigrid level
         !
         if(myid.eq.0)then
+            write(*,*) 'nlevmultimax=',nlevmultimax
             do n=1,nlevel
                 write(*,*) 'level=',n,myid,jxc(n),jyc(n),jzc(n)
             end do

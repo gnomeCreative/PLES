@@ -51,9 +51,9 @@
       real, allocatable :: beta_f6(:,:,:)
       real, allocatable :: bzet_f6(:,:,:)
       
-      real corr_factor
+      real,bind(C) :: corr_factor
       
-      integer ispon,kspon
+      integer,bind(C) :: ispon,kspon
       integer ntpom
 
 !***********************************************************************

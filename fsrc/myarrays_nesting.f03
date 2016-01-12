@@ -3,7 +3,8 @@
 !***********************************************************************
 !      for nesting procedure
 !-----------------------------------------------------------------------
-       use iso_c_binding
+
+    use iso_c_binding
 
        real,allocatable,dimension(:,:) :: uo1,vo1,wo1,un1,vn1,wn1
        real,allocatable,dimension(:,:) :: uo2,vo2,wo2,un2,vn2,wn2

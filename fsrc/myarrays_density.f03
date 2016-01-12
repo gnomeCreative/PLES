@@ -1,14 +1,17 @@
 !***********************************************************************
-      module myarrays_density
-!***********************************************************************
-!     eddy diffusivity
-!-----------------------------------------------------------------------
+module myarrays_density
+    !***********************************************************************
+    !     eddy diffusivity
+    !-----------------------------------------------------------------------
+    !
+    use,intrinsic ::  iso_c_binding
+
+    real,allocatable :: akapt(:,:,:,:),akaptV(:,:,:,:)
+    real,allocatable :: akapt_piano(:,:,:,:),akaptV_piano(:,:,:,:)
+    real,pointer :: pran(:),prsc(:)
+    type(c_ptr),bind(C) :: c_pran,c_prsc
+    integer,bind(c) :: re_analogy
 !
-      real, allocatable :: akapt(:,:,:,:),akaptV(:,:,:,:)
-      real, allocatable :: akapt_piano(:,:,:,:),akaptV_piano(:,:,:,:)
-      real, allocatable :: pran(:),prsc(:)
-      integer re_analogy
-!
 !***********************************************************************
-      end module myarrays_density
+end module myarrays_density
 !***********************************************************************

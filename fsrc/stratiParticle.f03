@@ -64,7 +64,7 @@ module strati
     !-------------------------------------------------------------------------
     ! EXTERN SUBROUTINES TO MODULES
     !-------------------------------------------------------------------------
-    use multigrid_module ! NOT DOMAIN SAFE
+    use multigrid_module
     use contourp_se_module
     use flucn_module
     use ts_module
@@ -73,13 +73,14 @@ module strati
 
     !------------------------------------------------------------------------
     use scala3 !domain dimension + re + dt
-    use subgrid ! NOT DOMAIN SAFE
+    use subgrid
     use period !periodicity
     use convex
     use print
     use mpi ! to initialize MPI
     use tipologia! for the data type MPI_REAL_SD
-    use orl ! for orlansky condition | NOT DOMAIN SAFE
+    use orl ! for orlansky condition
+    use velpar
     ! only used here, consider removing
     use parti
     use parete
@@ -142,18 +143,19 @@ module strati
     real l_x,l_y,l_z,l_f,coef_annit
     
     ! coef species decay
-    real kdeg(nscal)
+    real,allocatable :: kdeg(:)
            
     ! for reading grid and restart
     real coor_x,coor_y,coor_z
     real,allocatable :: xx1(:,:,:),yy1(:,:,:),zz1(:,:,:)
     real,allocatable :: xx2(:,:,:),yy2(:,:,:),zz2(:,:,:)
-    real val_u,val_v,val_w,val_rhov(nscal)
+    real val_u,val_v,val_w
+    real, allocatable :: val_rhov(:)
 
     ! for transposed tridiag and approximate factorization
-    real, allocatable :: g33_tr(:,:,:), giac_tr(:,:,:)
-    real aaa(3,n1+n2+n3),rh(n1+n2+n3)
-    real aa(n1+n2+n3),bb(n1+n2+n3),cc(n1+n2+n3)
+    real,allocatable :: g33_tr(:,:,:), giac_tr(:,:,:)
+    real,allocatable :: aaa(:,:),rh(:)
+    real,allocatable :: aa(:),bb(:),cc(:)
 
     ! for planes and tracers
     integer isonde
@@ -208,7 +210,9 @@ module strati
 
 contains
 
-    subroutine initializemain
+    subroutine les_initialize() bind ( C, name="les_initialize" )
+
+        implicit none
 
         ! initialize parallelization variables
         call init_parallel(kgridparasta,kgridparaend,ncolperproc,nlevmultimax)
@@ -220,30 +224,6 @@ contains
         !-----------------------------------------------------------------------
         ! read imput data
         !call read_simulation_setting()
-
-        !-----------------------------------------------------------------------
-        ! initialize output
-        call output_init()
-
-        !-----------------------------------------------------------------------
-
-        index_out1=1
-        index_out2=1
-
-        index_rho1=1
-        index_rho2=1
-
-        index_out3=1
-        index_out4=1
-
-        index_rho3=1
-        index_rho4=1
-
-        index_out5=1
-        index_out6=1
-
-        index_rho5=1
-        index_rho6=1
 
         !-----------------------------------------------------------------------
         !     check on conflicts
@@ -327,7 +307,8 @@ contains
         call iniz(f1ve,f2ve,f3ve,bcsi,beta,bzet)
         ti=0.
 
-        !      species decay initialized to zero
+        ! species decay initialized to zero
+        allocate(kdeg(nscal))
         do i=1,nscal
             kdeg(i) = 0.
         end do
@@ -652,6 +633,174 @@ contains
         !-----------------------------------------------------------------------
         ! initialization for delrhov: needed if attiva_scal = 0
         delrhov=0.
+
+        !-----------------------------------------------------------------------
+        ! variables allocation for ORLANSKY and INFLOW
+
+        allocate(du_dx1(n2,n3),dv_dx1(n2,n3),dw_dx1(n2,n3))
+        allocate(du_dx2(n2,n3),dv_dx2(n2,n3),dw_dx2(n2,n3))
+
+        allocate(du_dy3(n1,n3),dv_dy3(n1,n3),dw_dy3(n1,n3))
+        allocate(du_dy4(n1,n3),dv_dy4(n1,n3),dw_dy4(n1,n3))
+
+        allocate(du_dz5(n1,n2),dv_dz5(n1,n2),dw_dz5(n1,n2))
+        allocate(du_dz6(n1,n2),dv_dz6(n1,n2),dw_dz6(n1,n2))
+
+        allocate(drho_dx1(nscal,n2,n3),drho_dx2(nscal,n2,n3))
+        allocate(drho_dy3(nscal,n1,n3),drho_dy4(nscal,n1,n3))
+        allocate(drho_dz5(nscal,n1,n2),drho_dz6(nscal,n1,n2))
+
+        allocate(index_out1(0:n2+1,0:n3+1),index_out2(0:n2+1,0:n3+1))
+        allocate(index_out3(0:n1+1,0:n3+1),index_out4(0:n1+1,0:n3+1))
+        allocate(index_out5(0:n1+1,0:n2+1),index_out6(0:n1+1,0:n2+1))
+
+        allocate(index_rho1(0:n2+1,0:n3+1),index_rho2(0:n2+1,0:n3+1))
+        allocate(index_rho3(0:n1+1,0:n3+1),index_rho4(0:n1+1,0:n3+1))
+        allocate(index_rho5(0:n1+1,0:n2+1),index_rho6(0:n1+1,0:n2+1))
+
+        index_out1=1
+        index_out2=1
+
+        index_rho1=1
+        index_rho2=1
+
+        index_out3=1
+        index_out4=1
+
+        index_rho3=1
+        index_rho4=1
+
+        index_out5=1
+        index_out6=1
+
+        index_rho5=1
+        index_rho6=1
+
+        !-----------------------------------------------------------------------
+        ! variables allocation for VELPAR
+
+        allocate(usn(n2,n3),vsn(n2,n3),wsn(n2,n3))
+        allocate(udx(n2,n3),vdx(n2,n3),wdx(n2,n3))
+        allocate(rhosn(nscal,n2,n3),rhodx(nscal,n2,n3))
+        !
+        allocate(usp(n1,n3),vsp(n1,n3),wsp(n1,n3))
+        allocate(ust(n1,n3),vst(n1,n3),wst(n1,n3))
+        allocate(rhosp(nscal,n1,n3),rhost(nscal,n1,n3))
+        !
+        allocate(uav(n1,n2),vav(n1,n2),wav(n1,n2))
+        allocate(uin(n1,n2),vin(n1,n2),win(n1,n2))
+        allocate(rhoav(nscal,n1,n2),rhoin(nscal,n1,n2))
+
+
+        !-----------------------------------------------------------------------
+        ! variables allocation for SUBGRID
+
+        allocate(sub(n2),sub11(n2),sub22(n2),sub33(n2))
+        allocate(sub12(n2),sub13(n2),sub23(n2))
+        allocate(sus(n2),sus11(n2),sus22(n2),sus33(n2))
+        allocate(sus12(n2),sus13(n2),sus23(n2))
+        allocate(subrho11(n2),subrho22(n2),subrho33(n2))
+        allocate(susrho11(n2),susrho22(n2),susrho33(n2))
+        allocate(c11(n2),c22(n2),c33(n2))
+
+        !-----------------------------------------------------------------------
+        ! no idea about what these are used for...
+
+        allocate(aaa(3,n1+n2+n3),rh(n1+n2+n3))
+        allocate(aa(n1+n2+n3),bb(n1+n2+n3),cc(n1+n2+n3))
+
+        !-----------------------------------------------------------------------
+        ! variable allocation for the scalar equations
+        allocate(pran(nscal))
+        allocate(prsc(nscal))
+
+        ! convert values from c++ format to fortran format
+        call C_F_POINTER(c_pran,pran,[nscal])
+        call C_F_POINTER(c_prsc,prsc,[nscal])
+
+        ! variable allocation for piani and sonde and convert (see above)
+        allocate(piani(npiani))
+        call C_F_POINTER(c_piani,piani,[npiani])
+        allocate(sonde(3,nsonde))
+        allocate(sondeindexi(nsonde),sondeindexj(nsonde),sondeindexk(nsonde))
+        call C_F_POINTER(c_sondeindexi,sondeindexi,[nsonde])
+        call C_F_POINTER(c_sondeindexj,sondeindexj,[nsonde])
+        call C_F_POINTER(c_sondeindexk,sondeindexk,[nsonde])
+
+        if (myid==0) then
+            write (*,*) "Total piani = ",npiani
+            do i=1,npiani
+                write(*,*) "Piano number ",i," x=",piani(i)
+            end do
+
+            write (*,*) "Total sonde = ",nsonde
+            do i=1,nsonde
+                write(*,*) "Sonda number ",i,"point:(",sondeindexi(i),",",sondeindexj(i),",",sondeindexk(i),")"
+            end do
+        end if
+
+        !-----------------------------------------------------------------------
+        ! Check the filtering (FILTRAGGIO) parameters
+
+        if(ifiltro .eq. 1)then
+
+            if(myid .eq. 0)then
+                write(*,*)'PAY ATTENTION YOU ARE FILTERING THE FLOW FIELD'
+                write(11,*)'FILTERING ON',ifiltro
+                if(xend.gt.n1 .or. yend.gt.n2 .or.zend.gt.n3 &
+                    .or. xstart.lt.1 .or. ystart.lt.1 .or. zstart.lt.1)then
+                    write(*,*)'FILTERING AREA TOO LARGE'
+                    write(*,*)'OUT OF BOUNDS'
+                    write(*,*)'xend:',xend,',n1:',n1
+                    write(*,*)'yend:',yend,',n2:',n2
+                    write(*,*)'zend:',zend,',n3:',n3
+                    write(*,*)'xend:',xstart,1
+                    write(*,*)'yend:',ystart,1
+                    write(*,*)'zend:',zstart,1
+
+                    write(11,*)'FILTERING AREA TOO LARGE'
+                    write(*,*)'OUT OF BOUNDS'
+                    write(11,*)'xend:',xend,',n1:',n1
+                    write(11,*)'yend:',yend,',n2:',n2
+                    write(11,*)'zend:',zend,',n3:',n3
+                    write(11,*)'xend:',xstart,1
+                    write(11,*)'yend:',ystart,1
+                    write(11,*)'zend:',zstart,1
+
+                    stop
+
+                end if
+            end if
+
+            if(zstart .le. kparasta)then
+                zstart=kparasta
+            end if
+            if(zend .ge. kparaend)then
+                zend = kparaend
+            endif
+
+            if(zstart .gt. kparaend .or. zend .lt. kparasta)then
+                zstart = kparaend
+                zend =   kparaend -1
+                write(*,*)'proc: ',myid,'no filtering',zstart,zend
+                write(11,*)'proc: ',myid,'no filtering',zstart,zend
+            else
+                write(*,*) 'proc:',myid,'filter in k between',zstart,'and',zend
+                write(11,*)'proc:',myid,'filter in k between',zstart,'and',zend
+            end if
+
+        else
+            if(myid .eq. 0)then
+                write(11,*)'FILTERING OFF',ifiltro
+            end if
+        end if
+
+        !-----------------------------------------------------------------------
+        ! Setting for input/output formats
+
+        string_newres_format="10e18.10"
+        string_grid_format="10e18.10"
+
         !-----------------------------------------------------------------------
         ! ***** RESTART *****
         !-----------------------------------------------------------------------
@@ -664,6 +813,7 @@ contains
             if (myid== 0) kpsta = 0
             if (myid== nproc-1) kpend = jz+1
 
+            allocate(val_rhov(nscal))
             do k=0,jz+1
                 do j=0,jy+1
                     do i=0,jx+1
@@ -685,6 +835,7 @@ contains
                     end do
                 end do
             end do
+            deallocate(val_rhov)
         elseif (i_rest==3) then ! start with nesting
 
             !        read side 1
@@ -792,6 +943,9 @@ contains
         elseif (i_rest==3.and.potenziale==0) then
             call contrin_lat
         end if
+
+                !
+
         !-----------------------------------------------------------------------
         ! read inflow files and sett index for orlansky
         if (lett/=0) then
@@ -1336,6 +1490,7 @@ contains
             end do
         end do
 
+
         !-----------------------------------------------------------------------
         !***********************************************************************
         !-----------------------------------------------------------------------
@@ -1538,6 +1693,10 @@ contains
 
         if (myid == 0)write(*,*)'box volume: ',vol
 
+        !-----------------------------------------------------------------------
+        ! initialize output
+        call output_init()
+
 
     ! THIS IS THE LEVEL SET
     !call iniz_levelset()
@@ -1545,9 +1704,9 @@ contains
         count_print_time = 0
     ti_start = ti
 
-    end subroutine initializemain
+    end subroutine les_initialize
 
-    subroutine core
+    subroutine les_core() bind ( C, name="les_core" )
 
         !-----------------------------------------------------------------------
         !-----------------------------------------------------------------------
@@ -3579,9 +3738,9 @@ contains
         !     END CYCLE
         !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-    end subroutine core
+    end subroutine les_core
 
-    subroutine finalize()
+    subroutine les_finalize() bind ( C, name="les_finalize" )
 
         if (lagr==0) then
             close(29)   ! turbo.out
@@ -3712,7 +3871,7 @@ contains
     !ccc      close(1000)
 
     !...carlo       call deallocate_grids()
-    end subroutine finalize
+    end subroutine les_finalize
 
     subroutine init_parallel(kgridparasta,kgridparaend,ncolperproc,nlevmultimax)
 
@@ -3848,6 +4007,7 @@ contains
         end if
 
     end subroutine init_parallel
+
 
 end module strati
 

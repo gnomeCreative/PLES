@@ -123,7 +123,6 @@ subroutine carico_immb(tipo)
          irot21,irot22,irot23, &
          irot31,irot32,irot33
      
-     
       read(25,360)tri1,tri2,tri3,tri4
 
       read(26,370)i_tri1,i_tri2,i_tri3,i_tri4

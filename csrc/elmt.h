@@ -8,7 +8,9 @@
 #ifndef ELMT_H
 #define	ELMT_H
 
-#include "vector.h"
+#include <vector>
+
+#include "myvector.h"
 
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS  DEFINITIONS
@@ -108,6 +110,7 @@ public:
         qp1=qp2=qp3=qp4=qp5=tQuat(0.0,0.0,0.0,0.0);
         index=0;
         m=1.0;
+        radius=1.0;
         I=tVect(1.0,1.0,1.0);
         FWall=tVect(0.0,0.0,0.0);
         FParticle=tVect(0.0,0.0,0.0);
@@ -173,6 +176,8 @@ public:
         viscTang=0.5;
         frictionCoefPart=0.3;
         frictionCoefWall=0.3;
+        linearStiff=1.0;
+        contactModel=LINEAR;
     }
 };
 

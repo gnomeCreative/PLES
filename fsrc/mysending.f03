@@ -3,7 +3,9 @@
 !***********************************************************************
 ! contains info for the message passaging
 !-----------------------------------------------------------------------
-      use iso_c_binding
+
+        use iso_c_binding
+
       integer tagls,taglr,tagrs,tagrr
       integer leftpe,rightpe
       integer leftpem,rightpem

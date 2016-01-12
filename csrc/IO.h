@@ -18,15 +18,15 @@
 #include <sstream>
 #include <fstream>
 #include <math.h>
-#include <omp.h>
+//#include <omp.h>
 #include <iomanip>
 // only to create a directory
 #include <sys/stat.h>
 #include <sys/types.h>
 //
 #include "DEM.h"
-#include "vector.h"
 #include "elmt.h"
+#include "myvector.h"
 
 using namespace std;
 extern ProblemName problemName;

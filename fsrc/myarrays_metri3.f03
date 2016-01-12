@@ -17,11 +17,11 @@
       real,allocatable :: g21(:,:,:),g22(:,:,:),g23(:,:,:)
       real,allocatable :: g31(:,:,:),g32(:,:,:),g33(:,:,:)
       
-      real,allocatable :: giac(:,:,:)                      
+      real,allocatable :: giac(:,:,:)
 
       real,allocatable :: f1(:,:,:),f2(:,:,:),f3(:,:,:)
       real,allocatable :: annit(:,:,:),annitV(:,:,:)
-      real,allocatable :: annit_piano(:,:,:),annitV_piano(:,:,:)     
+      real,allocatable :: annit_piano(:,:,:),annitV_piano(:,:,:)
 
 !CORIOLIS OIL
       real,allocatable :: g_co11(:,:),g_co12(:,:),g_co13(:,:)

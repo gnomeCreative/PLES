@@ -5,6 +5,7 @@ module mysettings
     !     module or include file.h
     !
     use iso_c_binding
+
     implicit none
     !
     !-----------------------------------------------------------------------
@@ -12,8 +13,7 @@ module mysettings
     !-----------------------------------------------------------------------
     !     AGENERALE
     !
-    integer,bind(C) :: niter
-    integer i_rest
+    integer,bind(C) :: niter,i_rest,inf
     !     i_respa         startpa.h
     !     i_print         print.h
     !      integer i_printfile
@@ -21,62 +21,44 @@ module mysettings
     !      integer iformat_grid
     !      character*12 string_newres_format
     !      character*12 string_grid_format
-    integer inf
 
     !     characteristics number
     !     re                scala3
     !      real pran
-    real rich
+    real,bind(C) :: rich
 
     !     time step
-    integer ind_cou
-    real cou
+    integer,bind(C) :: ind_cou,espl
+    real,bind(C) :: cou
     !      real dt     scala3
-    integer espl
 
     !     numerical scheme and equa
-    integer attiva_scal
+    integer,bind(C) :: attiva_scal,insc
     !      integer potenziale    scala3
-    integer insc
 
     !     pressure (poisson eq.)
-    real bbx
-    real bby
-    real bbz
-    real eps
-    integer ficycle
-    integer bodypressure
-    integer ipress_cart
-    integer freesurface
+    real,bind(C) :: bbx,bby,bbz,eps
+    integer,bind(C) :: ficycle,bodypressure,ipress_cart,freesurface
 
     !     boundary condition, see a
-    integer lett
-    integer ibb
+    integer,bind(C) :: lett,ibb,coef_wall,integrale
     !     bodyforce	          myarrays_bodyforce
     !     num_iter	          myarrays_bodyforce
-    integer coef_wall
-    integer integrale
     !     rough 	          myarrays_wallmodel
     !     Z0                  myarrays_wallmodel
     !     att_wm_sgs	  myarrays_wallmodel
 
     !     turbulence model
-    integer nsgs
-    integer inmod
-    integer inmodrho
-    integer isotropo
+    integer,bind(C) :: nsgs,inmod,inmodrho,isotropo
     !     cost	           turbo2_data
     !     costH	           turbo2_data
     !     costV	           turbo2_data
      
     !     forcing
-    integer indm
-    integer windyes
-    integer wavebk
+    integer,bind(C) :: indm,windyes,wavebk,langyes
     !     alpha      myarrays_WB
     !     c10	 myarrays_WB
     !     l_0	 myarrays_WB
-    integer langyes
     !     lamb       myarrays_LC
     !     h_0        myarrays_LC
     !     A1         myarrays_cor
@@ -91,18 +73,12 @@ module mysettings
     !     omegaM2	 myarrays_cor
 
     !     other
-    integer visualizzo
-    integer lagr
-    integer i_sta
+    integer,bind(C) :: visualizzo,lagr,i_sta
 
     !     movie
-    integer imovieprint
-    integer ktime_movie
-    real dt_movie
-    real dt_delay
-    integer i_movie
-    integer j_movie
-    integer k_movie
+    integer,bind(C) :: imovieprint,ktime_movie
+    real,bind(C) :: dt_movie,dt_delay
+    integer,bind(C) :: i_movie,j_movie,k_movie
 
     !-----------------------------------------------------------------------
     !     ABOUNDARY
@@ -135,29 +111,20 @@ module mysettings
     !     APIANISONDE
     !     read index for tracer
 
-    integer npiani
-    integer nsonde
-    integer, allocatable :: sonde(:,:),piani(:)
+    integer,bind(C) :: npiani,nsonde
+    integer,pointer :: sonde(:,:),piani(:)
+    integer,pointer :: sondeindexi(:),sondeindexj(:),sondeindexk(:)
+    type(c_ptr),bind(C) :: c_sondeindexi,c_sondeindexj,c_sondeindexk,c_piani
 
     !-----------------------------------------------------------------------
     !     AFILTRAGGIO
     !     read area for filtering
             
-    integer ifiltro
-    integer nfiltro
+    integer,bind(C) :: ifiltro,nfiltro
       
-    integer filtrou
-    integer filtrov
-    integer filtrow
-    integer filtrorho
-    integer filtrofi
+    integer,bind(C) :: filtrou,filtrov,filtrow,filtrorho,filtrofi
 
-    integer xstart
-    integer xend
-    integer ystart
-    integer yend
-    integer zstart
-    integer zend
+    integer,bind(C) :: xstart,xend,ystart,yend,zstart,zend
            
 
 !***********************************************************************

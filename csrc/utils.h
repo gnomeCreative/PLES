@@ -9,7 +9,7 @@
 #ifndef UTILS_H
 #define	UTILS_H
 
-#include "vector.h"
+#include "myvector.h"
 class elmt;
 
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,13 +45,14 @@ public:
     // translation vector
     tVect trans;
     // limits for walls
-    double xMin,xMax,yMin,yMax,zMin,zMax;
+    //double xMin,xMax,yMin,yMax,zMin,zMax;
     // distance point-wall
     double dist(tVect x) const;
     // show wall characteristics
     void wallShow() const;
     // default constructor
     wall(){
+    	index=0;
         n=tVect(1.0,0.0,0.0);
         p=tVect(0.0,0.0,0.0);
         rotCenter=tVect(0.0,0.0,0.0);
@@ -67,6 +68,7 @@ public:
     }
     // better constructor
     wall(tVect ip, tVect in){
+    	index=0;
         n=in;
         p=ip;
         rotCenter=tVect(0.0,0.0,0.0);
@@ -122,6 +124,7 @@ public:
         }
     // constructor
     cylinder(tVect ip1, tVect ip2, double radius){
+    	index=0;
         p1=ip1;
         p2=ip2;
         R=radius;
@@ -158,6 +161,7 @@ public:
     void setPlanes();
 
     pbc(){
+    	index=0;
         v=tVect(1.0,0.0,0.0);
         p=tVect(0.0,0.0,0.0);
     }
