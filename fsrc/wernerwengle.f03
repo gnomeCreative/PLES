@@ -1,82 +1,62 @@
-!***********************************************************************
-subroutine wernerwengle(l,MN,vtan, &
-    dist_ib_parete,dist_pp_ib,ustar)
-    !***********************************************************************
-    !     wall function with Werner - Wengle:
-    !          se y<11.8       u+ = y+              linear
-    !             y>11.8       u+ = 8.3*y+**1/7     exponential
+subroutine wernerwengle(distanza,ustar,vtan)
+    ! wall function with Werner-Wengle:
+    ! if y<11.8       u+ = y+              (linear)
+    !    y>11.8       u+ = 8.3*y+**1/7     (exponential)
     !-----------------------------------------------------------------------
-    use myarrays2
-    !
-    use scala3
-    use period
+
+    ! for reference, see:
+    ! http://aerojet.engr.ucdavis.edu/fluenthelp/html/ug/node516.htm
+
+    use scala3, only: re
 
     implicit none
     !---------------------------------------------------------------
-    !     array declaration
-    !
-    integer MN,MP
-    integer l
-    integer ptx,pty,ptz
+    real,intent(inout) :: ustar
+    real,intent(in) :: distanza
+    real,intent(in) :: vtan
 
-    real aaa,bbb
-    real const1,const2,const3,const4
+    !---------------------------------------------------------------
+    ! parameter Werner-Wengle
+    real,parameter :: aaa=8.3
+    real,parameter :: bbb=1.0/7.0
+    real,parameter :: const1=0.5*(1.0-bbb)*aaa**((1.0+bbb)/(1.0-bbb))
+    real,parameter :: const2=(1.0+bbb)/aaa
+    real,parameter :: const3=aaa**(2.0/(1.0-bbb))
+    real,parameter :: const4=2.0/(1.0+bbb)
 
-    real dist_pp_ib(MN),dist_ib_parete(MN)
-
-    real d_centro,d_centro_plus,dycell,rycell
+    !---------------------------------------------------------------
+    real d_centro_plus,dycell,rycell
     real visco,sub
-    real vtan,vnor,dvtan,vtankr
+    real dvtan,vtankr
     real taupow,tausub
-    real ustar(MN)
 
-    real distanza,distanza_ib_parete
-    real distanza_ib_solida,coefparete
-    real denominatore
-
-    !-----------------------------------------------------------------------
-    !     only for check
-    ptx=1
-    pty=1
-    ptz=1 !25
-    !
-    !-----------------------------------------------------------------------
-    !     parameter Werner-Wengle
-
-    aaa=8.3
-    bbb=0.1428571429
-
-    const1 = 0.5*(1. - bbb)*aaa**((1. + bbb) /(1. - bbb))
-    const2 = (1. + bbb) / aaa
-    const3 = aaa ** (2. / (1. - bbb))
-    const4 = 2. / (1. + bbb)
     !-----------------------------------------------------------------------
     !    compute wall shear stress with WW POWER LAW 1/7
     !
-    d_centro=dist_ib_parete(l)+dist_pp_ib(l)
+    !distanza=dist_ib_parete(l)+dist_pp_ib(l)
 
-    visco=1./re
+    visco=1.0/re
 
-    d_centro_plus=d_centro/(1./re)
-    dycell=2.*d_centro
-    rycell = 1. / dycell
-    !....................................................................
+    d_centro_plus=distanza/visco
+    dycell=2.0*distanza
+    rycell=1.0/dycell
+
     ! sub bring the function to linear profile if necessary,
     !  if the node is in the viscous sublayer
     !
-    vtankr = 0.5 * visco * rycell * const3
-    dvtan  = vtankr - vtan
-    sub    = MAX (SIGN(1.,dvtan),0.)
-    !..................................................................
-    tausub   = 2. * visco * vtan * rycell
+    vtankr=0.5*visco*rycell*const3
+    dvtan=vtankr-vtan
+    sub=max(sign(1.0,dvtan),0.0)
 
-    taupow  =  ( vtan/(aaa*(d_centro/visco)**bbb) )**(7./4.)
+    tausub=2.0*visco*vtan*rycell
 
-    if(taupow .lt. tausub)then
-        sub=1.
+    taupow=(vtan/(aaa*(d_centro_plus)**bbb))**(7.0/4.0)
+
+    if (taupow<tausub) then
+        sub=1.0
     end if
 
-    ustar(l)=sqrt(sub*tausub+(1.-sub)*taupow)
+    ustar=sqrt(sub*tausub+(1.0-sub)*taupow)
 
     return
 end

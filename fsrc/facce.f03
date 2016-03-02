@@ -8,6 +8,7 @@ subroutine facce(myid,nproc,kparasta,kparaend, &
    use myarrays_metri3
    use scala3
    use tipologia
+   use output_module, only: info_run_file
    !
    use mpi
 
@@ -27,7 +28,6 @@ subroutine facce(myid,nproc,kparasta,kparaend, &
    !
    !-----------------------------------------------------------------------
    ! area face 1
-
    i = 0
    area1     = 0.
    area1_loc = 0.
@@ -107,7 +107,7 @@ subroutine facce(myid,nproc,kparasta,kparaend, &
 
    call mpi_bcast(area1,1,MPI_REAL_SD,0,mpi_comm_world,ierr)
 
-   write(11,*)'PE=',myid,'area1=',area1
+   write(info_run_file,*)'PE=',myid,'area1=',area1
 
    !
    !-----------------------------------------------------------------------
@@ -189,7 +189,7 @@ subroutine facce(myid,nproc,kparasta,kparaend, &
 
    call mpi_bcast(area2,1,MPI_REAL_SD,0,mpi_comm_world,ierr)
       
-   write(11,*)'PE=',myid,'area2=',area2
+   write(info_run_file,*)'PE=',myid,'area2=',area2
 
    !
    !-----------------------------------------------------------------------
@@ -240,13 +240,13 @@ subroutine facce(myid,nproc,kparasta,kparaend, &
 
       area5 = area5_loc
      
-      write(11,*)'area face 5 =',area5
+      write(info_run_file,*)'area face 5 =',area5
 
    end if ! close if PE=0
 
    call mpi_bcast(area5,1,MPI_REAL_SD,0,mpi_comm_world,ierr)
 
-   write(11,*)'PE=',myid,'area5=',area5
+   write(info_run_file,*)'PE=',myid,'area5=',area5
 
    !-----------------------------------------------------------------------
    ! area face 6
@@ -296,13 +296,13 @@ subroutine facce(myid,nproc,kparasta,kparaend, &
 
       area6 = area6_loc
 
-      write(11,*)'area della faccia 6 =',area6
+      write(info_run_file,*)'area della faccia 6 =',area6
 
    end if ! close if PE=nproc-1
 
    call mpi_bcast(area6,1,MPI_REAL_SD,nproc-1,mpi_comm_world,ierr)
 
-   write(11,*)'PE=',myid,'area6=',area6
+   write(info_run_file,*)'PE=',myid,'area6=',area6
 
    !
    !-----------------------------------------------------------------------
@@ -377,7 +377,7 @@ subroutine facce(myid,nproc,kparasta,kparaend, &
 
    call mpi_bcast(area3,1,MPI_REAL_SD,0,mpi_comm_world,ierr)
 
-   write(11,*)'PE=',myid,'area3=',area3
+   write(info_run_file,*)'PE=',myid,'area3=',area3
 
    !
    !-----------------------------------------------------------------------
@@ -451,7 +451,7 @@ subroutine facce(myid,nproc,kparasta,kparaend, &
 
    call mpi_bcast(area4,1,MPI_REAL_SD,0,mpi_comm_world,ierr)
 
-   write(11,*)'PE=',myid,'area4=',area4
+   write(info_run_file,*)'PE=',myid,'area4=',area4
 
 
 end subroutine

@@ -67,80 +67,82 @@ subroutine sett(myid,nproc,n,ksta,kend,kfsta,ix,iy,iz,nx,ny,nz, &
     !
     ! index sides sn and dx (1 and 2), general periodicity
     !
-    do 1 j=1,ny
-        do 1 k=ksta,kend
+    do j=1,ny
+        do k=ksta,kend
             !
             i_sn(1 ,j,k) =1-ip
             i_dx(ix,j,k) =1-ip
-        !
-1       continue
-        !
-        ! index sides bottom and upper (3 and 4), general periodicity
-        !
-        do 2 i=1,nx
-            do 2 k=ksta,kend
                 !
-                i_st(i,1 ,k) =1-jp
-                i_sp(i,iy,k) =1-jp
+        end do
+    end do
+    !
+    ! index sides bottom and upper (3 and 4), general periodicity
+    !
+    do i=1,nx
+        do k=ksta,kend
             !
-2           continue
-            !
-            ! index sides back and front (6 and 5), general periodicity
+            i_st(i,1 ,k) =1-jp
+            i_sp(i,iy,k) =1-jp
+                    !
+        end do
+    end do
+    !
+    ! index sides back and front (6 and 5), general periodicity
 
-            !hicco MA SIAMO SICUI CHE SIANO COSI' INDIETRO E AVANTI?????
-            !hicco DOVREBBE ESSERE IL CONTRARIO !!!!!!!
+    !hicco MA SIAMO SICUI CHE SIANO COSI' INDIETRO E AVANTI?????
+    !hicco DOVREBBE ESSERE IL CONTRARIO !!!!!!!
 
-            ! indici parete  indietro e avanti: (periodicita generalizzata)
-            !
-            if(myid.eq.0)then
-                do j=1,ny
-                    do i=1,nx
-                        i_in(i,j,ksta) =1-kp
-                    end do
-                end do
-            elseif(myid.eq.nproc-1)then
-                write(*,*)'IZ,NZ',iz,nz,ksta,kend
-                do j=1,ny
-                    do i=1,nx
-                        i_av(i,j,kend) =1-kp
-                    end do
-                end do
-            end if
+    ! indici parete  indietro e avanti: (periodicita generalizzata)
+    !
+    if(myid.eq.0)then
+        do j=1,ny
+            do i=1,nx
+                i_in(i,j,ksta) =1-kp
+            end do
+        end do
+    elseif(myid.eq.nproc-1)then
+        write(*,*)'IZ,NZ',iz,nz,ksta,kend
+        do j=1,ny
+            do i=1,nx
+                i_av(i,j,kend) =1-kp
+            end do
+        end do
+    end if
 
-            !-----------------------------------------------------------------------
-            ! for multigrid in case of line sor in j direction (implict solution)
-            ! build fixed coefficent for the tridiagonal matrix
-            !
-            ipot=2**(n-1)
-            pot=float(ipot)
-            ppot1=1/pot
-            ppot2=1/pot/pot
+    !-----------------------------------------------------------------------
+    ! for multigrid in case of line sor in j direction (implict solution)
+    ! build fixed coefficent for the tridiagonal matrix
+    !
+    ipot=2**(n-1)
+    pot=float(ipot)
+    ppot1=1/pot
+    ppot2=1/pot/pot
             
-            do k=ksta,kend !1,nz
-                do i=1,nx
+    do k=ksta,kend !1,nz
+        do i=1,nx
 
-                    do j=1,ny
-                        aa(i,j,k)=ppot2*r22(i,j-1,k)
-                        bb(i,j,k)=-ppot2*(r22(i  ,j,k  )+r22(i,j-1,k) &
-                            +r11(i  ,j,k  )*i_dx(i,j,k) &
-                            +r11(i-1,j,k  )*i_sn(i,j,k) &
-                            +r33(i  ,j,k  )*i_av(i,j,k) &
-                            +r33(i  ,j,k-1)*i_in(i,j,k))
-                        cc(i,j,k)=ppot2*r22(i,j,k)
-                    end do
-
-                    !     side bottom (3) aa=0
-                    aa(i,0,k)= 0.
-                    bb(i,0,k)= r22(i,0,k)*ppot2
-                    cc(i,0,k)=-r22(i,0,k)*ppot2
-     
-                    !     side upper (4) cc=0
-                    aa(i,ny+1,k)=-r22(i,ny,k)*ppot2
-                    bb(i,ny+1,k)= r22(i,ny,k)*ppot2
-                    cc(i,ny+1,k)= 0.
-
-                end do
+            do j=1,ny
+                aa(i,j,k)=ppot2*r22(i,j-1,k)
+                bb(i,j,k)=-ppot2*(r22(i  ,j,k  )+r22(i,j-1,k) &
+                    +r11(i  ,j,k  )*i_dx(i,j,k) &
+                    +r11(i-1,j,k  )*i_sn(i,j,k) &
+                    +r33(i  ,j,k  )*i_av(i,j,k) &
+                    +r33(i  ,j,k-1)*i_in(i,j,k))
+                cc(i,j,k)=ppot2*r22(i,j,k)
             end do
 
-            return
-        end
+            !     side bottom (3) aa=0
+            aa(i,0,k)= 0.
+            bb(i,0,k)= r22(i,0,k)*ppot2
+            cc(i,0,k)=-r22(i,0,k)*ppot2
+     
+            !     side upper (4) cc=0
+            aa(i,ny+1,k)=-r22(i,ny,k)*ppot2
+            bb(i,ny+1,k)= r22(i,ny,k)*ppot2
+            cc(i,ny+1,k)= 0.
+
+        end do
+    end do
+
+    return
+end

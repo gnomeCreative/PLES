@@ -62,24 +62,24 @@ void parseCommandLine(IO& io, GetPot& command_line) {
     }
 
     // lbm configuration file
-    io.configFile = "config.cfg";
+    io.demConfigFile = "config.cfg";
     if (command_line.search("-c")) {
-        io.configFile = command_line.next(io.configFile.c_str());
-        cout<<"Using "<<io.configFile<<" for DEM parameters\n";
+        io.demConfigFile = command_line.next(io.demConfigFile.c_str());
+        cout<<"Using "<<io.demConfigFile<<" for DEM parameters\n";
         // copy the lbm configuration file into the data folder for later reproducibility
-        std::system((std::string("mkdir -p '") + io.workDirectory + "'; cp '" + io.configFile + "' '" + io.workDirectory + "'").c_str());
+        std::system((std::string("mkdir -p '") + io.workDirectory + "'; cp '" + io.demConfigFile + "' '" + io.workDirectory + "'").c_str());
     }
 
     // make sure the config files can be read
-    std::ifstream lbmCfgFile(io.configFile.c_str());
+    std::ifstream lbmCfgFile(io.demConfigFile.c_str());
     if (!lbmCfgFile) {
-        cout << "ERROR: Can't open config file \"" << io.configFile << "\" for reading!\n";
+        cout << "ERROR: Can't open config file \"" << io.demConfigFile << "\" for reading!\n";
 //        return ERROR;
     }
     lbmCfgFile.close();
 }
 
-void parseConfigFile(IO& io, DEM& dem, GetPot& lbmCfgFile, GetPot& command_line) {
+void parseDemConfigFile(IO& io, DEM& dem, GetPot& lbmCfgFile, GetPot& command_line) {
 
     // PROBLEM NAME //////////////
     // necessary for hard coded sections of the code
@@ -177,8 +177,8 @@ int demMain(int argc, char** argv) {
     parseCommandLine(io, command_line);
 
     // parsing LBM input file
-    GetPot lbmCfgFile(io.configFile);
-    parseConfigFile(io, dem, lbmCfgFile, command_line);
+    GetPot lbmCfgFile(io.demConfigFile);
+    parseDemConfigFile(io, dem, lbmCfgFile, command_line);
 
     io.currentTimeStep = 0;
 

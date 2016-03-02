@@ -19,7 +19,7 @@ subroutine flud1(rc,cgra1,r,akapt,insc,isc,tipo,body)
    !-----------------------------------------------------------------------
    !     array declaration
    integer ierr,insc,isc
-   integer ncolperproc,m
+   integer m
    integer kparastak,kparaendk
    integer i,j,k,is,iss,jj,kk,ii,iii,jjj,kkk
    !

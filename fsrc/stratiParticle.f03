@@ -65,11 +65,11 @@ module strati
     ! EXTERN SUBROUTINES TO MODULES
     !-------------------------------------------------------------------------
     use multigrid_module
-    use contourp_se_module
+    use contour_module
     use flucn_module
-    use ts_module
     use jord_module
     use output_module
+    use ricerca_module
 
     !------------------------------------------------------------------------
     use scala3 !domain dimension + re + dt
@@ -97,18 +97,15 @@ module strati
     integer iq1,isc
     integer nlevel
     integer jxc(0:4),jyc(0:4),jzc(0:4)
-    integer kpstamg(0:4)  ,kpendmg(0:4),kfacepstamg(0:4)
+    integer kpstamg(0:4),kpendmg(0:4),kfacepstamg(0:4)
     integer kgridparasta,kgridparaend
     integer kpsta,kpend,kini,kfin
             
     ! quantities
-    double precision vol,vol_loc
     double precision divint,divint_loc
-    double precision enck,enck_loc
-    double precision bulk_loc
     real dbbx,dbby,dbbz
-    double precision um_loc,um,umm1
-    real u_bulk,volume,u_bulk_tot,volume_tot
+    real um_loc,um,umm1
+    !double precision um_loc,um,umm1
     real massa1,massa2,massa3,massa4,massa5,massa6
     real massa1tot,massa2tot
     real massa3tot,massa4tot
@@ -126,13 +123,12 @@ module strati
 
     ! for message passing
     integer ierr,ierror
-    integer ncolperproc
     integer ncolprocmg(0:4)
     integer kparastam,kparaendm
     integer status(MPI_STATUS_SIZE)
     !integer istatus(MPI_STATUS_SIZE)
            
-    integer correggo_rho,correggo_delu
+    !integer :: correggo_rho,correggo_delu
 
     integer, allocatable :: tipo(:,:,:),tipo2(:,:,:)
 
@@ -146,9 +142,6 @@ module strati
     real,allocatable :: kdeg(:)
            
     ! for reading grid and restart
-    real coor_x,coor_y,coor_z
-    real,allocatable :: xx1(:,:,:),yy1(:,:,:),zz1(:,:,:)
-    real,allocatable :: xx2(:,:,:),yy2(:,:,:),zz2(:,:,:)
     real val_u,val_v,val_w
     real, allocatable :: val_rhov(:)
 
@@ -158,13 +151,10 @@ module strati
     real,allocatable :: aa(:),bb(:),cc(:)
 
     ! for planes and tracers
-    integer isonde
     integer ipiani
     integer pianoturbo
-    character*20 filesonda
     character*30 filepiano
     character*2  identificosonda2
-    character*1  identificosonda
     character*2  idproc2
     character*1  idpiano,idproc
 
@@ -206,7 +196,6 @@ module strati
     real, allocatable :: rho_piano(:,:,:)
       
     integer count_print_time
-    integer icheck
 
 contains
 
@@ -214,8 +203,15 @@ contains
 
         implicit none
 
+        !-----------------------------------------------------------------------
+        ! initialize output files and folders
+        call create_output_folder()
+
         ! initialize parallelization variables
-        call init_parallel(kgridparasta,kgridparaend,ncolperproc,nlevmultimax)
+        call init_parallel(kgridparasta,kgridparaend,nlevmultimax)
+
+        ! intialize output data
+        call output_init()
 
         !-----------------------------------------------------------------------
         ticks = MPI_WTICK() ! FOR SCALING WTIME RESULTS
@@ -224,65 +220,9 @@ contains
         !-----------------------------------------------------------------------
         ! read imput data
         !call read_simulation_setting()
-
-        !-----------------------------------------------------------------------
-        !     check on conflicts
-        if (imoist==1 .and. nscal < 2) then
-            if (myid==0) then
-                write(*,*)'there is a conflict between the moisture\n'// &
-                    'procedure and the number of scalars,\n'// &
-                    'be sure nscal>=2 in scala3.h'
-                write(info_run_file,*)'there is a conflict between the moisture\n'// &
-                    'procedure and the number of scalars,\n'// &
-                    'be sure nscal>=2 in scala3.h'
-            end if
-
-            stop
-        end if
-
-        ! turn off some features
-        if (potenziale==1) then
-            if (myid==0) then
-                write(*,*)'TURN OFF att_wm_sgs and coef_wall'
-                write(info_run_file,*)'TURN OFF att_wm_sgs and coef_wall'
-            end if
-            att_wm_sgs = 0
-            coef_wall = 0
-        end if
-
-        if (coef_wall==0) then
-            if (myid==0) then
-                write(*,*)'TURN OFF att_wm_sgs'
-                write(info_run_file,*)'TURN OFF att_wm_sgs'
-            end if
-            att_wm_sgs = 0
-        end if
         !
         !-----------------------------------------------------------------------
         ! INITIALIZATION
-
-        ! how many plane to allocate less than kparasta --> deepl
-        ! ow many plane to allocate less than kparaend --> deepr
-        deepl = 1
-        deepr = 1
-
-        ! allocation needs one more plane left for quick
-        if (insc==1 .and. myid/= nproc-1) then
-            deepr = 2
-        end if
-
-        if (insc==2 .and. myid/= nproc-1) then
-            deepr = 2
-        end if
-
-
-        ! ibm stencil for taylor needs two plane on closer proc
-        if (bodyforce == 1) then
-            deepl = 2
-            deepr = 2
-            if (myid==0)       deepl=1
-            if (myid==nproc-1) deepr=1
-        end if
 
         allocate(f1ve(n1,n2,kparasta:kparaend))
         allocate(f2ve(n1,n2,kparasta:kparaend))
@@ -296,10 +236,10 @@ contains
         allocate(delv(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
         allocate(delw(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
 
-        allocate( delrho(      0:n1+1,0:n2+1,kparasta-1:kparaend+1))
+        allocate(delrho(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
         allocate(delrhov(nscal,0:n1+1,0:n2+1,kparasta-1:kparaend+1))
 
-        allocate( tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+        allocate(tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
         allocate(tipo2(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
         tipo  = 0
         tipo2 = 0
@@ -313,183 +253,77 @@ contains
             kdeg(i) = 0.
         end do
 
-        !-----------------------------------------------------------------------
-        ! read the grid
 
-        !     deep grid right -> deepgr
-        !     deep grid left -> deepgl
-        !     values in mysending
-        deepgr = 2
-        deepgl = 2
-        !
         ! temp matrix to allocate periodicity in k
+        call indy(nlevel,jxc,jyc,jzc)
 
-        call indy(n1,n2,n3,nlevel,jxc,jyc,jzc)
         if (myid==0)write(*,*)'NLEVEL: ',nlevel
-        do n=0,nlevel
-            jxc(n) = jxc(n)
-            jyc(n) = jyc(n)
-            jzc(n) = jzc(n)
-        end do
 
+        !do n=0,nlevel
+        !    jxc(n) = jxc(n)
+        !    jyc(n) = jyc(n)
+        !    jzc(n) = jzc(n)
+        !end do
 
-        call iniz_metrica(ncolperproc,nlevel,nlevmultimax)
+        call iniz_metrica(nlevel)
 
-        allocate(xx1(-8:n1+8,-8:n2+8,n3-8:n3))
-        allocate(yy1(-8:n1+8,-8:n2+8,n3-8:n3))
-        allocate(zz1(-8:n1+8,-8:n2+8,n3-8:n3))
+        call read_grid()
 
-        allocate(xx2(-8:n1+8,-8:n2+8,0:8))
-        allocate(yy2(-8:n1+8,-8:n2+8,0:8))
-        allocate(zz2(-8:n1+8,-8:n2+8,0:8))
-
-        open(12,file='gri3dp_in.dat',status='old')
-        !
-        read(12,*)alx,aly,alz
-        read(12,*)jx,jy,jz
-
-        if (jx/=n1 .and. myid==0) then
-            write(info_run_file,*)'MISMATCH GRID/CODE DIMENSION ON x',jx,n1
-            write(info_run_file,*)'check gri3dp_in.dat and scala3.h in the code'
-            write(*,*)'read info_run.txt'
-            stop
-        end if
-        if (jy/=n2 .and. myid==0) then
-            write(info_run_file,*)'MISMATCH GRID/CODE DIMENSION ON y',jy,n2
-            write(info_run_file,*)'check gri3dp_in.dat and scala3.h in the code'
-            write(*,*)'read info_run.txt'
-            stop
-        end if
-        if (jz/=n3 .and. myid==0) then
-            write(info_run_file,*)'MISMATCH GRID/CODE DIMENSION ON z',jz,n3
-            write(info_run_file,*)'check gri3dp_in.dat and scala3.h in the code'
-            write(*,*)'read info_run.txt'
-            stop
-        end if
-
-
-        if (myid==0) then
-            kini = kparasta - 1
-            kfin = kparaend + deep_mul +1 !deepgr
-        elseif (myid==nproc-1) then
-            kini = kparasta - deep_mul -1 !deepgl
-            kfin = kparaend
-        else
-            kini = kparasta - deep_mul -1 !deepgl
-            kfin = kparaend + deep_mul +1 !deepgr
-        end if
-
-        write(info_run_file,*)myid,'READ GRID BETWEEN',kini,kfin,kparasta,kparaend
-        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-
-        do k=0,jz
-            do j=0,jy
-                do i=0,jx
-                    read(12,*)coor_x
-                    read(12,*)coor_y
-                    read(12,*)coor_z
-
-                    if (k>=kini .and. k<=kfin) then
-                        x(i,j,k) = coor_x
-                        y(i,j,k) = coor_y
-                        z(i,j,k) = coor_z
-                    end if
-
-                    if (myid==0) then
-                        if (k>=(n3-8).and.k<=n3) then
-                            xx1(i,j,k) = coor_x
-                            yy1(i,j,k) = coor_y
-                            zz1(i,j,k) = coor_z
-                        end if
-                    end if
-
-                    if (myid==nproc-1) then
-                        if (k>=0.and.k<=8) then
-                            xx2(i,j,k) = coor_x
-                            yy2(i,j,k) = coor_y
-                            zz2(i,j,k) = coor_z
-                        end if
-                    end if
-
-                end do
-            end do
-        end do
-8753    format(8e18.10)
-        if (myid==0) then
-            write(*,*)'CHECK: grid read ---> OK'
-        end if
-
-        !-----------------------------------------------------------------------
-        ! periodic cells
-        !
-        call cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
-        deallocate(xx1,yy1,zz1,xx2,yy2,zz2)
-        !
-        !-----------------------------------------------------------------------
-        !
-        if (myid==0) then
-            write(*,*) 'myid:   ',myid
-            write(*,*) ' grid dimension: ',jx,jy,jz
-            write(*,*) 'array dimension: ',n1,n2,n3
-
-            write(*,*)'CHECK: bodyforce --->',bodyforce
-        end if
         !-----------------------------------------------------------------------
         !  read IBM data
+
         if (bodyforce>=1) then
 
-            open (15,file='Celle_IB_indici.inp',status='old')
-            open (16,file='Celle_Bloccate_Indici.inp',status='old')
+            if (bodyupdate) then
 
-            read(15,*)MN
-            read(16,*)MP
+                ! read geometry input
+                call readGeometry()
 
-            close(15)
-            close(16)
-
-            allocate(indici_CELLE_IB(MN,6))
-            allocate(indici_celle_bloccate(MP,3))
-            allocate(distanze_CELLE_IB(MN,3))
-            allocate(dist_pp_ib(MN))
-            allocate(dist_ib_parete(MN))
-            allocate(proiezioni(MN,3))
-            allocate(ustar(MN))
-
-            allocate(tricoef(MN,4))
-            allocate(trind(MN,4,3))
+                ! do the ricerca cycle (to be changed A LOT!)
+                call do_ricerca(tipo)
 
 
-            allocate(rot(MN,3,3))
-            allocate(rot_inverse(MN,3,3))
-            allocate(id_ib(n1,n2,n3))
-            allocate(id_ib_solide(n1,n2,n3))
+            else
+
+                open(155,file='Celle_IB_indici.inp',status='old')
+                open(156,file='Celle_Bloccate_Indici.inp',status='old')
+
+                read(155,*)MN
+                read(156,*)MP
+
+                close(155)
+                close(156)
+
+                allocate(indici_CELLE_IB(MN,6))
+                allocate(indici_celle_bloccate(MP,3))
+                allocate(distanze_CELLE_IB(MN,3))
+                allocate(dist_pp_ib(MN))
+                allocate(dist_ib_parete(MN))
+                allocate(proiezioni(MN,3))
+                allocate(ustar(MN))
+
+                allocate(tricoef(MN,4))
+                allocate(trind(MN,4,3))
 
 
+                allocate(rot(MN,3,3))
+                allocate(rot_inverse(MN,3,3))
 
+                call carico_immb(tipo)
+                allocate(r_solid(nscal,num_solide))
+                if (myid==0) then
+                    write(*,*)'CHECK: call carico_immb----> OK'
+                    write(*,*)'values for MN and MP: ',MN,MP
+                end if
 
-            allocate(dist_nulle(MN))
-            do l=1,MN
-                dist_nulle(l) = 0.
-            end do
-
-            !      call carico_immb(MN,MP,numero_celle_IB,numero_celle_bloccate,
-            !     >     indici_CELLE_IB,indici_celle_bloccate,distanze_CELLE_IB,
-            !     >  dist_pp_ib,dist_ib_parete,proiezioni,
-            !     >  num_ib,num_solide,tipo)
-
-            call carico_immb(tipo)
-            allocate(r_solid(nscal,num_solide))
-            if (myid==0) then
-                write(*,*)'CHECK: call carico_immb----> OK'
-                write(*,*)'values for MN and MP: ',MN,MP
             end if
 
         else
-            !      if no ibm set all the cells to fluid
+            ! if no ibm set all the cells to fluid
             do k=kparasta,kparaend
                 do j=1,jy
                     do i=1,jx
-                        tipo(i,j,k)=2
+                        tipo(i,j,k)=2 ! ATTENTION HERE, MODIFIED!!!!!!!!!!!
                     end do
                 end do
             end do
@@ -557,12 +391,12 @@ contains
         allocate(gg133(0:n1+1,kparasta-1:kparaend+1))
         allocate(gg333(0:n1+1,kparasta-1:kparaend+1))
         !
-        call facce(myid,nproc,kparasta,kparaend,area1,area2,area3,area4,area5,area6)
 
+        call facce(myid,nproc,kparasta,kparaend,area1,area2,area3,area4,area5,area6)
         !-----------------------------------------------------------------------
         ! allocate plane at sides
 
-        !     face 1
+        ! face 1
         allocate(up1(0:jy+1,0:jz+1))
         allocate(vp1(0:jy+1,0:jz+1))
         allocate(wp1(0:jy+1,0:jz+1))
@@ -574,7 +408,7 @@ contains
         wp1=0.
         rhovp1=0.
 
-        !     face 2
+        ! face 2
         allocate(up2(0:jy+1,0:jz+1))
         allocate(vp2(0:jy+1,0:jz+1))
         allocate(wp2(0:jy+1,0:jz+1))
@@ -586,7 +420,7 @@ contains
         wp2=0.
         rhovp2=0.
 
-        !     face 3
+        ! face 3
         allocate(up3(0:jx+1,0:jz+1))
         allocate(vp3(0:jx+1,0:jz+1))
         allocate(wp3(0:jx+1,0:jz+1))
@@ -596,7 +430,7 @@ contains
         wp3   = 0.
         rhovp3 = 0.
 
-        !     face 4
+        ! face 4
         allocate(up4(0:jx+1,0:jz+1))
         allocate(vp4(0:jx+1,0:jz+1))
         allocate(wp4(0:jx+1,0:jz+1))
@@ -606,7 +440,7 @@ contains
         wp4   = 0.
         rhovp4 = 0.
 
-        !     face 5
+        ! face 5
         allocate(up5(0:jx+1,0:jy+1))
         allocate(vp5(0:jx+1,0:jy+1))
         allocate(wp5(0:jx+1,0:jy+1))
@@ -618,7 +452,7 @@ contains
         wp5=0.
         rhovp5=0.
 
-        !     face 6
+        ! face 6
         allocate(up6(0:jx+1,0:jy+1))
         allocate(vp6(0:jx+1,0:jy+1))
         allocate(wp6(0:jx+1,0:jy+1))
@@ -746,7 +580,7 @@ contains
 
             if(myid .eq. 0)then
                 write(*,*)'PAY ATTENTION YOU ARE FILTERING THE FLOW FIELD'
-                write(11,*)'FILTERING ON',ifiltro
+                write(info_run_file,*)'FILTERING ON',ifiltro
                 if(xend.gt.n1 .or. yend.gt.n2 .or.zend.gt.n3 &
                     .or. xstart.lt.1 .or. ystart.lt.1 .or. zstart.lt.1)then
                     write(*,*)'FILTERING AREA TOO LARGE'
@@ -758,14 +592,14 @@ contains
                     write(*,*)'yend:',ystart,1
                     write(*,*)'zend:',zstart,1
 
-                    write(11,*)'FILTERING AREA TOO LARGE'
-                    write(*,*)'OUT OF BOUNDS'
-                    write(11,*)'xend:',xend,',n1:',n1
-                    write(11,*)'yend:',yend,',n2:',n2
-                    write(11,*)'zend:',zend,',n3:',n3
-                    write(11,*)'xend:',xstart,1
-                    write(11,*)'yend:',ystart,1
-                    write(11,*)'zend:',zstart,1
+                    write(info_run_file,*)'FILTERING AREA TOO LARGE'
+                    write(info_run_file,*)'OUT OF BOUNDS'
+                    write(info_run_file,*)'xend:',xend,',n1:',n1
+                    write(info_run_file,*)'yend:',yend,',n2:',n2
+                    write(info_run_file,*)'zend:',zend,',n3:',n3
+                    write(info_run_file,*)'xend:',xstart,1
+                    write(info_run_file,*)'yend:',ystart,1
+                    write(info_run_file,*)'zend:',zstart,1
 
                     stop
 
@@ -783,23 +617,18 @@ contains
                 zstart = kparaend
                 zend =   kparaend -1
                 write(*,*)'proc: ',myid,'no filtering',zstart,zend
-                write(11,*)'proc: ',myid,'no filtering',zstart,zend
+                write(info_run_file,*)'proc: ',myid,'no filtering',zstart,zend
             else
                 write(*,*) 'proc:',myid,'filter in k between',zstart,'and',zend
-                write(11,*)'proc:',myid,'filter in k between',zstart,'and',zend
+                write(info_run_file,*)'proc:',myid,'filter in k between',zstart,'and',zend
             end if
 
         else
             if(myid .eq. 0)then
-                write(11,*)'FILTERING OFF',ifiltro
+                write(*,*)'FILTERING OFF',ifiltro
+                write(info_run_file,*)'FILTERING OFF',ifiltro
             end if
         end if
-
-        !-----------------------------------------------------------------------
-        ! Setting for input/output formats
-
-        string_newres_format="10e18.10"
-        string_grid_format="10e18.10"
 
         !-----------------------------------------------------------------------
         ! ***** RESTART *****
@@ -817,11 +646,11 @@ contains
             do k=0,jz+1
                 do j=0,jy+1
                     do i=0,jx+1
-                        read(12,8753)val_u !u(i,j,k)
-                        read(12,8753)val_v !v(i,j,k)
-                        read(12,8753)val_w !w(i,j,k)
+                        read(12,string_newres_format)val_u !u(i,j,k)
+                        read(12,string_newres_format)val_v !v(i,j,k)
+                        read(12,string_newres_format)val_w !w(i,j,k)
                         do isc=1,nscal
-                            read(12,8753)val_rhov(isc) !rhov(isc,i,j,k)
+                            read(12,string_newres_format)val_rhov(isc) !rhov(isc,i,j,k)
                         end do
 
                         if (k>= kpsta .and. k<=kpend ) then
@@ -867,7 +696,7 @@ contains
                 open(86,file='parete6.dat',status='old')
             end if
 
-            call aree_parziali(myid,nproc,lett,i_rest,bodyforce,area1,area2,area3,area4,area5,area6,kparasta,kparaend)
+            call aree_parziali(myid,nproc,lett,i_rest,area1,area2,area3,area4,area5,area6,kparasta,kparaend)
 
             call prepare_nesting(ti,dbbx,81,82,83,84,85,86)
 
@@ -915,9 +744,11 @@ contains
         !-----------------------------------------------------------------------
         ! compute metric terms as in Zang Street Koseff and index at the walls
         !
-        call metrica
+        call metrica()
         call mul_met(nlevel,jxc,jyc,jzc)
-        call wall(nlevel,jxc,jyc,jzc,ncolperproc)
+        call wall(nlevel,jxc,jyc,jzc)
+        !compute volume
+        call compute_volume(n1,n2,deepl,deepr,myid,kparasta,kparaend,tipo)
         !-----------------------------------------------------------------------
         ! if semimplict allocation for tridiag of g33 and giac
 
@@ -935,21 +766,20 @@ contains
         ! compute initial contravariant flux if i_rest==2 dns-interpolation
         !
         if (i_rest==2) then
-            call contrin
+            call contrin()
         end if
         !     for nesting
         if (i_rest==3.and.potenziale==1) then
-            call contrin_pot
+            call contrin_pot()
         elseif (i_rest==3.and.potenziale==0) then
-            call contrin_lat
+            call contrin_lat()
         end if
 
-                !
 
         !-----------------------------------------------------------------------
         ! read inflow files and sett index for orlansky
         if (lett/=0) then
-            call aree_parziali(myid,nproc,lett,i_rest,bodyforce,area1,area2,area3,area4,area5,area6,kparasta,kparaend)
+            call aree_parziali(myid,nproc,lett,i_rest,area1,area2,area3,area4,area5,area6,kparasta,kparaend)
 
             call inflow(myid,nproc,lett,bodyforce,area1,area2,area3,area4,area5,area6,kparasta,kparaend)
         end if
@@ -958,7 +788,7 @@ contains
         ! for nesting: redistribution of mass on controvariant fluxes
         ! to obtain a divergence free flow
         if (i_rest==3) then
-            call aree_parziali(myid,nproc,lett,i_rest,bodyforce,area1,area2,area3,area4,area5,area6,kparasta,kparaend)
+            call aree_parziali(myid,nproc,lett,i_rest,area1,area2,area3,area4,area5,area6,kparasta,kparaend)
 
             if (freesurface==0) then !if freesurface off
                 if (myid==0) then
@@ -974,31 +804,23 @@ contains
         !-----------------------------------------------------------------------
         ! boundary conditions
         if (i_rest==3) then
-            call contour_se_nesting
+            call contour_se_nesting()
         else
-            call contour_se
+            call contour_se()
         end if
 
         ! boundary conditions for periodicity
-        call contourp_se
+        call contourp_se()
+
+        ! compute cartesian velocity and controvariant
+        call update()
         !
-        !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-        !     open output file
-        if (lagr==0) then
-            open(29,file='turbo.out',status='unknown')
-            open(30,file='subdis.out',status='unknown')
-            open(31,file='subscl.out',status='unknown')
-            open(33,file='subrho.out',status='unknown')
-        end if
-        open(34,file='bulk_velocity.dat',status='unknown')
-        !      open(35,file='eddy_viscosity.dat',status='unknown')
-        open(13,file='encheck.dat',status='unknown')
-        !
+
         !-----------------------------------------------------------------------
         !
-        if (myid==0 .and.lagr==0) then
-            write(29,*)niter/i_print
-        endif
+        !if (myid==0 .and.lagr==0) then
+        !    write(29,*) niter/i_print
+        !endif
         !
         !-----------------------------------------------------------------------
         !
@@ -1523,7 +1345,7 @@ contains
             allocate(  utangente(1:jx,2,kparasta:kparaend))
             allocate(punto_wfp3(3,3,jx,kparasta:kparaend))
             allocate(punto_wfp4(3,3,jx,kparasta:kparaend))
-            att_mod_par=0.
+            att_mod_par=0
             utangente=1.
             u_t=1.
 
@@ -1674,35 +1496,14 @@ contains
 
         enddo
         !
-        !-----------------------------------------------------------------------
-        !     compute the volume once
-        vol_loc=0.
-        do k=kparasta,kparaend
-            do j=1,jy
-                do i=1,jx
-                    vol_loc=vol_loc+giac(i,j,k)
-                end do
-            end do
-        end do
-        !
-        !     reduce operation on vol
-        !
-        vol  = 0.
 
-        call MPI_REDUCE(vol_loc,vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,ierr)
-
-        if (myid == 0)write(*,*)'box volume: ',vol
-
-        !-----------------------------------------------------------------------
-        ! initialize output
-        call output_init()
-
-
-    ! THIS IS THE LEVEL SET
-    !call iniz_levelset()
+        ! THIS IS THE LEVEL SET
+        !call iniz_levelset()
 
         count_print_time = 0
-    ti_start = ti
+        ti_start = ti
+
+
 
     end subroutine les_initialize
 
@@ -1718,38 +1519,44 @@ contains
 
         !
         startitertime=MPI_WTIME()
+
+        !-----------------------------------------------------------------------
+        !++++++++++  WRITE OUTPUT  +++++++++++++++++++++++++++++++++++++++++++++
+        !-----------------------------------------------------------------------
+        call output_step(count_print_time,dbbx,tipo)
+
         !
         !-----------------------------------------------------------------------
         ! boundary conditions on du, dv, dw
         !
-        call condi1
-        call condi2
-        call condi3
+        call condi1()
+        call condi2()
+        call condi3()
+
+        ! boundary conditions for periodicity
+        !call contourp_se()
+        !call contour()
 
         !
         ! average on fluxes in periodicity direction
         !
         do ii=1,1-ip
-      
             do k=kparasta,kparaend
                 do j=1,jy
                     uc(0,j,k)=.5*(uc(0,j,k)+uc(jx,j,k))
                     uc(jx,j,k)=uc(0,j,k)
                 end do
             end do
-
-        enddo
+        end do
 
         do jj=1,1-jp
-      
             do k=kparasta,kparaend
                 do i=1,jx
                     vc(i,0,k)=.5*(vc(i,0,k)+vc(i,jy,k))
                     vc(i,jy,k)=vc(i,0,k)
                 end do
             end do
-
-        enddo
+        end do
       
         ! send wc(i,j,jz) to P0 in wc_piano of myid=0
 
@@ -1789,7 +1596,6 @@ contains
             call wall_function_bodyfitted(ktime,niter,tipo,i_rest)
         end if
 
-        !
         !-----------------------------------------------------------------------
 
 
@@ -1868,16 +1674,11 @@ contains
 
         if ( bodyforce==1 .and. coef_wall >=1 .and. ktime ==1 .and. i_rest /=0 ) then
           
-            !       call correggi_ib       (ktime,MN,MP,num_iter,
-            !     >  num_ib,num_solide,numero_celle_IB,numero_celle_bloccate,
-            !     >  indici_CELLE_IB,distanze_CELLE_IB,indici_celle_bloccate,
-            !     >  coef_wall,visualizzo,integrale,
-            !     >  dist_ib_parete,dist_pp_ib,correggo_rho,correggo_delu,
-            !     >  delrhov,proiezioni,ustar,divergenzaib,tipo)
-            correggo_rho = 0
-            correggo_delu = 0
+            ! call correggi_ib (...)
+            !correggo_rho = 0
+            !correggo_delu = 0
             ipressione_ibm = 0
-            call correggi_ib       (ktime,coef_wall,visualizzo,integrale,correggo_rho,correggo_delu,delrhov,tipo,z0,ti,niter)
+            call correggi_ib(ktime,tipo)
      
      
         end if
@@ -1979,9 +1780,9 @@ contains
         ! update time
         ti=ti+dt
         if (myid==0) then
-            write(*,*)'ktime, tempo  ',ktime,ti
-            write(*,*)'bbx, dbbx  ',bbx,dbbx
-            write(*,*)'bby, dbby  ',bby,dbby
+            write(*,*)'----> ktime, tempo  ',ktime,ti,'----------------------'
+            !write(*,*)'bbx, dbbx  ',bbx,dbbx
+            !write(*,*)'bby, dbby  ',bby,dbby
         endif
         !-----------------------------------------------------------------------
 
@@ -1989,7 +1790,6 @@ contains
             call nesting(bodyforce,ti,area1,area2,area5,area6,kparasta,kparaend,myid,nproc,freesurface)
 
         elseif (i_rest==3 .and. potenziale==1) then
-
             call redistribuzione(bodyforce,area1,area2,area5,area6,kparasta,kparaend,myid,nproc)
         end if
  
@@ -2008,17 +1808,6 @@ contains
         !      call MPI_WAIT (req2,status,ierror)
         end if
 
-        !      if (myid/=0) then
-        !      call MPI_ISEND(annit(0,0,kparasta+1),(jx+2)*(jy+2),MPI_REAL_SD,
-        !     >              leftpe,tagls,MPI_COMM_WORLD,req3,ierror)
-        !      call MPI_WAIT (req3,status,ierror)
-        !      end if
-        !      if (myid/=nproc-1) then
-        !      call MPI_IRECV(annit(0,0,kparaend+2),(jx+2)*(jy+2),MPI_REAL_SD,
-        !     >              rightpe,tagrr,MPI_COMM_WORLD,req4,ierror)
-        !      call MPI_WAIT (req4,status,ierror)
-        !      end if
-
         !     send to right
         if (myid/=nproc-1) then
             call MPI_SSEND(annit(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
@@ -2029,16 +1818,6 @@ contains
         !      call MPI_WAIT (req6,status,ierror)
         end if
 
-        !      if (myid/=nproc-1) then
-        !      call MPI_ISEND(annit(0,0,kparaend-1),(jx+2)*(jy+2),MPI_REAL_SD,
-        !     >              rightpe,tagrs,MPI_COMM_WORLD,req7,ierror)
-        !      call MPI_WAIT (req7,status,ierror)
-        !      end if
-        !      if (myid/=0) then
-        !      call MPI_IRECV(annit(0,0,kparasta-2),(jx+2)*(jy+2),MPI_REAL_SD,
-        !     >              leftpe,taglr,MPI_COMM_WORLD,req8,ierror)
-        !      call MPI_WAIT (req8,status,ierror)
-        !      end if
         !-----------------------------------------------------------------------
         !     send to left
         if (myid/=0) then
@@ -2050,17 +1829,6 @@ contains
         !      call MPI_WAIT (req2,status,ierror)
         end if
 
-        !      if (myid/=0) then
-        !      call MPI_ISEND(annitV(0,0,kparasta+1),(jx+2)*(jy+2),MPI_REAL_SD,
-        !     >              leftpe,tagls,MPI_COMM_WORLD,req3,ierror)
-        !      call MPI_WAIT (req3,status,ierror)
-        !      end if
-        !      if (myid/=nproc-1) then
-        !      call MPI_IRECV(annitV(0,0,kparaend+2),(jx+2)*(jy+2),MPI_REAL_SD,
-        !     >              rightpe,tagrr,MPI_COMM_WORLD,req4,ierror)
-        !      call MPI_WAIT (req4,status,ierror)
-        !      end if
-
         !     send to right
         if (myid/=nproc-1) then
             call MPI_SSEND(annitV(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
@@ -2071,16 +1839,6 @@ contains
         !      call MPI_WAIT (req6,status,ierror)
         end if
 
-        !      if (myid/=nproc-1) then
-        !      call MPI_ISEND(annitV(0,0,kparaend-1),(jx+2)*(jy+2),MPI_REAL_SD,
-        !     >              rightpe,tagrs,MPI_COMM_WORLD,req7,ierror)
-        !      call MPI_WAIT (req7,status,ierror)
-        !      end if
-        !      if (myid/=0) then
-        !      call MPI_IRECV(annitV(0,0,kparasta-2),(jx+2)*(jy+2),MPI_REAL_SD,
-        !     >              leftpe,taglr,MPI_COMM_WORLD,req8,ierror)
-        !      call MPI_WAIT (req8,status,ierror)
-        !      end if
         !
         !-----------------------------------------------------------------------
         !     read wind file
@@ -2103,17 +1861,17 @@ contains
         starteqstime=MPI_WTIME()
 
         !-----------------------------------------------------------------------
-        !     nesting: generate disturbance on the inflow
+        ! nesting: generate disturbance on the inflow
         if (ibb==1) then
             call buffer_bodyforce(ti,ktime,bcsi,beta,bzet)
         end if
  
 
         !-----------------------------------------------------------------------
-        !      SCALAR EQUATION
+        ! SCALAR EQUATION
         !-----------------------------------------------------------------------
         !
-        !     if attiva_scal=0, scalar eq. solution is bypassed
+        ! if attiva_scal=0, scalar eq. solution is bypassed
         if (attiva_scal==0. .or. potenziale==1) then
       
             if (myid==0) then
@@ -2165,7 +1923,7 @@ contains
             startrhoa=MPI_WTIME()
 
             allocate(rho(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
-            !      cycle on n scalars
+            ! cycle on n scalars
             do isc=1,nscal
 
                 do k=kparasta-deepl,kparaend+deepr !0,n3+1
@@ -2176,7 +1934,7 @@ contains
                     end do
                 end do
 
-                !      call vislam(pran,akapt)         !coefficienti di diffusione laminare
+                ! call vislam(pran,akapt)         !coefficienti di diffusione laminare
 
                 call mixrho_para(inmodrho,rho) ! scale similar part for the model
 
@@ -2221,9 +1979,9 @@ contains
                     end if
                     !
                     !-----------------------------------------------------------------------
-                    !         approximate factorization
+                    ! approximate factorization
                     !
-                    !         upload csi
+                    ! upload csi
                     do k=kparasta,kparaend
                         do j=1,jy
                             call coed1(j,k,delrho,aaa,rh,kparasta,kparaend,isc) !coefficent construction upload csi
@@ -2244,7 +2002,7 @@ contains
                         end do
                     end do
                     !
-                    !         upload eta
+                    ! upload eta
                     do k=kparasta,kparaend
                         do i=1,jx
                             call coed2(i,k,delrho,aaa,rh,kparasta,kparaend,isc)! coefficent construction upload eta
@@ -2267,8 +2025,8 @@ contains
 
                     endrhoa=MPI_WTIME()
                     !
-                    !         new subroutine to solve the third part of approximate factorization
-                    !         with transposed method
+                    ! new subroutine to solve the third part of approximate factorization
+                    ! with transposed method
                     !
                     startrhob=MPI_WTIME()
 
@@ -2276,7 +2034,7 @@ contains
      
                 end if
 
-                !       clipping
+                ! clipping
                 if (myid == 0)write(*,*)'CLIPPING'
                 do k=kparasta,kparaend
                     do j=1,jy
@@ -2314,7 +2072,7 @@ contains
                 endrhob=MPI_WTIME()
 
                 !
-                !       distribution of closer plane between procs
+                ! distribution of closer plane between procs
                 !
                 startrhoghost=MPI_WTIME()
 
@@ -2341,21 +2099,6 @@ contains
                     call MPI_RECV(rho(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
                 endif
 
-                if (leftpem /= MPI_PROC_NULL) then
-                    !      call MPI_WAIT(req1,istatus,ierr)
-                    !      call MPI_WAIT(req4,istatus,ierr)
-                    if (insc==1) then
-                    !    call MPI_WAIT(req5,istatus,ierr)
-                    end if
-                endif
-                if (rightpem /= MPI_PROC_NULL) then
-                    !      call MPI_WAIT(req2,istatus,ierr)
-                    !      call MPI_WAIT(req3,istatus,ierr)
-                    if (insc==1) then
-                    !             call MPI_WAIT(req6,istatus,ierr)
-                    end if
-                endif
-
                 !     put on rhov the computed values
                 do k=kparasta-deepl,kparaend+deepr !0,jz+1
                     do j=0,jy+1
@@ -2374,12 +2117,12 @@ contains
         endrhoghost=MPI_WTIME()
         !
         !--------------------------------------------------------------------
-        !     MOMENTUM EQUATION
+        !                       MOMENTUM EQUATION
         !--------------------------------------------------------------------
         !
-        !     predictor step,
-        !     solution of the equation for u, v ,w to determine the
-        !     intermediate flow field
+        ! predictor step,
+        ! solution of the equation for u, v ,w to determine the
+        ! intermediate flow field
         !
         !
         !-----------------------------------------------------------------------
@@ -2387,10 +2130,8 @@ contains
         !-----------------------------------------------------------------------
         starteq1a=MPI_WTIME()
         !
-        !     compute convective and diffusive explicit terms in first eq.
+        ! compute convective and diffusive explicit terms in first eq.
         iq1=1
-        bulk=0.
-        bulk_loc=bulk
         call mix_para(inmod,iq1,kparasta,kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr, &
             nproc,myid,rightpem,leftpem,ktime,i_print,lagr)
 
@@ -2502,24 +2243,12 @@ contains
             endeq1a=MPI_WTIME()
 
             starteq1b=MPI_WTIME()
-            icheck=0
-            call tridiag_trasp_para(annit,g33_tr,giac_tr,delu,icheck,ktime)!annit_piano,
+
+            call tridiag_trasp_para(annit,g33_tr,giac_tr,delu,ktime)!annit_piano,
 
 
             endeq1b=MPI_WTIME()
 
-            do iproc=0,nproc-1
-                if (myid==iproc) then
-                    mmm=300+iproc
-                    write(mmm,*)myid,'u1',endeq1a-starteq1a
-                endif
-            enddo
-            do iproc=0,nproc-1
-                if (myid==iproc) then
-                    mmm=300+iproc
-                    write(mmm,*)myid,'u2',endeq1b-starteq1b
-                endif
-            enddo
         end if
         !
         !-----------------------------------------------------------------------
@@ -2527,11 +2256,9 @@ contains
         !-----------------------------------------------------------------------
 
         starteq2a=MPI_WTIME()
-        !     compute convective and diffusive explicit terms in second eq.
+        ! compute convective and diffusive explicit terms in second eq.
         !
         iq1=2
-        bulk=0.
-        bulk_loc=bulk
         call mix_para(inmod,iq1,kparasta,kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr, &
             nproc,myid,rightpem,leftpem,ktime,i_print,lagr)
 
@@ -2577,9 +2304,9 @@ contains
             call rhs1_rho(kparasta,kparaend)  ! right hand side of momentum eq.
             !
             !-----------------------------------------------------------------------
-            !      approximate factorization
+            ! approximate factorization
             !
-            !      second eq., upload csi
+            ! second eq., upload csi
             do k=kparasta,kparaend
                 do j=1,jy
                     call coef1_par(j,k,delv,aaa,rh,kparasta,kparaend)  !coefficent construction upload csi
@@ -2600,7 +2327,7 @@ contains
                 end do
             end do
             !
-            !      second eq., upload eta
+            ! second eq., upload eta
             do k=kparasta,kparaend
                 do i=1,jx
                     call coef2_par(i,k,delv,aaa,rh,kparasta,kparaend)  !coefficent construction upload eta
@@ -2624,24 +2351,11 @@ contains
             endeq2a=MPI_WTIME()
 
             starteq2b=MPI_WTIME()
-            icheck=100
-            call tridiag_trasp_para(annit,g33_tr,giac_tr,delv,icheck,ktime)!annit_piano,
+
+            call tridiag_trasp_para(annit,g33_tr,giac_tr,delv,ktime)!annit_piano,
 
             endeq2b=MPI_WTIME()
 
-            do iproc=0,nproc-1
-                if (myid==iproc) then
-                    mmm=300+iproc
-                    write(mmm,*)myid,'v1',endeq2a-starteq2a
-                endif
-            enddo
-
-            do iproc=0,nproc-1
-                if (myid==iproc) then
-                    mmm=300+iproc
-                    write(mmm,*)myid,'v2',endeq2b-starteq2b
-                endif
-            enddo
         end if
 
         !-----------------------------------------------------------------------
@@ -2652,8 +2366,6 @@ contains
         !     compute convective and diffusive explicit terms in third eq.
         !
         iq1=3
-        bulk=0.
-        bulk_loc=bulk
         call mix_para(inmod,iq1,kparasta,kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr, &
             nproc,myid,rightpem,leftpem,ktime,i_print,lagr)
      
@@ -2753,8 +2465,8 @@ contains
             endeq3a=MPI_WTIME()
 
             starteq3b=MPI_WTIME()
-            icheck=200
-            call tridiag_trasp_para(annit,g33_tr,giac_tr,delw,icheck,ktime)!annit_piano,
+
+            call tridiag_trasp_para(annit,g33_tr,giac_tr,delw,ktime)!annit_piano,
 
             endeq3b=MPI_WTIME()
 
@@ -2834,32 +2546,22 @@ contains
         !-----------------------------------------------------------------------
         !     update velocity u^ = u+du from time step n to intermediate one
         !     on wall found with parabolic extrapolation
-        call update
+        call update()
         !
         !-----------------------------------------------------------------------
         !     correction on IBM
 
-        if (bodyforce==1 .and. potenziale==0) then
-            if (attiva_scal==1) then
-                correggo_rho=1
-            else
-                correggo_rho=0
-            end if
-
-            correggo_delu=1
-        !         call correggi_ib       (ktime,MN,MP,num_iter,
-        !     >    num_ib,num_solide,numero_celle_IB,numero_celle_bloccate,
-        !     >    indici_CELLE_IB,distanze_CELLE_IB,indici_celle_bloccate,
-        !     >    coef_wall,visualizzo,integrale,
-        !     >    dist_ib_parete,dist_pp_ib,correggo_rho,correggo_delu,
-        !     >    delrhov,proiezioni,ustar,divergenzaib,tipo)
-
-        !       call correggi_ib       (ktime,
-        !     >  coef_wall,visualizzo,integrale,
-        !     >  correggo_rho,correggo_delu,
-        !     >  delrhov,tipo,z0)
-
-        end if
+!        if (bodyforce==1 .and. potenziale==0) then
+!            if (attiva_scal==1) then
+!                correggo_rho=1
+!            else
+!                correggo_rho=0
+!            end if
+!
+!            correggo_delu=1
+!        !         call correggi_ib (...)
+!
+!        end if
         !-----------------------------------------------------------------------
         !     compute intermediate controvariant component
         !
@@ -3037,10 +2739,8 @@ contains
         !                    tagls,taglr,tagrs,tagrr,leftpe,rightpe)
         else
             if (ipress_cart==0) then
-                call multi(eps,ficycle,nlevel, &
-                    jxc,jyc,jzc, &
-                    kparasta,kparaend,myid,nproc, &
-                    rightpe,leftpe, &
+                call multi(eps,ficycle,nlevel,jxc,jyc,jzc, &
+                    kparasta,kparaend,myid,nproc,rightpe,leftpe, &
                     tagls,taglr,tagrs,tagrr,islor, &
                     bodyforce,bodypressure,tipo,deepl,deepr, &
                     ktime,freesurface,ti)
@@ -3068,39 +2768,28 @@ contains
             call MPI_RECV(fi(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
         endif
                                                                                      
-        if (leftpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req1,istatus,ierr)
-        !      call MPI_WAIT(req4,istatus,ierr)
-        endif
-        if (rightpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req2,istatus,ierr)
-        !      call MPI_WAIT(req3,istatus,ierr)
-        endif
-
         endmultitime=MPI_WTIME()
 
         if (myid==0) then
             print*,myid,'mlt ',endmultitime-startmultitime
-            write(6000,*)ktime,endmultitime-startmultitime
         endif
         !
         !-----------------------------------------------------------------------
         !     compute pressure gradient
         startgrad=MPI_WTIME()
-        !
         call gradie(kparasta,kparaend)
         !
         !-----------------------------------------------------------------------
         !     compute cartesian velocity and controvariant
-        !
         call vel_up(kparasta,kparaend,rightpe,leftpe,bodyforce,freesurface)
         !
         !-----------------------------------------------------------------------
         !     correction on IBM
         if (bodyforce==1) then
-            if (potenziale == 1) then
-                !          solid cell
+            if (potenziale==1) then
+                ! solid cell
                 do l=1,num_solide
+
                     i=indici_celle_bloccate(l,1)
                     j=indici_celle_bloccate(l,2)
                     k=indici_celle_bloccate(l,3)
@@ -3108,72 +2797,40 @@ contains
                     u(i,j,k)=0.
                     v(i,j,k)=0.
                     w(i,j,k)=0.
+
                 end do
                 ! Giulia boundary condition before correggi_ib
-                call contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
+                call contour() !contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
                 !
-                call contourp(kparasta,kparaend,nproc,myid,lett)
+                call contourp() !contourp(kparasta,kparaend,nproc,myid,lett)
             else !potenziale
-                correggo_rho=0
-                correggo_delu=0
+                !correggo_rho=0
+                !correggo_delu=0
 
-                !           call correggi_ib       (ktime,MN,MP,num_iter,
-                !     >     num_ib,num_solide,numero_celle_IB,numero_celle_bloccate,
-                !     >     indici_CELLE_IB,distanze_CELLE_IB,indici_celle_bloccate,
-                !     >     coef_wall,visualizzo,integrale,
-                !     >     dist_ib_parete,dist_pp_ib,correggo_rho,correggo_delu,
-                !     >     delrhov,proiezioni,ustar,divergenzaib,tipo)
+                ! call correggi_ib (...)
 
                 !----------------------------------------------------------------------
                 !     boundary condition
 
-                call contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
+                call contour() !contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
                 !
-                call contourp(kparasta,kparaend,nproc,myid,lett)
+                call contourp() !contourp(kparasta,kparaend,nproc,myid,lett)
 
                 ipressione_ibm = 0
-                call correggi_ib(ktime,coef_wall,visualizzo,integrale,correggo_rho,correggo_delu, &
-                    delrhov,tipo,z0,ti,niter)
+                call correggi_ib(ktime,tipo)
 
             end if !potenziale
 
         else !bodyforce
 
-            call contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
+            call contour() !call contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
             !
-            call contourp(kparasta,kparaend,nproc,myid,lett)
+            call contourp() !contourp(kparasta,kparaend,nproc,myid,lett)
 
         end if
 
         !---------------------------------------------------------------------
 
-        !     print bulk velocity
-        u_bulk=0.
-        volume=0.
-        u_bulk_tot=0.
-        volume_tot=0.
-
-        do k=kparasta,kparaend
-            do j=1,jy
-                do i=1,jx
-                    if (tipo(i,j,k)/=0) then
-                        u_bulk=u_bulk+u(i,j,k)*giac(i,j,k)
-                        volume=volume+giac(i,j,k)
-                    end if
-                end do
-            end do
-        end do
-
-        !     u_bulk sum between procs
-        call MPI_ALLREDUCE(u_bulk,u_bulk_tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        !     volume sum between procs
-        call MPI_ALLREDUCE(volume,volume_tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
-        u_bulk_tot=u_bulk_tot/volume_tot
-
-        if (myid==0) then
-            write(*,*)'u_bulk:',u_bulk_tot
-        end if
         !
         !-----------------------------------------------------------------------
         !     case constant mass
@@ -3201,7 +2858,7 @@ contains
             else
                 !          compute delta bbx
                 if (myid==0)write(*,*)'myid',myid,'um',um,umm1-um
-                dbbx=1/dt*0.5*(umm1 - um) !(0.5*umm1+0.5*umm-um) questo era di anna
+                dbbx=1.0/dt*0.5*(umm1 - um) !(0.5*umm1+0.5*umm-um) questo era di anna
                 dbby=0.
                 dbbz=0.
                 if (myid==0) then
@@ -3424,78 +3081,7 @@ contains
             ! THIS IS THE LEVEL SET
             !call Extension_velocities()
 
-            !-----------------------------------------------------------------------
-            !     save data for time statistics
-        if (ktime==1) then
-            !       allocation
-            allocate( umed(1:n1,1:n2,kparasta:kparaend,4+nscal))
-            allocate(uutau(1:n1,1:n2,kparasta:kparaend,6+nscal+nscal))
-            !       initialization
-            deltatempo=0.
-            umed  = 0.
-            uutau = 0.
 
-        end if
-
-        do k=kparasta,kparaend
-            do j=1,jy
-                do i=1,jx
-                    umed(i,j,k,1) = umed(i,j,k,1) +      u(i,j,k)*dt          ! u media * Tempo totale
-                    umed(i,j,k,2) = umed(i,j,k,2) +      v(i,j,k)*dt          ! v media * Tempo totale
-                    umed(i,j,k,3) = umed(i,j,k,3) +      w(i,j,k)*dt          ! w media * Tempo totale
-                    umed(i,j,k,4) = umed(i,j,k,4) +      fi(i,j,k)*dt
-
-                    uutau(i,j,k,1)=uutau(i,j,k,1)+u(i,j,k)*u(i,j,k)*dt    ! u*u    * Tempo totale
-                    uutau(i,j,k,2)=uutau(i,j,k,2)+u(i,j,k)*v(i,j,k)*dt    ! u*v    * Tempo totale
-                    uutau(i,j,k,3)=uutau(i,j,k,3)+u(i,j,k)*w(i,j,k)*dt    ! u*w    * Tempo totale
-                    uutau(i,j,k,4)=uutau(i,j,k,4)+v(i,j,k)*v(i,j,k)*dt    ! v*v    * Tempo totale
-                    uutau(i,j,k,5)=uutau(i,j,k,5)+v(i,j,k)*w(i,j,k)*dt    ! v*w    * Tempo totale
-                    uutau(i,j,k,6)=uutau(i,j,k,6)+w(i,j,k)*w(i,j,k)*dt    ! w*w    * Tempo totale
-
-
-                    do n=1,nscal
-                        umed(i,j,k,4+n) = umed(i,j,k,4+n) + rhov(n,i,j,k)*dt          ! r media * Tempo totale
-
-                        uutau(i,j,k,6+n)= uutau(i,j,k,6+n) + rhov(n,i,j,k)*rhov(n,i,j,k)*dt  ! r*r
-
-                        uutau(i,j,k,6+nscal+n)= uutau(i,j,k,6+nscal+n) + rhov(n,i,j,k)*v(i,j,k)*dt  ! r*v   * Tempo totale
-
-                    end do
-
-                end do
-            end do
-        end do
-
-        !     update the total time
-        deltatempo = deltatempo + dt
-
-        !     print the data
-        !      if (ktime==niter) then
-        !        if (myid<10) then
-        !          write(idproc,'(i1)')myid
-        !          filepntempo='medietempo0'//idproc//'.dat'
-        !else
-        !          write(idproc2,'(i2)')myid
-        !          filepntempo='medietempo'//idproc2//'.dat'
-        !end if
-
-        !        open(1000,file=filepntempo,status='unknown')
-        !        write(1000,1001)deltatempo
-        !        do k=kparasta,kparaend
-        !        do j=1,jy
-        !        do i=1,jx
-        !          write(1000,1001)umed(i,j,k,1),umed(i,j,k,2),
-        !     >                    umed(i,j,k,3),umed(i,j,k,4),
-        !     >                    umed(i,j,k,5), uutau(i,j,k,1),
-        !     >                    uutau(i,j,k,2),uutau(i,j,k,3),
-        !     >                    uutau(i,j,k,4),uutau(i,j,k,5),
-        !     >                    uutau(i,j,k,6),uutau(i,j,k,7)
-        !        end do
-        !        end do
-        !        end do
-        !        close(1000)
-        !      end if
-        ! 1001 format(12e18.10)
         !-----------------------------------------------------------------------
         ! Compute the mean temperature Theta and Humidity Q at the surface
         if (imoist==1) then
@@ -3520,6 +3106,11 @@ contains
                 write(*,*)'Tm ',tm_tot,' Qm ',qm_tot
             end if
 
+        end if
+
+        ! update averages and Reynolds stresses
+        if (i_medietempo) then
+            call update_medie()
         end if
 
         !-----------------------------------------------------------------------
@@ -3641,43 +3232,6 @@ contains
             !            call MPI_WAIT(req6,istatus,ierr)
             end if
         endif
-        !
-        !-----------------------------------------------------------------------
-        !     print tracers
-        !
-        !     open file
-        if (ktime == 1) then
-            do isonde=1,nsonde
-                if (sonde(3,isonde)>=kparasta.and.sonde(3,isonde)<=kparaend) then
-                    if (isonde < 10) then
-                        write(identificosonda,'(i1)')isonde
-                        filesonda = 'nsonda0'//identificosonda//'.dat'
-                    else
-                        write(identificosonda2,'(i2)')isonde
-                        filesonda = 'nsonda'//identificosonda2//'.dat'
-                    end if
-                    open(20000+isonde,file=filesonda,status='unknown')
-                end if
-            end do
-        end if
-
-        do isonde = 1,nsonde
-            if (sonde(3,isonde)>=kparasta.and.sonde(3,isonde)<=kparaend) then
-                write(20000+isonde,1111)ti, &
-                    u(sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
-                    v(sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
-                    w(sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
-                    fi(sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
-                    (rhov(isc,sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
-                    isc=1,nscal)
-            end if
-        end do
-
-        if (ktime == niter) then
-            do isonde = 1,nsonde
-                close(20000+isonde)
-            end do
-        end if
 
         !-----------------------------------------------------------------------
         !     COMPUTE THE DIVERGENCE
@@ -3691,37 +3245,9 @@ contains
         mpitimestart=MPI_WTIME()
 
         mpitimeend=MPI_WTIME()
-        !
-        !-----------------------------------------------------------------------
-        !     print kinetic energy in time
-        !
-        enck_loc=0.
-
-        do k=kparasta,kparaend
-            do j=1,jy
-                do i=1,jx
-                    enck_loc=enck_loc+.5*(u(i,j,k)*u(i,j,k)+v(i,j,k)*v(i,j,k)+w(i,j,k)*w(i,j,k))*giac(i,j,k)
-                end do
-            end do
-        end do
-        !
-        !     reduce operation on enck and vol
-        !
-        enck = 0.
-        call MPI_REDUCE(enck_loc,enck,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,ierr)
 
 
-        if (myid==0) then
-            enck=enck/vol
-            write(13,*) ti,enck
-        endif
-        !
-1111    format(10e18.10)
 
-        !-----------------------------------------------------------------------
-        !++++++++++  WRITE OUTPUT  +++++++++++++++++++++++++++++++++++++++++++++
-        !-----------------------------------------------------------------------
-        call output_step(count_print_time,dbbx,tipo)
         !-----------------------------------------------------------------------
 
 
@@ -3742,13 +3268,7 @@ contains
 
     subroutine les_finalize() bind ( C, name="les_finalize" )
 
-        if (lagr==0) then
-            close(29)   ! turbo.out
-        end if
-        close(34)   ! bulk velocity nel tempo
-        !      close(35)   ! eddy viscosity
-        close(50)
-
+        call output_finalize()
 
         endtime=MPI_WTIME()
         resolution=MPI_WTICK()
@@ -3817,7 +3337,7 @@ contains
         !----------------------------------------------
         !**********************************************
         !----------------------------------------------
-        ! deallocazione matrici
+        ! matrix deallocation
 
         if (wavebk==1) then
             deallocate(u_wind,w_wind)
@@ -3873,7 +3393,7 @@ contains
     !...carlo       call deallocate_grids()
     end subroutine les_finalize
 
-    subroutine init_parallel(kgridparasta,kgridparaend,ncolperproc,nlevmultimax)
+    subroutine init_parallel(kgridparasta,kgridparaend,nlevmultimax)
 
         use scala3
         use tipologia
@@ -3885,7 +3405,7 @@ contains
 
         integer ierr, ierror
         integer iproc
-        integer,intent(inout) :: kgridparasta,kgridparaend,ncolperproc,nlevmultimax
+        integer,intent(inout) :: kgridparasta,kgridparaend,nlevmultimax
 
         call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         if (myid==0) then
@@ -3995,6 +3515,37 @@ contains
             leftpem=leftpe
             rightpem=rightpe
         endif
+
+        ! DEPTH OF GHOST LAYERS -----------------------------------
+        ! how many plane to allocate less than kparasta --> deepl
+        ! ow many plane to allocate less than kparaend --> deepr
+        deepl = 1
+        deepr = 1
+
+        ! allocation needs one more plane left for quick
+        if (insc==1 .and. myid/= nproc-1) then
+            deepr = 2
+        end if
+
+        if (insc==2 .and. myid/= nproc-1) then
+            deepr = 2
+        end if
+
+
+        ! ibm stencil for taylor needs two plane on closer proc
+        if (bodyforce == 1) then
+            deepl = 2
+            deepr = 2
+            if (myid==0)       deepl=1
+            if (myid==nproc-1) deepr=1
+        end if
+
+        !     deep grid right -> deepgr
+        !     deep grid left -> deepgl
+        !     values in mysending
+        deepgr = 2
+        deepgl = 2
+
         !
         !-----------------------------------------------------------------------
         ! CHECKING CONDITIONS ON PROCESSORS ARE MET
@@ -4006,8 +3557,157 @@ contains
             error stop 'ERROR: NUM. PROC. INCORRECT'
         end if
 
+
+        !-----------------------------------------------------------------------
+        !     check on conflicts
+        if (imoist==1 .and. nscal < 2) then
+            if (myid==0) then
+                write(*,*)'there is a conflict between the moisture\n'// &
+                    'procedure and the number of scalars,\n'// &
+                    'be sure nscal>=2 in scala3.h'
+                write(info_run_file,*)'there is a conflict between the moisture\n'// &
+                    'procedure and the number of scalars,\n'// &
+                    'be sure nscal>=2 in scala3.h'
+            end if
+
+            stop
+        end if
+
+        ! turn off some features
+        if (potenziale==1) then
+            if (myid==0) then
+                write(*,*)'TURN OFF att_wm_sgs and coef_wall'
+                write(info_run_file,*)'TURN OFF att_wm_sgs and coef_wall'
+            end if
+            att_wm_sgs = 0
+            coef_wall = 0
+        end if
+
+        if (coef_wall==0) then
+            if (myid==0) then
+                write(*,*)'TURN OFF att_wm_sgs'
+                write(info_run_file,*)'TURN OFF att_wm_sgs'
+            end if
+            att_wm_sgs = 0
+        end if
+
     end subroutine init_parallel
 
+    subroutine read_grid()
+
+        real coor_x,coor_y,coor_z
+        real,allocatable :: xx1(:,:,:),yy1(:,:,:),zz1(:,:,:)
+        real,allocatable :: xx2(:,:,:),yy2(:,:,:),zz2(:,:,:)
+
+        !-----------------------------------------------------------------------
+        ! read the grid
+
+        allocate(xx1(-8:n1+8,-8:n2+8,n3-8:n3))
+        allocate(yy1(-8:n1+8,-8:n2+8,n3-8:n3))
+        allocate(zz1(-8:n1+8,-8:n2+8,n3-8:n3))
+
+        allocate(xx2(-8:n1+8,-8:n2+8,0:8))
+        allocate(yy2(-8:n1+8,-8:n2+8,0:8))
+        allocate(zz2(-8:n1+8,-8:n2+8,0:8))
+
+        open(12,file='gri3dp_in.dat',status='old')
+        !
+        read(12,*)alx,aly,alz
+        read(12,*)jx,jy,jz
+
+        if (jx/=n1 .and. myid==0) then
+            write(info_run_file,*)'MISMATCH GRID/CODE DIMENSION ON x',jx,n1
+            write(info_run_file,*)'check gri3dp_in.dat and scala3.h in the code'
+            write(*,*)'read info_run.txt'
+            stop
+        end if
+        if (jy/=n2 .and. myid==0) then
+            write(info_run_file,*)'MISMATCH GRID/CODE DIMENSION ON y',jy,n2
+            write(info_run_file,*)'check gri3dp_in.dat and scala3.h in the code'
+            write(*,*)'read info_run.txt'
+            stop
+        end if
+        if (jz/=n3 .and. myid==0) then
+            write(info_run_file,*)'MISMATCH GRID/CODE DIMENSION ON z',jz,n3
+            write(info_run_file,*)'check gri3dp_in.dat and scala3.h in the code'
+            write(*,*)'read info_run.txt'
+            stop
+        end if
+
+
+        if (myid==0) then
+            kini = kparasta - 1
+            kfin = kparaend + deep_mul +1 !deepgr
+        elseif (myid==nproc-1) then
+            kini = kparasta - deep_mul -1 !deepgl
+            kfin = kparaend
+        else
+            kini = kparasta - deep_mul -1 !deepgl
+            kfin = kparaend + deep_mul +1 !deepgr
+        end if
+
+        write(info_run_file,*)myid,'READ GRID BETWEEN',kini,kfin,kparasta,kparaend
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+        do k=0,jz
+            do j=0,jy
+                do i=0,jx
+                    read(12,*)coor_x
+                    read(12,*)coor_y
+                    read(12,*)coor_z
+
+                    if (k>=kini .and. k<=kfin) then
+                        x(i,j,k) = coor_x
+                        y(i,j,k) = coor_y
+                        z(i,j,k) = coor_z
+                    end if
+
+                    if (myid==0) then
+                        if (k>=(n3-8).and.k<=n3) then
+                            xx1(i,j,k) = coor_x
+                            yy1(i,j,k) = coor_y
+                            zz1(i,j,k) = coor_z
+                        end if
+                    end if
+
+                    if (myid==nproc-1) then
+                        if (k>=0.and.k<=8) then
+                            xx2(i,j,k) = coor_x
+                            yy2(i,j,k) = coor_y
+                            zz2(i,j,k) = coor_z
+                        end if
+                    end if
+
+                end do
+            end do
+        end do
+        if (myid==0) then
+            write(*,*)'CHECK: grid read ---> OK'
+        end if
+
+        !-----------------------------------------------------------------------
+        ! compute centroid position
+        if(myid==0)write(*,*)'Compute centroids'
+        call compute_centroids(jx,jy,jz,myid,nproc,kparasta,kparaend)
+
+        !-----------------------------------------------------------------------
+        ! periodic cells
+        !
+        call cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
+        deallocate(xx1,yy1,zz1,xx2,yy2,zz2)
+        !
+        !-----------------------------------------------------------------------
+        !
+        if (myid==0) then
+            write(*,*) 'Grid dimension: ',jx,jy,jz
+            write(*,*) 'Array dimension: ',n1,n2,n3
+
+            write(*,*)'CHECK: bodyforce --->',bodyforce
+        end if
+
+    end subroutine read_grid
+
+    !subroutine convertstring(instr,)
 
 end module strati
 

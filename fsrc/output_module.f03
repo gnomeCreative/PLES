@@ -14,27 +14,52 @@ module output_module
     implicit none
 
     ! flags
-    integer,bind(C) :: print_iter_or_time,i_printfile,i_paraview,ifolder
-    integer,bind(C) :: i_cumulative,iscrivo,iformat_newres,iformat_grid
+    integer,bind(C) :: print_iter_or_time,i_printfile,iformat_newres
+    logical,bind(C) :: i_paraview,i_newres,i_medietempo
+    logical,bind(C) :: i_cumulative,iformat_grid
+    character(len=500) :: result_folder
+    !character,bind(C),dimension(*) :: result_folder_name,simulation_name
+
+
+    logical :: iscrivo
 
     ! information output files
-    integer,parameter  :: info_run_file=11
+    integer,parameter :: info_run_file=11
+    integer,parameter :: new_res_file=14
+    integer,parameter :: medietempo_file=14
+    integer,parameter :: paraview_file=17
+    integer,parameter :: paraview_piece_file=18
+    integer,parameter :: turbo_file=29
+    integer,parameter :: subdis_file=30
+    integer,parameter :: subscl_file=31
+    integer,parameter :: subrho_file=33
+    integer,parameter :: bulkvel_file=34
+    integer,parameter :: encheck_file=13
+    integer,parameter :: drag_file=54
+    integer,parameter :: maxvel_file=53
+    integer,parameter :: sonde_file_base=2000
 
     ! formats
-    character*12 :: string_newres_format
-    character*50 :: new_res_step_folder
-    character*12 :: string_grid_format
-    character*20 :: fmt_newres
+    character(len=12) :: string_newres_format
+    character(len=12) :: string_grid_format
+    character(len=20) :: fmt_newres
 
     ! file names
-    character*120               :: filename_newres,filename_medietempo,filename_paraview,filename_movie,filename_paraview_piece
+    character(len=500) :: filename_newres,filename_medietempo,filename_paraview
+    character(len=500) :: filename_movie,filename_paraview_piece
+    !
+    character(len=500) :: filename_inforun,filename_turbo,filename_subdis
+    character(len=500) :: filename_subscl,filename_subrho,filename_drag
+    character(len=500) :: filename_bulkvel,filename_maxvel,filename_encheck
+    character(len=500) :: flename_sondefilebase
+
     character*120,allocatable   :: paraview_piecename(:)
 
-
     ! folders to store results (see output_init)
-    character(len=23) :: result_folder ! length = length(result_folder_name)+length('results/')
+    !character(len=23) :: result_folder ! length = length(result_folder_name)+length('results/')
     character(len=34) :: new_res_folder
     character(len=36) :: paraview_folder
+    character(len=38) :: medietempo_folder
 
     character(len=4) :: char_myid
 
@@ -44,7 +69,7 @@ module output_module
     ! variables for printing
     real, allocatable :: umed(:,:,:,:) !(1:n1,1:n2,kparasta:kparaend,4)
     real, allocatable :: uutau(:,:,:,:) !(1:n1,1:n2,kparasta:kparaend,7)
-    real deltatempo
+    real :: deltatempo
 
     real,allocatable :: print_u(:,:,:),print_v(:,:,:),print_w(:,:,:)
       
@@ -82,10 +107,10 @@ module output_module
 
 contains
 
-    !***********************************************************************
-    subroutine output_init()
+    !**********************************************************************
+    subroutine create_output_folder()
 
-        use mysettings, only: lagr
+        use mysettings, only: lagr,nsonde
 
         use mpi
 
@@ -93,18 +118,23 @@ contains
 
         character(len=12),parameter :: paraview_folder_name = 'paraviewData'
         character(len=10),parameter :: new_res_folder_name = 'newResData'
-        character(len=7),parameter  :: global_result_folder_name = 'results'
-        character(len=8)            :: date
-        character(len=6)            :: time
-        character(len=15)           :: result_folder_name ! length = date+time+1
+        character(len=14),parameter :: medietempo_folder_name = 'medietempoData'
+        !character(len=7),parameter  :: global_result_folder_name = 'results'
+        !character(len=8)            :: date
+        !character(len=6)            :: time
+        !character(len=15)           :: result_folder_name ! length = date+time+1
 
+        ! for sonde
+        character*3  identificosonda
+        character*20 filesonda
+
+        integer isonde
         integer ierr
         integer ichar
 
         !-----------------------------------------------------------------------
         ! check date and time for the result folder creation
-        call date_and_time(date,time)
-
+        !call date_and_time(date,time)
 
         if (myid == 0) then
 
@@ -115,22 +145,22 @@ contains
             end if
 
             ! global result folder
-            write(*,*) 'Check if global result folder exist'
-            call system('mkdir '//trim(global_result_folder_name))
+            !write(*,*) 'Check if global result folder exist'
+            !call system('mkdir '//trim(global_result_folder_name))
 
         end if
 
         ! result folder
-        result_folder_name=date//'_'//time
-        result_folder=global_result_folder_name//'/'//result_folder_name
-        if (myid == 0) then
-            write(*,*) 'Create result folder (format=date_time)'
-            call system('mkdir '//trim(result_folder))
-        end if
+        !result_folder_name=date//'_'//time
+        !result_folder=global_result_folder_name//'/'//result_folder_name
+        !if (myid == 0) then
+        !    write(*,*) 'Create result folder (format=date_time)'
+        !    call system('mkdir '//trim(result_folder))
+        !end if
 
         ! paraview folder
-        if (i_paraview == 1) then
-            paraview_folder=result_folder//'/'//paraview_folder_name
+        if (i_paraview) then
+            paraview_folder=trim(result_folder)//'/'//paraview_folder_name
             if (myid == 0) then
                 call system('mkdir '//paraview_folder)
                 write(*,*) 'Created folder ',paraview_folder
@@ -139,19 +169,102 @@ contains
         end if
 
         ! newRes folder
-        if (1 == 1) then
-            new_res_folder=result_folder//'/'//new_res_folder_name
+        if (i_newres) then
+            new_res_folder=trim(result_folder)//'/'//new_res_folder_name
             if (myid == 0) then
                 call system('mkdir '//new_res_folder)
                 write(*,*) 'Created folder ',new_res_folder
             end if
         end if
 
+        ! medietempo folder
+        if (i_medietempo) then
+            medietempo_folder=trim(result_folder)//'/'//medietempo_folder_name
+            if (myid == 0) then
+                call system('mkdir '//medietempo_folder)
+                write(*,*) 'Created folder ',medietempo_folder
+            end if
 
-        if (i_paraview == 1) then
-            if (myid == 0) write(*,*) 'Preparing paraview output split into ',nproc,' pieces'
-            allocate(paraview_piecename(0:nproc-1))
         end if
+
+        ! Files for information output -------------------------------------
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+        filename_inforun=trim(result_folder)//'/'//'info_run.txt'
+        open(info_run_file,file=filename_inforun,action='write',status='replace')
+
+        !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        !     open output files
+
+        if (myid==0) then
+            if (lagr==0) then
+                filename_turbo=trim(result_folder)//'/'//'turbo.out'
+                filename_subdis=trim(result_folder)//'/'//'subdis.out'
+                filename_subscl=trim(result_folder)//'/'//'subscl.out'
+                filename_subrho=trim(result_folder)//'/'//'subrho.out'
+                open(turbo_file,file=filename_turbo,action='write',status='replace')
+                open(subdis_file,file=filename_subdis,action='write',status='replace')
+                open(subscl_file,file=filename_subscl,action='write',status='replace')
+                open(subrho_file,file=filename_subrho,action='write',status='replace')
+            end if
+
+            filename_bulkvel=trim(result_folder)//'/'//'bulk_velocity.dat'
+            open(bulkvel_file,file=filename_bulkvel,action='write',status='replace')
+            filename_maxvel=trim(result_folder)//'/'//'max_velocity.dat'
+            open(maxvel_file,file=filename_maxvel,action='write',status='replace')
+            filename_encheck=trim(result_folder)//'/'//'encheck.dat'
+            open(encheck_file,file=filename_encheck,action='write',status='replace')
+            filename_drag=trim(result_folder)//'/'//'drag.dat'
+            open(drag_file,file=filename_drag,action='write',status='replace')
+
+            !  sonde files
+            do isonde=1,nsonde
+                write(identificosonda,'(i3.3)')isonde
+                filesonda = trim(result_folder)//'nsonda'//identificosonda//'.dat'
+                open(sonde_file_base+isonde,file=filesonda,action='write',status='unknown')
+            end do
+
+        end if
+
+
+    end subroutine create_output_folder
+
+    !***********************************************************************
+    subroutine output_init()
+
+        use mysettings, only: lagr,nsonde
+
+        use mpi
+
+        implicit none
+
+        integer ierr
+        integer ichar
+
+        !-----------------------------------------------------------------------
+        ! check date and time for the result folder creation
+
+        !-----------------------------------------------------------------------
+        ! Setting for input/output formats
+        string_newres_format="10e18.10"
+        string_grid_format="10e18.10"
+
+
+        allocate(paraview_piecename(0:nproc-1))
+
+        ! medietempo allocation
+        if (i_medietempo) then
+
+            ! allocation
+            allocate( umed(1:n1,1:n2,kparasta:kparaend,4+nscal))
+            allocate(uutau(1:n1,1:n2,kparasta:kparaend,6+nscal+nscal))
+            ! initialization
+            deltatempo=0.
+            umed  = 0.
+            uutau = 0.
+
+        end if
+
         ! string form of processor identifier
         write (char_myid,'(i4)') myid
         do ichar = 1,len(char_myid)
@@ -168,21 +281,18 @@ contains
             if (myid == 0) write(*,*) 'New_res file format: ',fmt_newres
         end if
 
-
-        ! Files for information output -------------------------------------
-        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-        open(info_run_file,file=trim(result_folder)//'/'//'info_run.txt',status='unknown')
-
     end subroutine output_init
 
     !***********************************************************************
     subroutine output_step(count_print_time,dbbx,tipo)
+
         !-----------------------------------------------------------------------
         !++++++++++  WRITE OUTPUT  +++++++++++++++++++++++++++++++++++++++++++++
 
         use parti, only: alx, alz, ti
         use mysettings, only: bbx, niter
         use convex, only: bulk
+        use myarrays_ibm, only: bodyupdate,bodyforce
         !
         use mpi
 
@@ -223,29 +333,43 @@ contains
         ! if it's time to write output, start prodecure
         if (writeprocedure) then
 
-            ! set the folder for the output and the filename
+            !-----------------------------------------------------------------------
+            if (myid == 0) write(*,*) 'OUTPUT STEP BEGINS ---------------------------------'
+
+                ! set the folder for the output and the filename
             call write_preparation(ti)
 
             ! write output new_res_form without mpi procedure
-            if (i_printfile == 0 .or. i_printfile == 2 .or. i_paraview==1) then
-
+            if ((i_newres .and. i_printfile == 0) .or. (i_newres .and. i_printfile == 2)) then
                 ! collect data to print
                 call prepare_printdata
-
-                ! print data on file
-                call write_output(ti,bbx,dbbx,tipo)
-
+                ! and produce new_res
+                call write_newres(ti,bbx,dbbx,tipo)
             end if
+
+            ! print paraview
+            if (i_paraview) then
+                call write_paraview(tipo)
+            end if
+
+            ! print medietempo
+            if (i_medietempo) then
+                call write_medietempo()
+            end if
+
 
             call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
-            !     check if I can write another new_res before ending the
-            !     number of iteration
+                !
+            !-----------------------------------------------------------------------
+            !
+            if (myid == 0) write(*,*) 'OUTPUT STEP ENDS -----------------------------------'
+
+            !     check if I can write another new_res before ending the number of iterations
             if (print_iter_or_time == 1) then
-                !         time_evaluation = (niter-ktime)*dt
 
+                ! time_evaluation = (niter-ktime)*dt
                 ! time_evaluation =  niter*dt - ti_start
-
 
                 time_evaluation = (ti-ti_start) + (niter-ktime)*dt
                 next_print = time_evaluation/real(i_time)
@@ -270,6 +394,20 @@ contains
 
         end if !write procedure
 
+        ! print data from sonde
+        call write_tracers(ti)
+
+        ! print kinetic energy
+        call print_energy(tipo)
+
+        ! print bulk velocity
+        call print_velocity(tipo)
+
+        ! print bulk velocity
+        if (bodyforce==1 .and. bodyupdate) then
+            call print_drag()
+        end if
+
     end subroutine
 
     !***********************************************************************
@@ -281,9 +419,9 @@ contains
         implicit none
 
         ! file names
-        character(len=12),parameter :: filename_header= 'new_res_iter'
-        character(len=18),parameter :: filemedie_header='meantime_iter_proc'
-        character(len=9),parameter  :: paraview_header ='para_iter'
+        character(len=7),parameter :: filename_header= 'new_res'
+        character(len=9),parameter :: filemedie_header='meantime'
+        character(len=4),parameter  :: paraview_header ='para'
 
         ! arguments
         real,intent(in) :: ti
@@ -297,12 +435,9 @@ contains
         character(len=13) :: char_iktime
         character(len=4)  :: char_piece
 
-
-        !-----------------------------------------------------------------------
-        if (myid == 0) write(*,*) 'OUTPUT STEP BEGIN ---------------------------'
+        !-------------------------------------------------------------------------
 
         ! set the folder for the output
-
         ! print for iterations
         if (print_iter_or_time == 0) then
 
@@ -310,13 +445,6 @@ contains
             do ichar = 1,len(char_ikiter)
                 if (char_ikiter(ichar:ichar)==' ') char_ikiter(ichar:ichar)='0'
             end do
-
-            if (ifolder == 1) then
-                new_res_step_folder = new_res_folder//'/RUN_ITER_'//char_ikiter
-            else
-                new_res_step_folder= new_res_folder
-
-            end if
 
         ! print for time
         else if (print_iter_or_time == 1) then
@@ -328,114 +456,124 @@ contains
                 if (char_iktime(ichar:ichar)==' ') char_iktime(ichar:ichar)='0'
             end do
 
-            if (ifolder == 1) then
-                new_res_step_folder = new_res_folder//'/RUN_TIME_'//char_iktime//'sec'
-            else
-                new_res_step_folder= new_res_folder
-            end if
 
-        end if
-
-        !rid_folder = len_trim(new_res_step_folder)
-        if (ifolder == 1 .and. myid == 0) then
-            call system('mkdir '//trim(new_res_step_folder))
-            write(*,*) 'Created folder "',trim(new_res_step_folder),'"'
         end if
 
         ! flag for telling every processor if it must write
-        iscrivo = 0
+        iscrivo = .false.
 
         call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         !-----------------------------------------------------------------------
-        ! set the output filename for new_res
+        ! setting up names
 
-        ! one proc write
+        ! 1: set the base filename for new_res, paraview and medetempo
+        filename_newres=trim(new_res_folder)//'/'//filename_header
+        filename_medietempo=trim(medietempo_folder)//'/'//filemedie_header
+        filename_paraview=trim(paraview_folder)//'/'//paraview_header
+        filename_paraview_piece=trim(paraview_folder)//'/'//paraview_header
+        do iproc=0,nproc-1
+            paraview_piecename(iproc)=paraview_header
+        end do
+
+        ! 2: add iteration or time ID
+        if (print_iter_or_time == 0) then
+            ! add interation number
+            filename_newres=trim(filename_newres)//'_iter'//char_ikiter
+            filename_medietempo=trim(filename_medietempo)//'_iter'//char_ikiter
+            filename_paraview=trim(filename_paraview)//'_iter'//char_ikiter
+            filename_paraview_piece=trim(filename_paraview_piece)//'_iter'//char_ikiter
+            do iproc=0,nproc-1
+                paraview_piecename(iproc)=trim(paraview_piecename(iproc))//'_iter'//char_ikiter
+            end do
+        else if (print_iter_or_time == 1) then
+            ! add time
+            filename_newres=trim(filename_newres)//'_time'//char_iktime//'sec'
+            filename_medietempo=trim(filename_medietempo)//'_time'//char_iktime//'sec'
+            filename_paraview=trim(filename_paraview)//'_time'//char_iktime//'sec'
+            filename_paraview_piece=trim(filename_paraview_piece)//'_time'//char_iktime//'sec'
+            do iproc=0,nproc-1
+                paraview_piecename(iproc)=trim(paraview_piecename(iproc))//'_time'//char_iktime//'sec'
+            end do
+        end if
+
+        ! 3: add processor ID
+        ! new_res can be parallel or not
         if (i_printfile == 0 .or. i_printfile == 1) then
-            ! filename for iter
-            if (print_iter_or_time == 0) then
-                filename_newres=trim(new_res_step_folder)//'/'// &
-                    filename_header//char_ikiter//'.dat'
-            end if
-            ! filename for time
-            if (print_iter_or_time == 1) then
-                filename_newres=trim(new_res_step_folder)//'/'// &
-                    filename_header//char_iktime//'sec.dat'
-            end if
-            ! only procs 0 write
-            if (myid == 0) iscrivo = 1
-
+            filename_newres=trim(filename_newres)//'.dat'
+        else if (i_printfile == 2) then
+            ! add processor id
+            filename_newres=trim(filename_newres)//'_proc'//char_myid//'.dat'
         end if
+        ! medietempo is always parallel
+        filename_medietempo=trim(filename_medietempo)//'_proc'//char_myid//'.dat'
+        ! paraview is also always parallel (but with header)
+        filename_paraview_piece=trim(filename_paraview_piece)//'_proc'//char_myid//'.vti'
+        filename_paraview=trim(filename_paraview)//'.pvti'
 
-        ! all procs write
-        if (i_printfile == 2) then
-            ! filename for iter
-            if (print_iter_or_time == 0) then
-                filename_newres=trim(new_res_step_folder)//'/'// &
-                    filename_header//char_ikiter//'_proc'//char_myid//'.dat'
-            end if
-            ! filename for time
-            if (print_iter_or_time == 1) then
-                filename_newres=trim(new_res_step_folder)//'/'// &
-                    filename_header//char_iktime//'sec_proc'//char_myid//'.dat'
-            end if
-            ! all procs write
-            iscrivo = 1
-        end if
-
+        ! this is the LOCAL paraview piece name, necessary for
+        do iproc=0,nproc-1
+            write (char_piece,'(i4.1)') iproc
+            do ichar = 1,len(char_piece)
+                if (char_piece(ichar:ichar)==' ') char_piece(ichar:ichar)='0'
+            end do
+            paraview_piecename(iproc)=trim(paraview_piecename(iproc))//'_proc'//char_piece//'.vti'
+        end do
 
         !-----------------------------------------------------------------------
-        ! set the output filename for medietempo
-        filename_medietempo = trim(new_res_step_folder)//'/'// &
-            filemedie_header//char_myid//'.dat'
+        ! who writes the new_res??
+        if (i_printfile == 0 .or. i_printfile == 1) then
+            ! only proc 0 writes
+            if (myid == 0) iscrivo=.true.
+        else if (i_printfile == 2) then
+            ! all procs write
+            iscrivo=.true.
+        end if
 
         !-----------------------------------------------------------------------
         ! set output file names for paraview
         ! also for paraview all procs write, and in addition there is one header file
         ! that is handled only by processor 0
-        if (i_paraview == 1) then
-            ! filename for iter
-            if (print_iter_or_time == 0) then
-                if (myid==0) then
-                    filename_paraview=paraview_folder//'/'// &
-                        paraview_header//char_ikiter//'.pvti'
-                end if
-                do iproc=0,nproc-1
-                    write (char_piece,'(i4.1)') iproc
-                    do ichar = 1,len(char_piece)
-                        if (char_piece(ichar:ichar)==' ') char_piece(ichar:ichar)='0'
-                    end do
-                    paraview_piecename(iproc)=paraview_header//char_ikiter//'_'//char_piece//'.vti'
-                end do
-                filename_paraview_piece=paraview_folder//'/'// &
-                    paraview_piecename(myid)
-            ! filename for time
-            else if (print_iter_or_time == 1) then
-                if (myid==0) then
-                    filename_paraview=paraview_folder//'/'// &
-                        paraview_header//char_iktime//'.pvti'
-                end if
-                do iproc=0,nproc-1
-                    write (char_piece,'(i4.1)') char_piece
-                    do ichar = 1,len(char_piece)
-                        if (char_piece(ichar:ichar)==' ') char_piece(ichar:ichar)='0'
-                    end do
-                    paraview_piecename(iproc)=paraview_header//char_iktime//'_'//char_piece//'.vti'
-                end do
-                filename_paraview_piece=paraview_folder//'/'// &
-                    paraview_piecename(myid)
-            end if
 
-        end if
-
-
-
+    !        if (i_paraview) then
+    !            ! filename for iter
+    !            if (print_iter_or_time == 0) then
+    !                if (myid==0) then
+    !                    filename_paraview=paraview_folder//'/'// &
+    !                        paraview_header//char_ikiter//'.pvti'
+    !                end if
+    !                do iproc=0,nproc-1
+    !                    write (char_piece,'(i4.1)') iproc
+    !                    do ichar = 1,len(char_piece)
+    !                        if (char_piece(ichar:ichar)==' ') char_piece(ichar:ichar)='0'
+    !                    end do
+    !                    paraview_piecename(iproc)=paraview_header//char_ikiter//'_'//char_piece//'.vti'
+    !                end do
+    !                filename_paraview_piece=paraview_folder//'/'// &
+    !                    paraview_piecename(myid)
+    !            ! filename for time
+    !            else if (print_iter_or_time == 1) then
+    !                if (myid==0) then
+    !                    filename_paraview=paraview_folder//'/'// &
+    !                        paraview_header//char_iktime//'.pvti'
+    !                end if
+    !                do iproc=0,nproc-1
+    !                    write (char_piece,'(i4.1)') char_piece
+    !                    do ichar = 1,len(char_piece)
+    !                        if (char_piece(ichar:ichar)==' ') char_piece(ichar:ichar)='0'
+    !                    end do
+    !                    paraview_piecename(iproc)=paraview_header//char_iktime//'_'//char_piece//'.vti'
+    !                end do
+    !                filename_paraview_piece=paraview_folder//'/'// &
+    !                    paraview_piecename(myid)
+    !            end if
+    !
+    !        end if
         !-----------------------------------------------------------------------
-
 
     end subroutine write_preparation
 
     !***********************************************************************
-    subroutine prepare_printdata
+    subroutine prepare_printdata()
         !***********************************************************************
         !     in these sub the variable that must be print are given to temp
         !     arrays like print_u.
@@ -1097,7 +1235,7 @@ contains
     end subroutine prepare_printdata
 
     !***********************************************************************
-    subroutine write_output(ti,bbx,dbbx,tipo)
+    subroutine write_newres(ti,bbx,dbbx,tipo)
 
         !***********************************************************************
         !     this sub write the new_res_form which contains the flow field for
@@ -1107,7 +1245,7 @@ contains
         !     iformat_newres = 0 ---> *
         !     iformat_newres = 1 ---> use a format from Agenerale.in
         !     iformat_newres = 2 ---> binary
-        ! Paraview always usus standard format
+        ! Paraview always uses standard format
 
         implicit none
 
@@ -1116,29 +1254,23 @@ contains
         integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
         !-----------------------------------------------------------------------
         ! local variables declaration
-        integer fileunit
         integer kstawrite,kendwrite
         integer i,j,k,n,isc
         !integer ierr
 
-        integer ifmt_mean
-        character*2 char_fmt
-        character*12 fmt_mean
-
-        fileunit= 14
         !-----------------------------------------------------------------------
-        !     start to write new_res file (only proc that have iscrivo=1 write)
-        if (iscrivo == 1) then
+        !     start to write new_res file (only proc that have iscrivo true write)
+        if (iscrivo) then
 
             write(*,*) 'Write newres on file: ',filename_newres
 
             ! with no format
             if (iformat_newres == 0) then
 
-                open(fileunit,file=filename_newres,status='unknown')
-                write (fileunit,*) nscal
-                write (fileunit,*) ti
-                write (fileunit,*) bbx,dbbx
+                open(new_res_file,file=filename_newres,status='unknown')
+                write (new_res_file,*) nscal
+                write (new_res_file,*) ti
+                write (new_res_file,*) bbx,dbbx
 
                 !  write the cartesian component
                 if (i_printfile == 0) then
@@ -1155,12 +1287,12 @@ contains
                 do k=kstawrite,kendwrite         !0,jz+1
                     do j=0,jy+1
                         do i=0,jx+1
-                            write (fileunit,*) print_u(i,j,k)
-                            write (fileunit,*) print_v(i,j,k)
-                            write (fileunit,*) print_w(i,j,k)
-                            write (fileunit,*) print_fi(i,j,k)
+                            write (new_res_file,*) print_u(i,j,k)
+                            write (new_res_file,*) print_v(i,j,k)
+                            write (new_res_file,*) print_w(i,j,k)
+                            write (new_res_file,*) print_fi(i,j,k)
                             do isc = 1,nscal
-                                write (fileunit,*) print_rhov(isc,i,j,k)
+                                write (new_res_file,*) print_rhov(isc,i,j,k)
                             end do
                         end do
                     end do
@@ -1180,7 +1312,7 @@ contains
                 do k=kstawrite,kendwrite !1,jz
                     do j=1,jy
                         do i=0,jx
-                            write(fileunit,*)print_uc(i,j,k)
+                            write(new_res_file,*)print_uc(i,j,k)
                         end do
                     end do
                 end do
@@ -1188,7 +1320,7 @@ contains
                 do k=kstawrite,kendwrite  !1,jz
                     do j=0,jy
                         do i=1,jx
-                            write(fileunit,*)print_vc(i,j,k)
+                            write(new_res_file,*)print_vc(i,j,k)
                         end do
                     end do
                 end do
@@ -1197,16 +1329,16 @@ contains
                 do k=kstawrite,kendwrite  !0,jz
                     do j=1,jy
                         do i=1,jx
-                            write(fileunit,*)print_wc(i,j,k)
+                            write(new_res_file,*)print_wc(i,j,k)
                         end do
                     end do
                 end do
 
-                close(fileunit)
+                close(new_res_file)
 
             !     file with annit
             !         write(rsti,'(i6)')itin
-            !         open(fileunit,file='annit'//prti,status='unknown')
+            !         open(new_res_file,file='annit'//prti,status='unknown')
 
             !         write(stringprint)ti
             !         do k=kstawrite,kendwrite !0,jz+1
@@ -1216,15 +1348,15 @@ contains
             !         end do
             !         end do
             !         end do
-            !         close(fileunit)
+            !         close(new_res_file)
 
             !-----------------------------------------------------------------------
             ! with format fmt_newres
             else if (iformat_newres == 1) then
-                open(fileunit,file=trim(filename_newres),status='unknown')
-                write(fileunit,*) nscal
-                write(fileunit,*)ti
-                write(fileunit,*)bbx,dbbx
+                open(new_res_file,file=trim(filename_newres),status='unknown')
+                write(new_res_file,*) nscal
+                write(new_res_file,*)ti
+                write(new_res_file,*)bbx,dbbx
 
                 ! write the cartesiano component
                 if (i_printfile == 0) then
@@ -1241,7 +1373,7 @@ contains
                 do k=kstawrite,kendwrite         !0,jz+1
                     do j=0,jy+1
                         do i=0,jx+1
-                            write(fileunit,fmt_newres)print_u(i,j,k), &
+                            write(new_res_file,fmt_newres)print_u(i,j,k), &
                                 print_v(i,j,k), &
                                 print_w(i,j,k), &
                                 print_fi(i,j,k), &
@@ -1264,7 +1396,7 @@ contains
                 do k=kstawrite,kendwrite !1,jz
                     do j=1,jy
                         do i=0,jx
-                            write(fileunit,fmt_newres)print_uc(i,j,k)
+                            write(new_res_file,fmt_newres)print_uc(i,j,k)
                         end do
                     end do
                 end do
@@ -1272,7 +1404,7 @@ contains
                 do k=kstawrite,kendwrite  !1,jz
                     do j=0,jy
                         do i=1,jx
-                            write(fileunit,fmt_newres)print_vc(i,j,k)
+                            write(new_res_file,fmt_newres)print_vc(i,j,k)
                         end do
                     end do
                 end do
@@ -1281,17 +1413,17 @@ contains
                 do k=kstawrite,kendwrite  !0,jz
                     do j=1,jy
                         do i=1,jx
-                            write(fileunit,fmt_newres)print_wc(i,j,k)
+                            write(new_res_file,fmt_newres)print_wc(i,j,k)
                         end do
                     end do
                 end do
 
-                close(fileunit)
+                close(new_res_file)
 
 
             !     file with annit
             !         write(rsti,'(i6)')itin
-            !         open(fileunit,file='annit'//prti,status='unknown')
+            !         open(new_res_file,file='annit'//prti,status='unknown')
 
             !         write(stringprint)ti
             !         do k=kstawrite,kendwrite !0,jz+1
@@ -1301,17 +1433,17 @@ contains
             !         end do
             !         end do
             !         end do
-            !         close(fileunit)
+            !         close(new_res_file)
 
             !-----------------------------------------------------------------------
             !     binary
             else if (iformat_newres == 2) then
 
-                open(fileunit,file=filename_newres,status='unknown',form='unformatted')
+                open(new_res_file,file=filename_newres,status='unknown',form='unformatted')
 
-                write(fileunit)nscal
-                write(fileunit)ti
-                write(fileunit)bbx,dbbx
+                write(new_res_file)nscal
+                write(new_res_file)ti
+                write(new_res_file)bbx,dbbx
 
                 !        write the cartesiano component
                 if (i_printfile == 0) then
@@ -1328,7 +1460,7 @@ contains
                 do k=kstawrite,kendwrite         !0,jz+1
                     do j=0,jy+1
                         do i=0,jx+1
-                            write(fileunit)print_u(i,j,k), &
+                            write(new_res_file)print_u(i,j,k), &
                                 print_v(i,j,k), &
                                 print_w(i,j,k), &
                                 print_fi(i,j,k), &
@@ -1351,7 +1483,7 @@ contains
                 do k=kstawrite,kendwrite !1,jz
                     do j=1,jy
                         do i=0,jx
-                            write(fileunit)print_uc(i,j,k)
+                            write(new_res_file)print_uc(i,j,k)
                         end do
                     end do
                 end do
@@ -1359,7 +1491,7 @@ contains
                 do k=kstawrite,kendwrite  !1,jz
                     do j=0,jy
                         do i=1,jx
-                            write(fileunit)print_vc(i,j,k)
+                            write(new_res_file)print_vc(i,j,k)
                         end do
                     end do
                 end do
@@ -1368,16 +1500,16 @@ contains
                 do k=kstawrite,kendwrite  !0,jz
                     do j=1,jy
                         do i=1,jx
-                            write(fileunit)print_wc(i,j,k)
+                            write(new_res_file)print_wc(i,j,k)
                         end do
                     end do
                 end do
 
-                close(fileunit)
+                close(new_res_file)
 
             !     file with annit
             !         write(rsti,'(i6)')itin
-            !         open(fileunit,file='annit'//prti,status='unknown')
+            !         open(new_res_file,file='annit'//prti,status='unknown')
 
             !         write(stringprint)ti
             !         do k=kstawrite,kendwrite !0,jz+1
@@ -1387,15 +1519,10 @@ contains
             !         end do
             !         end do
             !         end do
-            !         close(fileunit)
+            !         close(new_res_file)
 
             end if ! on the format
         end if ! if iscrivo
-
-
-        if (i_paraview==1) then
-            call write_paraview_files(tipo)
-        end if
 
 
         !-----------------------------------------------------------------------
@@ -1413,7 +1540,23 @@ contains
         deallocate(print_akapt)
         deallocate(print_akaptv)
         deallocate(print_rhov)
-        !
+
+    end subroutine write_newres
+
+    !***********************************************************************
+    subroutine write_medietempo()
+
+        use mpi
+
+        implicit none
+
+        integer ifmt_mean
+        character*2 char_fmt
+        character*12 fmt_mean
+
+        integer :: ierr
+        integer :: i,j,k,n
+
         !-----------------------------------------------------------------------
         ! write the medietempo for time statistics
 
@@ -1421,16 +1564,15 @@ contains
         write(char_fmt,'(i2)')ifmt_mean
         fmt_mean = '('//char_fmt//'e18.10)'
 
-        fileunit = 15
-
-        open(fileunit,file=trim(filename_medietempo),status='unknown')
-        write(fileunit,*)nscal,nproc,re
-        write(fileunit,*)jx,jy,jz
-        write(fileunit,*)deltatempo
+        open(medietempo_file,file=trim(filename_medietempo),status='new',action='write')
+        write(*,*) 'Write medietempo file: ',trim(filename_medietempo)
+        write(medietempo_file,*)nscal,nproc,re
+        write(medietempo_file,*)jx,jy,jz
+        write(medietempo_file,*)deltatempo
         do k=kparasta,kparaend
             do j=1,jy
                 do i=1,jx
-                    !        write(fileunit,1001)umed(i,j,k,1),umed(i,j,k,2),
+                    !        write(medietempo_file,1001)umed(i,j,k,1),umed(i,j,k,2),
                     !     >         umed(i,j,k,3),umed(i,j,k,4),
                     !     >         umed(i,j,k,5), uutau(i,j,k,1),
                     !     >         uutau(i,j,k,2),uutau(i,j,k,3),
@@ -1438,7 +1580,7 @@ contains
                     !     >         uutau(i,j,k,6),uutau(i,j,k,7)
 
 
-                    write(fileunit,fmt_mean)(umed(i,j,k,n),n=1,4+nscal), &       !u,v,w,fi,r_n
+                    write(medietempo_file,fmt_mean)(umed(i,j,k,n),n=1,4+nscal), &       !u,v,w,fi,r_n
                         (uutau(i,j,k,n),n=1,6+nscal+nscal)  !uu_ii, uu_ij, rr_n, rv_n
 
 
@@ -1446,7 +1588,7 @@ contains
                 end do
             end do
         end do
-        close(fileunit)
+        close(medietempo_file)
 
         !      end if
 
@@ -1455,23 +1597,50 @@ contains
         !1001    format(12e18.10)
 
         !     the data are used only for average in the time window and not globally
-        if (i_cumulative == 0) then
+        if (.not.i_cumulative) then
             deltatempo = 0.
             umed = 0.
             uutau = 0.
         end if
 
-        !
-        !-----------------------------------------------------------------------
-        !
-        if (myid == 0) write(*,*) 'OUTPUT STEP END ---------------------------'
-
-    end subroutine write_output
+    end subroutine write_medietempo
 
     !***********************************************************************
-    subroutine write_paraview_files(tipo)
+    subroutine write_tracers(ti)
+
+        use mysettings, only: sonde,nsonde
+
+        implicit none
+
+        real, intent(in) :: ti
+        !
+        integer :: isc,isonde
+
+        !use myarrays
+        !-----------------------------------------------------------------------
+        !     print tracers
+        !
+        do isonde = 1,nsonde
+            if (sonde(3,isonde)>=kparasta.and.sonde(3,isonde)<=kparaend) then
+                write(sonde_file_base+isonde,'(10e18.10)') ti, &
+                    print_u(sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
+                    print_v(sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
+                    print_w(sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
+                    print_fi(sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
+                    (print_rhov(isc,sonde(1,isonde),sonde(2,isonde),sonde(3,isonde)), &
+                    isc=1,nscal)
+            end if
+        end do
+
+    !1000    format(10e18.10)
+
+    end subroutine write_tracers
+
+    !***********************************************************************
+    subroutine write_paraview(tipo)
 
         use myarrays_metri3, only: x,y,z
+        use myarrays_velo3, only: u,v,w,fi,rhov
         use myarrays_ibm, only: bodyforce
         !use myarrays_levelset2, only: phi0, phi_temp, fext
 
@@ -1483,7 +1652,7 @@ contains
         integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
         !-----------------------------------------------------------------------
         ! local variables declaration
-        integer fileunit
+        integer piecefile
         integer i,j,k,isc,iproc
         integer z_piece_begin(0:nproc-1),z_piece_end(0:nproc-1)
         integer x_piece_begin,x_piece_end
@@ -1506,188 +1675,440 @@ contains
 
         ! header file is written only by root processor
         if (myid == 0) then
-            fileunit=17
             write(*,*) 'Write Paraview header file ',trim(filename_paraview)
-            open(fileunit,file=trim(filename_paraview),status='unknown')
-            write(fileunit,'(A)')'<?xml version="1.0"?>'
-            write(fileunit,'(A)')'<VTKFile type="PImageData" version="0.1">'
-            write(fileunit,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A)')'  <PImageData WholeExtent="',&
+            open(paraview_file,file=trim(filename_paraview),status='unknown')
+            write(paraview_file,'(A)')'<?xml version="1.0"?>'
+            write(paraview_file,'(A)')'<VTKFile type="PImageData" version="0.1">'
+            write(paraview_file,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A)')'  <PImageData WholeExtent="',&
                 x_piece_begin,' ',x_piece_end,' ',y_piece_begin,' ',y_piece_end,' ',z_piece_begin(0),' ',z_piece_end(nproc-1),&
                 '" GhostLevel="1" Origin="0.0 0.0 0.0" Spacing="1.0 1.0 1.0">' ! spacing is missing
-            write(fileunit,'(A)')'    <PPointData>'
-!            write(fileunit,'(A)')'      <PDataArray type="Float64" Name="coord" NumberOfComponents="3">'
-!            write(fileunit,'(A)')'      </PDataArray>'
-            !            write(fileunit,'(A)')'      <PDataArray type="Int32" Name="y">'
-            !            write(fileunit,'(A)')'      </PDataArray>'
-            !            write(fileunit,'(A)')'      <PDataArray type="Int32" Name="z">'
-            !            write(fileunit,'(A)')'      </PDataArray>'
-            write(fileunit,'(A)')'      <PDataArray type="Float64" Name="vel" NumberOfComponents="3">'
-            write(fileunit,'(A)')'      </PDataArray>'
-            write(fileunit,'(A)')'      <PDataArray type="Float64" Name="pres">'
-            write(fileunit,'(A)')'      </PDataArray>'
-            !            write(fileunit,'(A)')'      <PDataArray type="Float64" Name="phi_temp">'
-            !            write(fileunit,'(A)')'      </PDataArray>'
-            !            write(fileunit,'(A)')'      <PDataArray type="Float64" Name="fext">'
-            !            write(fileunit,'(A)')'      </PDataArray>'
-            !            write(fileunit,'(A)')'      <PDataArray type="Float64" Name="phi0">'
-            !            write(fileunit,'(A)')'      </PDataArray>'
-            if (bodyforce == 1) then
-                write(fileunit,'(A)')'      <PDataArray type="Int32" Name="tipo">'
-                write(fileunit,'(A)')'      </PDataArray>'
-            end if
-            if (nscal>0) then
-                do isc = 1,nscal
-                    write(fileunit,'(A,I0.1,A)')'      <PDataArray type="Float64" Name="scal',isc,'">'
-                    write(fileunit,'(A)')'      </PDataArray>'
-                end do
-            end if
-            write(fileunit,'(A)')'    </PPointData>'
-            write(fileunit,'(A)')'    <PCellData>'
-            write(fileunit,'(A)')'    </PCellData>'
-            !write(fileunit,'(A,I0.1,A,I0.1,A)')'    <Piece Extent="0 ',jx+1,' 0 ',jy+1,' ',piece_begin,' ',piece_end,'" Source="para_iter000010_0.vti"/>'
+            write(paraview_file,'(A)')'    <PPointData>'
+            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="warp" NumberOfComponents="3"/>'
+            !            write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="y"/>'
+            !            write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="z"/>'
+            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="vel" NumberOfComponents="3"/>'
+            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="pres"/>'
+            !            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="phi_temp"/>'
+            !            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fext"/>'
+            !            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="phi0"/>'
+            !if (bodyforce == 1) then
+            write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="tipo"/>'
+            !end if
+            !            if (nscal>0) then
+            !                do isc = 1,nscal
+            !                    write(paraview_file,'(A,I0.1,A)')'      <PDataArray type="Float64" Name="scal',isc,'"/>'
+            !                end do
+            !            end if
+            write(paraview_file,'(A)')'    </PPointData>'
+            write(paraview_file,'(A)')'    <PCellData>'
+            write(paraview_file,'(A)')'    </PCellData>'
+            !write(paraview_file,'(A,I0.1,A,I0.1,A)')'    <Piece Extent="0 ',jx+1,' 0 ',jy+1,' ',piece_begin,' ',piece_end,'" Source="para_iter000010_0.vti"/>'
             do iproc=0,nproc-1
-                write(fileunit,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,A,A)') '    <Piece Extent="',&
+                write(paraview_file,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,A,A)') '    <Piece Extent="',&
                     x_piece_begin,' ',x_piece_end,' ',y_piece_begin,' ',y_piece_end,' ',&
                     z_piece_begin(iproc),' ',z_piece_end(iproc),&
                     '" Source="',trim(paraview_piecename(iproc)),'">'
-                write(fileunit,'(A)')'    </Piece>'
+                write(paraview_file,'(A)')'    </Piece>'
             end do
 
-            write(fileunit,'(A)')'  </PImageData>'
-            write(fileunit,'(A)')'</VTKFile>'
+            write(paraview_file,'(A)')'  </PImageData>'
+            write(paraview_file,'(A)')'</VTKFile>'
 
-            close(fileunit)
+            close(paraview_file)
         end if
 
         ! every processor writes a piece file
-        fileunit=18+myid
-        write(*,*) 'Write Paraview piece file ',trim(filename_paraview_piece)
-        open(fileunit,file=trim(filename_paraview_piece),status='unknown')
-        write(fileunit,'(A)')'<?xml version="1.0"?>'
-        write(fileunit,'(A)')'<VTKFile type="ImageData" version="0.1">'
-        write(fileunit,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A)')'  <ImageData WholeExtent="', &
+        piecefile=paraview_piece_file+myid
+        write(*,*) 'Write Paraview piece file ',trim(paraview_piecename(myid))
+        open(piecefile,file=trim(filename_paraview_piece),status='unknown')
+        write(piecefile,'(A)')'<?xml version="1.0"?>'
+        write(piecefile,'(A)')'<VTKFile type="ImageData" version="0.1">'
+        write(piecefile,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A)')'  <ImageData WholeExtent="', &
             x_piece_begin,' ',x_piece_end,' ',y_piece_begin,' ',y_piece_end,' ',z_piece_begin(myid),' ',z_piece_end(myid),&
             '">'
-        write(fileunit,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A)')'  <Piece Extent="',&
+        write(piecefile,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A)')'  <Piece Extent="',&
             x_piece_begin,' ',x_piece_end,' ',y_piece_begin,' ',y_piece_end,' ',z_piece_begin(myid),' ',z_piece_end(myid),&
             '">'
-        write(fileunit,'(A)')'    <PointData>'
-!        write(fileunit,'(A)')'      <DataArray type="Float64" Name="coord" NumberOfComponents="3">'
-!        do k=kparasta-1,kparaend+1
-!            do j=0,jy+1
-!                do i=0,jx+1
-!                    write(fileunit,'(ES14.7,A,ES14.7,A,ES14.7,A)',advance='no') &
-!                        x(i,j,k),' ',y(i,j,k),' ',z(i,j,k),' '
-!                end do
-!            end do
-!        end do
-!        write(fileunit,*)
-!        write(fileunit,'(A)')'      </DataArray>'
-        !            write(fileunit,'(A)')'      <DataArray type="Float64" Name="y">'
-        !            do k=kparasta-1,kparaend+1
-        !                do j=0,jy+1
-        !                    do i=0,jx+1
-        !                        write(fileunit,'(I0.1,A)',advance='no') y(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(fileunit,*)
-        !            write(fileunit,'(A)')'      </DataArray>'
-        !            write(fileunit,'(A)')'      <DataArray type="Float64" Name="z">'
-        !            do k=kparasta-1,kparaend+1
-        !                do j=0,jy+1
-        !                    do i=0,jx+1
-        !                        write(fileunit,'(I0.1,A)',advance='no') z(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(fileunit,*)
-        !            write(fileunit,'(A)')'      </DataArray>'
-        write(fileunit,'(A)')'      <DataArray type="Float64" Name="vel" NumberOfComponents="3">'
+        write(piecefile,'(A)')'    <PointData>'
+        write(piecefile,'(A)')'      <DataArray type="Float64" Name="warp" NumberOfComponents="3">'
         do k=kparasta-1,kparaend+1
             do j=0,jy+1
                 do i=0,jx+1
-                    write(fileunit,'(ES14.7,A,ES14.7,A,ES14.7,A)',advance='no') &
-                        print_u(i,j,k),' ',print_v(i,j,k),' ',print_w(i,j,k),' '
+                    write(piecefile,'(ES14.7,A,ES14.7,A,ES14.7,A)',advance='no') &
+                        x(i,j,k)-1.0*i,' ',y(i,j,k)-1.0*j,' ',z(i,j,k)-1.0*k,' '
                 end do
             end do
         end do
-        write(fileunit,*)
-        write(fileunit,'(A)')'      </DataArray>'
-        write(fileunit,'(A)')'      <DataArray type="Float64" Name="pres">'
+        write(piecefile,*)
+        write(piecefile,'(A)')'      </DataArray>'
+        write(piecefile,'(A)')'      <DataArray type="Float64" Name="vel" NumberOfComponents="3">'
         do k=kparasta-1,kparaend+1
             do j=0,jy+1
                 do i=0,jx+1
-                    write(fileunit,'(ES14.7,A)',advance='no') print_fi(i,j,k),' '
+                    write(piecefile,'(ES14.7,A,ES14.7,A,ES14.7,A)',advance='no') &
+                        u(i,j,k),' ',v(i,j,k),' ',w(i,j,k),' '
                 end do
             end do
         end do
-        write(fileunit,*)
-        write(fileunit,'(A)')'      </DataArray>'
-        !            write(fileunit,'(A)')'      <DataArray type="Float64" Name="phi_temp">'
-        !            do k=kparasta-1,kparaend+1
-        !                do j=0,jy+1
-        !                    do i=0,jx+1
-        !                        write(fileunit,'(ES14.7,A)',advance='no') phi_temp(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(fileunit,*)
-        !            write(fileunit,'(A)')'      </DataArray>'
-        !            write(fileunit,'(A)')'      <DataArray type="Float64" Name="Fext">'
-        !            do k=kparasta-1,kparaend+1
-        !                do j=0,jy+1
-        !                    do i=0,jx+1
-        !                        write(fileunit,'(ES14.7,A)',advance='no') fext(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(fileunit,*)
-        !            write(fileunit,'(A)')'      </DataArray>'
-        !            write(fileunit,'(A)')'      <DataArray type="Float64" Name="phi0">'
-        !            do k=kparasta-1,kparaend+1
-        !                do j=0,jy+1
-        !                    do i=0,jx+1
-        !                        write(fileunit,'(ES14.7,A)',advance='no') phi0(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(fileunit,*)
-        !            write(fileunit,'(A)')'      </DataArray>'
-        if (bodyforce == 1) then
-            write(fileunit,'(A)')'      <DataArray type="Int32" Name="tipo">'
-            do k=kparasta-1,kparaend+1
-                do j=0,jy+1
-                    do i=0,jx+1
-                        write(fileunit,'(I0.1,A)',advance='no') tipo(i,j,k),' '
-                    end do
+        write(piecefile,*)
+        write(piecefile,'(A)')'      </DataArray>'
+        write(piecefile,'(A)')'      <DataArray type="Float64" Name="pres">'
+        do k=kparasta-1,kparaend+1
+            do j=0,jy+1
+                do i=0,jx+1
+                    write(piecefile,'(ES14.7,A)',advance='no') fi(i,j,k),' '
                 end do
             end do
-            write(fileunit,'(A)')'      </DataArray>'
-        end if
-        if (nscal>0) then
-            do isc = 1,nscal
-                write(fileunit,'(A,I0.1,A)')'      <DataArray type="Float64" Name="scal',isc,'">'
-                do k=kparasta-1,kparaend+1
-                    do j=0,jy+1
-                        do i=0,jx+1
-                            write(fileunit,'(ES14.7,A)',advance='no') print_rhov(isc,i,j,k),' '
-                        end do
-                    end do
+        end do
+        write(piecefile,*)
+        write(piecefile,'(A)')'      </DataArray>'
+        !            write(piecefile,'(A)')'      <DataArray type="Float64" Name="phi_temp">'
+        !            do k=kparasta-1,kparaend+1
+        !                do j=0,jy+1
+        !                    do i=0,jx+1
+        !                        write(piecefile,'(ES14.7,A)',advance='no') phi_temp(i,j,k),' '
+        !                    end do
+        !                end do
+        !            end do
+        !            write(piecefile,*)
+        !            write(piecefile,'(A)')'      </DataArray>'
+        !            write(piecefile,'(A)')'      <DataArray type="Float64" Name="Fext">'
+        !            do k=kparasta-1,kparaend+1
+        !                do j=0,jy+1
+        !                    do i=0,jx+1
+        !                        write(piecefile,'(ES14.7,A)',advance='no') fext(i,j,k),' '
+        !                    end do
+        !                end do
+        !            end do
+        !            write(piecefile,*)
+        !            write(piecefile,'(A)')'      </DataArray>'
+        !            write(piecefile,'(A)')'      <DataArray type="Float64" Name="phi0">'
+        !            do k=kparasta-1,kparaend+1
+        !                do j=0,jy+1
+        !                    do i=0,jx+1
+        !                        write(piecefile,'(ES14.7,A)',advance='no') phi0(i,j,k),' '
+        !                    end do
+        !                end do
+        !            end do
+        !            write(piecefile,*)
+        !            write(piecefile,'(A)')'      </DataArray>'
+        !if (bodyforce == 1) then
+        write(piecefile,'(A)')'      <DataArray type="Int32" Name="tipo">'
+        do k=kparasta-1,kparaend+1
+            do j=0,jy+1
+                do i=0,jx+1
+                    write(piecefile,'(I0.1,A)',advance='no') tipo(i,j,k),' '
                 end do
-                write(fileunit,*)
             end do
+        end do
+        write(piecefile,'(A)')'      </DataArray>'
+        !            write(fileunit,'(A)')'      <DataArray type="Float64" Name="surfNorm" NumberOfComponents="3">'
+        !            do k = 1,nz
+        !                do j = 1,ny
+        !                    do i = 1,nx
+        !                        write(fileunit,'(ES14.7,A,ES14.7,A,ES14.7,A)',advance='no') &
+        !                            normalVectorX(i,j,k),' ',normalVectorY(i,j,k),' ',normalVectorZ(i,j,k),' '
+        !                    end do
+        !                end do
+        !            end do
+        !            write(fileunit,*)
+        !            write(fileunit,'(A)')'      </DataArray>'
+            !end if
+        !            if (nscal>0) then
+        !                do isc = 1,nscal
+        !                write(piecefile,'(A,I0.1,A)')'      <DataArray type="Float64" Name="scal',isc,'">'
+        !                do k=kparasta-1,kparaend+1
+        !                    do j=0,jy+1
+        !                        do i=0,jx+1
+        !                            write(piecefile,'(ES14.7,A)',advance='no') rhov(isc,i,j,k),' '
+        !                        end do
+        !                    end do
+        !                end do
+        !                write(piecefile,*)
+        !            end do
+        !        end if
+        !        write(piecefile,'(A)')'      </DataArray>'
+        write(piecefile,'(A)')'    </PointData>'
+        write(piecefile,'(A)')'    <CellData>'
+        write(piecefile,'(A)')'    </CellData>'
+        write(piecefile,'(A)')'    </Piece>'
+        write(piecefile,'(A)')'  </ImageData>'
+        write(piecefile,'(A)')'</VTKFile>'
+
+        close(piecefile)
+
+    end subroutine write_paraview
+
+    !***********************************************************************
+    subroutine output_finalize()
+
+        use mysettings, only: lagr,nsonde
+
+        implicit none
+
+        integer :: isonde
+
+        if (myid==0) then
+
+            if (lagr==0) then
+                close(turbo_file)   ! turbo.out
+                close(subdis_file)
+                close(subscl_file)
+                close(subrho_file)
+            end if
+            close(bulkvel_file)   ! bulk velocity nel tempo
+            close(maxvel_file)
+            close(encheck_file)
+            !      close(35)   ! eddy viscosity
+            !close(50)
+
+            do isonde = 1,nsonde
+                close(sonde_file_base+isonde)
+            end do
+
         end if
-        write(fileunit,'(A)')'      </DataArray>'
-        write(fileunit,'(A)')'    </PointData>'
-        write(fileunit,'(A)')'    <CellData>'
-        write(fileunit,'(A)')'    </CellData>'
-        write(fileunit,'(A)')'    </Piece>'
-        write(fileunit,'(A)')'  </ImageData>'
-        write(fileunit,'(A)')'</VTKFile>'
 
-        close(fileunit)
+    end subroutine output_finalize
 
-    end subroutine write_paraview_files
+    !***********************************************************************
+    subroutine print_energy(tipo)
+
+        use myarrays_metri3, only: fluid_vol,giac
+        use myarrays_velo3, only: u,v,w
+        use parti, only: ti
+
+        use tipologia
+        use mpi
+
+        implicit none
+
+        integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+
+        ! for energy coputation
+        real :: enck,enck_loc
+        integer :: i,j,k
+        integer :: ierr
+
+        !-----------------------------------------------------------------------
+        !     print kinetic energy in time
+        !
+        enck_loc=0.
+
+        do k=kparasta,kparaend
+            do j=1,jy
+                do i=1,jx
+                    if (tipo(i,j,k)/=0) then
+                        enck_loc=enck_loc+.5*(u(i,j,k)*u(i,j,k)+v(i,j,k)*v(i,j,k)+w(i,j,k)*w(i,j,k))*giac(i,j,k)
+                    end if
+                end do
+            end do
+        end do
+
+        ! reduce operation on enck and vol
+        enck = 0.
+        call MPI_REDUCE(enck_loc,enck,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+        if (myid==0) then
+            enck=enck/fluid_vol
+            open(encheck_file,file=filename_encheck,status='OLD',action='WRITE',position='APPEND')
+            write(encheck_file,*) ti,enck
+            close(encheck_file)
+        end if
+    end subroutine print_energy
+
+    !***********************************************************************
+    subroutine print_velocity(tipo)
+
+        use myarrays_metri3, only: fluid_vol,giac
+        use myarrays_velo3, only: u,v,w
+        use parti, only: ti
+
+        use tipologia
+        use mpi
+
+        implicit none
+
+        integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+
+        real :: u_bulk,u_bulk_tot,v_bulk,v_bulk_tot,w_bulk,w_bulk_tot
+        real :: u_max,u_max_tot,v_max,v_max_tot,w_max,w_max_tot
+        integer :: i,j,k
+        integer :: ierr
+
+        ! bulk velocity
+        u_bulk=0.
+        u_bulk_tot=0.
+        v_bulk=0.
+        v_bulk_tot=0.
+        w_bulk=0.
+        w_bulk_tot=0.
+
+        ! max velocity
+        u_max=0.
+        u_max_tot=0.
+        v_max=0.
+        v_max_tot=0.
+        w_max=0.
+        w_max_tot=0.
+
+        do k=kparasta,kparaend
+            do j=1,jy
+                do i=1,jx
+                    if (tipo(i,j,k)/=0) then
+                        u_bulk=u_bulk+u(i,j,k)*giac(i,j,k)
+                        v_bulk=v_bulk+v(i,j,k)*giac(i,j,k)
+                        w_bulk=w_bulk+w(i,j,k)*giac(i,j,k)
+
+                        u_max=max(u_max,abs(u(i,j,k)))
+                        v_max=max(v_max,abs(v(i,j,k)))
+                        w_max=max(w_max,abs(w(i,j,k)))
+                    end if
+                end do
+            end do
+        end do
+
+        ! u_bulk sum between procs
+        call MPI_REDUCE(u_bulk,u_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+        call MPI_REDUCE(v_bulk,v_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+        call MPI_REDUCE(w_bulk,w_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+        ! u_max reduce between procs
+        call MPI_REDUCE(u_max,u_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+        call MPI_REDUCE(v_max,v_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+        call MPI_REDUCE(w_max,w_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+
+        if (myid==0) then
+
+            u_bulk_tot=u_bulk_tot/fluid_vol
+
+            write(*,*)'u_bulk:',u_bulk_tot,', u_max:',u_max_tot
+
+            open(bulkvel_file,file=filename_bulkvel,status='old',action='write',position='append')
+            write(bulkvel_file,*) ti,u_bulk_tot,v_bulk_tot,w_bulk_tot
+            close(bulkvel_file)
+
+            open(maxvel_file,file=filename_maxvel,status='old',action='write',position='append')
+            write(maxvel_file,*) ti,u_max_tot,v_max_tot,w_max_tot
+            close(maxvel_file)
+        end if
+
+    end subroutine print_velocity
+
+    !***********************************************************************
+    subroutine print_drag()
+
+        use myarrays_ibm, only: x_force_sphere,y_force_sphere,z_force_sphere
+        use parti, only: ti
+
+        implicit none
+
+        real :: u_bulk,u_bulk_tot
+        integer :: i,j,k
+        integer :: ierr
+
+        if (myid==0) then
+
+            write(*,*)'u_bulk:',u_bulk_tot
+
+            open(drag_file,file=filename_drag,status='old',action='write',position='append')
+            write(drag_file,*) ti,x_force_sphere(1),y_force_sphere(1),z_force_sphere(1)
+            close(drag_file)
+        end if
+
+    end subroutine print_drag
+
+    !***********************************************************************
+    subroutine update_medie()
+
+        use myarrays_velo3, only: u,v,w,fi,rhov
+
+        implicit none
+
+        integer :: i,j,k,n
+
+        do k=kparasta,kparaend
+            do j=1,jy
+                do i=1,jx
+                    umed(i,j,k,1) = umed(i,j,k,1) +      u(i,j,k)*dt          ! u media * Tempo totale
+                    umed(i,j,k,2) = umed(i,j,k,2) +      v(i,j,k)*dt          ! v media * Tempo totale
+                    umed(i,j,k,3) = umed(i,j,k,3) +      w(i,j,k)*dt          ! w media * Tempo totale
+                    umed(i,j,k,4) = umed(i,j,k,4) +      fi(i,j,k)*dt
+
+                    uutau(i,j,k,1)=uutau(i,j,k,1)+u(i,j,k)*u(i,j,k)*dt    ! u*u    * Tempo totale
+                    uutau(i,j,k,2)=uutau(i,j,k,2)+u(i,j,k)*v(i,j,k)*dt    ! u*v    * Tempo totale
+                    uutau(i,j,k,3)=uutau(i,j,k,3)+u(i,j,k)*w(i,j,k)*dt    ! u*w    * Tempo totale
+                    uutau(i,j,k,4)=uutau(i,j,k,4)+v(i,j,k)*v(i,j,k)*dt    ! v*v    * Tempo totale
+                    uutau(i,j,k,5)=uutau(i,j,k,5)+v(i,j,k)*w(i,j,k)*dt    ! v*w    * Tempo totale
+                    uutau(i,j,k,6)=uutau(i,j,k,6)+w(i,j,k)*w(i,j,k)*dt    ! w*w    * Tempo totale
+
+
+                    do n=1,nscal
+                        umed(i,j,k,4+n) = umed(i,j,k,4+n) + rhov(n,i,j,k)*dt          ! r media * Tempo totale
+
+                        uutau(i,j,k,6+n)= uutau(i,j,k,6+n) + rhov(n,i,j,k)*rhov(n,i,j,k)*dt  ! r*r
+
+                        uutau(i,j,k,6+nscal+n)= uutau(i,j,k,6+nscal+n) + rhov(n,i,j,k)*v(i,j,k)*dt  ! r*v   * Tempo totale
+
+                    end do
+
+                end do
+            end do
+        end do
+
+        !     update the total time
+        deltatempo = deltatempo + dt
+
+        !     print the data
+    !        if (ktime==niter) then
+    !            if (myid<10) then
+    !                write(idproc,'(i1)')myid
+    !                filepntempo='medietempo0'//idproc//'.dat'
+    !            else
+    !                write(idproc2,'(i2)')myid
+    !                filepntempo='medietempo'//idproc2//'.dat'
+    !            end if
+    !            open(1000,file=filepntempo,status='unknown')
+    !            write(1000,1001)deltatempo
+    !            do k=kparasta,kparaend
+    !                do j=1,jy
+    !                    do i=1,jx
+    !                        write(1000,1001)umed(i,j,k,1),umed(i,j,k,2),
+    !                        >                    umed(i,j,k,3),umed(i,j,k,4),
+    !                        >                    umed(i,j,k,5), uutau(i,j,k,1),
+    !                        >                    uutau(i,j,k,2),uutau(i,j,k,3),
+    !                        >                    uutau(i,j,k,4),uutau(i,j,k,5),
+    !                        >                    uutau(i,j,k,6),uutau(i,j,k,7)
+    !                    end do
+    !                end do
+    !            end do
+    !            close(1000)
+    !        end if
+    !1001    format(12e18.10)
+
+
+    end subroutine update_medie
+
+    !***********************************************************************
+    subroutine set_simulation_folder(simulation_folder_string) bind(C,name='set_simulation_folder')
+
+        use, intrinsic :: iso_c_binding
+
+        implicit none
+
+        character(kind=c_char), dimension(*), intent(IN) :: simulation_folder_string
+        integer :: i,l
+
+
+        do l=1,500
+            if (simulation_folder_string(l) == C_NULL_CHAR) exit
+            result_folder(l:l)=simulation_folder_string(l)
+        end do
+        result_folder(l:500)=" "
+
+
+        print *, 'In Fortran:'
+        print *, 'simulation folder: ', trim(result_folder)
+    end subroutine set_simulation_folder
 
 end module output_module
+

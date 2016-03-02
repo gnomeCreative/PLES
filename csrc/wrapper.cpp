@@ -15,6 +15,7 @@
 #include <string>
 #include <cstring>
 #include <mpi.h>
+#include <time.h>
 
 
 #include "getpot.h"
@@ -31,6 +32,7 @@ extern "C" {
 void les_initialize();
 void les_core();
 void les_finalize();
+void set_simulation_folder(const char*);
 }
 
 extern int nproc,myid;
@@ -49,53 +51,104 @@ void goCycle(IO& io, DEM& dem) {
 
 void parseCommandLine(IO& io, GetPot& command_line) {
 
+	// std::system((std::string("mkdir -p '") + io.workDirectory + "'; cp '" + io.lbmCfgName + "' '" + io.workDirectory + "'").c_str());
 	extern int myid;
 
 	if (myid==0) {
 		cout<<"Parsing command line"<<endl;
 	}
 
+	// PART 1 - SIMULATION FOLDER ---------------------------------------------------
+
 	// create the data directory in case it doesn't exist
-	io.workDirectory = "data";
+	// standard is ./results
+	io.workDirectory = "./results";
 	if (command_line.search("-d")) {
 		io.workDirectory = command_line.next(io.workDirectory);
+		if (myid==0) {
+			std::system((std::string("mkdir -p '") + io.workDirectory + "'").c_str());
+		}
 	}
 
 	// if the name of the simulation is specified create subfolder
-	std::string programName = "name";
+	// standard is just a string with the current time
+	std::string programName = "time";
 	if (command_line.search("-n")) {
 		// creating work directory
 		programName=command_line.next(programName);
-		// if the specified name is "time" then create a folder named with the initial time
-		if (programName=="time") {
-			string simulationTime;
-			time_t t;
-			time(&t);
-			simulationTime=ctime(&t);
-			io.workDirectory=io.workDirectory+"/"+simulationTime;
-			io.workDirectory=io.workDirectory.substr(0,io.workDirectory.size()-1);
-		}
-		else {
-			io.workDirectory=io.workDirectory+"/"+programName;
-		}
 	}
+	cout<<"check1"<<endl;
+	// if there is no specified name, create a folder named with the initial time
+	if (programName=="time") {
+		char* buff;
+		if (myid==0) {
+		time_t now = time(NULL);
+		const struct tm* timeptr=localtime(&now);
+		strftime(buff, 20, "%Y%m%d_%H%M%S", timeptr);
+		//time_t rawtime;
+		//  time (&rawtime);
+		}
+		MPI_Bcast(buff, 20, MPI_CHAR, 0, MPI::COMM_WORLD);
+		MPI::COMM_WORLD.Barrier();
+		io.workDirectory=io.workDirectory+"/"+std::string(buff);
+	}
+	// otherwise use the name as input
+	else {
+		io.workDirectory=io.workDirectory+"/"+programName;
+	}
+	cout<<"check2"<<endl;
+	// make simulation folder
+	if (myid==0) {
+		std::system((std::string("mkdir -p '") + io.workDirectory + "'").c_str());
+	}
+	cout<<"check3"<<endl;
+	// send simulation folder to Fortran
+	set_simulation_folder(io.workDirectory.c_str());
 
-	// lbm configuration file
-	io.configFile = "config.cfg";
-	if (command_line.search("-c")) {
-		io.configFile = command_line.next(io.configFile.c_str());
-		cout<<"Using "<<io.configFile<<" for DEM parameters\n";
-		// copy the lbm configuration file into the data folder for later reproducibility
-		std::system((std::string("mkdir -p '") + io.workDirectory + "'; cp '" + io.configFile + "' '" + io.workDirectory + "'").c_str());
+	// PART 2 - CONFIGURATION FILES ---------------------------------------------------
+
+	// DEM configuration file
+	io.demConfigFile = "demConfigFile.cfg";
+	if (command_line.search("-dem")) {
+		io.demConfigFile = command_line.next(io.demConfigFile.c_str());
+	}
+	if (myid==0) {
+		cout<<"Using "<<io.demConfigFile<<" for DEM parameters\n";
+	}
+	// LES configuration file
+	io.lesConfigFile = "lesConfigFile.cfg";
+	if (command_line.search("-les")) {
+		io.lesConfigFile = command_line.next(io.lesConfigFile.c_str());
+	}
+	if (myid==0) {
+		cout<<"Using "<<io.lesConfigFile<<" for LES parameters\n";
+	}
+	// copy the configuration files into the data folder for later reproducibility
+	if (myid==0) {
+		std::system(("cp '" + io.demConfigFile + "' '" + io.workDirectory + "'").c_str());
+		std::system(("cp '" + io.lesConfigFile + "' '" + io.workDirectory + "'").c_str());
 	}
 
 	// make sure the config files can be read
-	std::ifstream lbmCfgFile(io.configFile.c_str());
-	if (!lbmCfgFile) {
-		cout << "ERROR: Can't open config file \"" << io.configFile << "\" for reading!\n";
-		//        return ERROR;
+	std::ifstream demCfgFile(io.demConfigFile.c_str());
+	std::ifstream lesCfgFile(io.lesConfigFile.c_str());
+	if (!demCfgFile) {
+		if (myid==0) {
+			cout << "ERROR: Can't open DEM config file \"" << io.demConfigFile << "\" for reading!\n";
+		}
+		MPI::Finalize();
+		exit(0);
 	}
-	lbmCfgFile.close();
+	if (!lesCfgFile) {
+		if (myid==0) {
+			cout << "ERROR: Can't open LES config file \"" << io.lesConfigFile << "\" for reading!\n";
+		}
+		MPI::Finalize();
+		exit(0);
+	}
+	demCfgFile.close();
+	demCfgFile.close();
+
 }
 
 void printUfo(GetPot& command_line, GetPot& lbmCfgFile){
@@ -121,7 +174,7 @@ void printUfo(GetPot& command_line, GetPot& lbmCfgFile){
 	}
 }
 
-void parseConfigFile(IO& io, DEM& dem, GetPot& lbmCfgFile, GetPot& command_line) {
+void parseDemConfigFile(IO& io, DEM& dem, GetPot& lbmCfgFile, GetPot& command_line) {
 
 	// PROBLEM NAME //////////////
 	// necessary for hard coded sections of the code
@@ -199,22 +252,29 @@ void parseLesConfigFile(GetPot& command_line, GetPot& lesCfgFile) {
 	ASSERT(i_rest >= 0);
 	PARSE_EXTERNAL(lesCfgFile, int, print_iter_or_time, "print_iter_or_time", -1);
 	ASSERT(print_iter_or_time >= 0);
+	ASSERT(print_iter_or_time <= 1);
 	PARSE_EXTERNAL(lesCfgFile, int, i_print, "i_print", -1);
 	ASSERT(i_print >= 0);
 	PARSE_EXTERNAL(lesCfgFile, int, i_time, "i_time", -1);
 	ASSERT(i_time >= 0);
 	PARSE_EXTERNAL(lesCfgFile, int, i_printfile, "i_printfile", -1);
 	ASSERT(i_printfile >= 0);
-	PARSE_EXTERNAL(lesCfgFile, int, i_paraview, "i_paraview", -1);
-	ASSERT(i_paraview >= 0);
-	PARSE_EXTERNAL(lesCfgFile, int, i_cumulative, "i_cumulative", -1);
-	ASSERT(i_cumulative >= 0);
+	ASSERT(i_printfile <= 2);
+	PARSE_EXTERNAL(lesCfgFile, bool, i_paraview, "i_paraview", false);
+	PARSE_EXTERNAL(lesCfgFile, bool, i_newres, "i_newres", false);
+	PARSE_EXTERNAL(lesCfgFile, bool, i_medietempo, "i_medietempo", false);
+	PARSE_EXTERNAL(lesCfgFile, bool, i_cumulative, "i_cumulative", false);
 	PARSE_EXTERNAL(lesCfgFile, int, iformat_newres, "iformat_newres", -1);
 	ASSERT(iformat_newres >= 0);
-	PARSE_EXTERNAL(lesCfgFile, int, iformat_grid, "iformat_grid", -1);
-	ASSERT(iformat_grid >= 0);
-	PARSE_EXTERNAL(lesCfgFile, int, ifolder, "ifolder", -1);
-	ASSERT(ifolder >= 0);
+	ASSERT(iformat_newres <= 2);
+	PARSE_EXTERNAL(lesCfgFile, bool, iformat_grid, "iformat_grid", false);
+
+	// strings
+	//string result_folder_string;
+	//const char * c = str.c_str();
+	//char* problemNameString;
+	//PARSE_CLASS_MEMBER(lesCfgFile, problemNameString, "problemName","none");
+
 	//string string_newres_format_C,string_grid_format_C;
 	//PARSE_EXTERNAL(lesCfgFile, string, string_newres_format_C, "string_newres_format", "aa");
 	//PARSE_EXTERNAL(lesCfgFile, string, string_grid_format_C, "string_grid_format", "aa");
@@ -288,6 +348,7 @@ void parseLesConfigFile(GetPot& command_line, GetPot& lesCfgFile) {
 	ASSERT(ibb >= 0);
 	PARSE_EXTERNAL(lesCfgFile, int, bodyforce, "bodyforce", -1);
 	ASSERT(bodyforce >= 0);
+	PARSE_EXTERNAL(lesCfgFile, bool, bodyupdate, "bodyupdate", true);
 	PARSE_EXTERNAL(lesCfgFile, int, num_iter, "num_iter", -1);
 	ASSERT(num_iter >= 0);
 	PARSE_EXTERNAL(lesCfgFile, int, coef_wall, "coef_wall", -1);
@@ -572,6 +633,14 @@ int main(int argc, char* argv[]){
 
 	MPI::Init();
 
+	myid = MPI::COMM_WORLD.Get_rank();
+	nproc = MPI::COMM_WORLD.Get_size();
+
+	//int l;
+	//char* name="Hello world";
+	//l = send_c_strings(name);
+	//printf("In C: l = %d\n",l);
+
 	// DECLARATION OF VARIABLES - Input-Output ///////////////
 	IO io;
 
@@ -582,17 +651,14 @@ int main(int argc, char* argv[]){
 	GetPot command_line(argc, argv);
 	parseCommandLine(io, command_line);
 
-	// parsing LBM input file
-	GetPot lbmCfgFile(io.configFile);
-	parseConfigFile(io, dem, lbmCfgFile, command_line);
+	// parsing DEM input file
+	GetPot lbmCfgFile(io.demConfigFile);
+	parseDemConfigFile(io, dem, lbmCfgFile, command_line);
+	MPI::COMM_WORLD.Barrier();
 
-	myid = MPI::COMM_WORLD.Get_rank();
-	nproc = MPI::COMM_WORLD.Get_size();
-
-	string lesConfigFile="lesCgfFile.cfg";
-	GetPot lesCfgFile(lesConfigFile);
+	// parsing LES input file
+	GetPot lesCfgFile(io.lesConfigFile);
 	parseLesConfigFile(command_line,lesCfgFile);
-
 	MPI::COMM_WORLD.Barrier();
 
 	les_initialize();
@@ -611,11 +677,9 @@ int main(int argc, char* argv[]){
 
 	if (false) {
 
-
-
 		io.currentTimeStep = 0;
 
-    	/* /////////////////////////////////////////////////////////
+		/* /////////////////////////////////////////////////////////
         // PROGRAM CORE  ///////////////////////////////////////////
         //////////////////////////////////////////////////////////*/
 		cout<<"PROBLEM ID: "<<problemName<<"\n";

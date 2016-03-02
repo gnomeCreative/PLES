@@ -13,7 +13,7 @@ module parti
    !       common/caratt/diam,ropart
    !       common/del/deltax,deltaz
    !       common/incaratt/ro1,ro2,ro3,di1,di2,di3
-   common/dominio/alx,alz
-   common/tempopa/ti
+   !common/dominio/alx,alz
+   !common/tempopa/ti
 
 end module parti

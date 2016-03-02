@@ -4,7 +4,7 @@
 
 module scala3
 
-    use,intrinsic :: iso_c_binding
+    use,intrinsic   :: iso_c_binding
     ! SONO DEFINITI:
     ! i parametri n1,n2,n3 massimi di dimensione
     ! il numero di scalari che si considerano nscal
@@ -12,10 +12,10 @@ module scala3
     !
     integer,bind(C) :: n1,n2,n3
     integer,bind(C) :: nscal
-    integer jx,jy,jz
+    integer         :: jx,jy,jz
     integer,bind(C) :: potenziale
-    integer single_or_double
-    real,bind(C) :: dt,dt_start,re
+    integer         :: single_or_double
+    real,bind(C)    :: dt,dt_start,re
     !
     !parameter (n1=32,n2=32,n3=32)
     !parameter (nscal=1) !MUST NOT BE LESS THAN 1

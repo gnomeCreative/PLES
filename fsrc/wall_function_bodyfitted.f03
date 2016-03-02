@@ -34,7 +34,7 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
     !-----------------------------------------------------------------------
     !             FACE 3
     !-----------------------------------------------------------------------
-    if(ktime .eq. 1)then
+    if (ktime==1) then
 
         !     first value for ustar
 
@@ -121,12 +121,13 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
     end if
 
 
-    if(ktime .eq. 1 .and. i_rest==0)then
+    if (ktime==1 .and. i_rest==0)then
         u_t = 1.
         utangente = 1.
         att_mod_par = 0
     else
-        do iwall = 1,wfp3
+        if (wfp3==1) then
+
             j = 1
             do k=kparasta,kparaend
                 do i=1,jx
@@ -172,26 +173,26 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
                     end if
                 end do
             end do
-        end do  ! iwall
+        end if  ! wfp3
 
 
-        do iwall = 1,1-wfp3
+        if (wfp3==1) then
             do k=kparasta,kparaend
                 do i=1,jx
                     att_mod_par(i,1,k)=0
                 end do
             end do
-        end do
+        end if
       
     end if
     !-----------------------------------------------------------------------
     !             FACE 4
     !-----------------------------------------------------------------------
 
-    if(ktime .eq. 1)then
+    if (ktime==1) then
 
      
-        do iwall = 1,wfp4
+        if (wfp4==1) then
             j=jy
             do k=kparasta,kparaend
                 do i=1,jx
@@ -257,7 +258,7 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
 	    
                 end do
             end do
-        end do
+        end if !wpf4
     end if
 
 
@@ -266,7 +267,7 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
         utangente = 1.
         att_mod_par = 0
     else
-        do iwall = 1,wfp4
+        if (wfp4==1) then
             j = jy
             do k=kparasta,kparaend
                 do i=1,jx
@@ -300,8 +301,6 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
                             call compute_ustar(distanza,re,utangente(i,2,k),u_t(i,2,k), &
                                 rough,z0)
 
-
-     
                             !    switch off the wall function if y+<11 or if it is not a fluid node
                             !    in case of ibm
                             if(u_t(i,2,k)*distanza*re .le. 11. .or.tipo(i,j,k).ne.2)then
@@ -323,16 +322,16 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
                     end if
                 end do
             end do
-        end do  ! iwall
+        end if  ! wfp4
       
       
-        do iwall = 1,1-wfp4
+        if (wfp4==0) then
             do k=kparasta,kparaend
                 do i=1,jx
                     att_mod_par(i,2,k)=0
                 end do
             end do
-        end do
+        end if
            
     end if
     !-----------------------------------------------------------------------
@@ -349,8 +348,10 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
             do kk=1,att_mod_par(i,2,k)
                 u_t_sopra = u_t_sopra +u_t(i,2,k)*u_t(i,2,k)
             end do
+
         end do
     end do
+
 
     call MPI_ALLREDUCE(u_t_sotto,tau_sotto,1,MPI_REAL_SD, &
         MPI_SUM,MPI_COMM_WORLD,ierr)
@@ -367,97 +368,78 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
     return
 end
 
-!-----------------------------------------------------------------------
-! SUBROUTINE
-!-----------------------------------------------------------------------
-
 !***********************************************************************
-subroutine piano_per3punti ( x1, y1, z1,  &
-    x2, y2, z2,  &
-    x3, y3, z3,  &
-    a, b, c, d )
-    !-----------------------------------------------------------------------
-    ! dati tre punti di coordinate (x1,y1,z1),(x2,y2,z2),(x3,y3,z3) trovo
-    ! il piano che vi passa di eq: ax+by+cz+d=0
-    !-----------------------------------------------------------------------
-    implicit none
-    !
-    real a,b,c,d
-    real x1,y1,z1
-    real x2,y2,z2
-    real x3,y3,z3
-
-    a = ( y2 - y1 ) * ( z3 - z1 ) - ( z2 - z1 ) * ( y3 - y1 )
-    b = ( z2 - z1 ) * ( x3 - x1 ) - ( x2 - x1 ) * ( z3 - z1 )
-    c = ( x2 - x1 ) * ( y3 - y1 ) - ( y2 - y1 ) * ( x3 - x1 )
-    d = - x2 * a - y2 * b - z2 * c
-
-    return
-end
-
-
-!***********************************************************************
-subroutine punto_proiezione_piano(a,b,c,d,x,y,z,xn,yn,zn)
-    !***********************************************************************
-    !------------------------------------------------------------
-    ! dato un piano di equazione ax+by+cz+d=0 ed un punto (x,y,z)
-    ! trovo il punto appartenente al piano (xn,yn,zn) piu' vicino
-    ! al punto sopra
-    !------------------------------------------------------------
-    ! COME PROCEDO:
-    ! normale N al piano (a,b,c)
-    ! la linea definita da (xn-x)/a = (yn-y)/b = (zn-z)/c = t
-    ! passa per il punto (x,y,z) ed e' parallela a N
-    !
-    ! risolvendo per il punto (xn,yn,zn) ottengo:
-    !
-    !  xn = a * t + x
-    !  yn = b * t + y
-    !  zn = c * t + z
-    !
-    ! pongo questi valori nell'equazione del piano e risolvo per t
-    !
-    ! a*(a * t + x) + b*(b * t + y) + c*(c * t + z) + d = 0
-    !
-    ! t=(-a*x -b*y -c*z -d) / (a*a + b*b + c*c)
-    !------------------------------------------------------------
+subroutine compute_ustar(distanza,reynol,umedia,u_t,rough,rougheight)
 
     implicit none
 
-    real a,b,c,d
-    real x,y,z
-    real xn,yn,zn
-    real t
+    !-----------------------------------------------------------------------
+    !     variables declaration
 
-    if ( a == 0.0D+00 .and. b == 0.0D+00 .and. c == 0.0D+00 ) then
-        write ( *, '(a)' ) ' '
-        write ( *, '(a)' ) 'PLANE_IMP_POINT_NEAR_3D - Fatal error!'
-        write ( *, '(a)' ) '  A = B = C = 0.'
-        stop
-    else
+    real,intent(in) :: rougheight,reynol,umedia,distanza
+    integer,intent(in) :: rough
+    real,intent(out) :: u_t
+    !
+    real errore_star,argomentolog,f,fprime,tempv
+    integer contatore_star
 
-        t = -( a * x + b * y + c * z + d )/( a * a + b * b + c * c )
 
-        xn = x + a * t
-        yn = y + b * t
-        zn = z + c * t
+    !-----------------------------------------------------------------------
+    ! parameters law of the wall
+    real,parameter :: vonKarman=0.41 ! k
+    real,parameter :: coef_rough=5.1
+    real,parameter :: kdynamic=1/vonKarman   ! 1/k with k von karman constant
+    real,parameter :: transition=0.0
 
+    ! parameters iterative procedure
+    integer,parameter :: max_iterations=100
+    real,parameter :: convergence_error=1.e-4
+    real,parameter :: min_ut=1.0e-8
+
+    ! coef_rough=5.1
+
+    !-----------------------------------------------------------------------
+    !     CASE 1: smooth surface
+
+    if (rough==0) then
+        !     Newton - Rapshon iterative procedure
+        contatore_star = 0
+        errore_star = 1000.
+        do while (errore_star>convergence_error .and. contatore_star<max_iterations)
+            tempv=u_t
+            u_t = abs(u_t)
+
+            ! argomentolog = 1.0+ u_t*rougheight*reynol ! ALE
+
+            ! coef_rough = coef_rough  & ! ALE
+                !- real(transition)*kdynamic*log(argomentolog)! ALE
+
+            f=u_t*(kdynamic*log(abs(distanza*u_t*reynol))+ coef_rough) - umedia
+
+            ! fprime is f derivative
+            fprime = kdynamic*log(abs(distanza*u_t*reynol))+kdynamic+coef_rough !& ! ALE
+            ! -real(transition)*u_t*kdynamic*rougheight/(1./reynol + rougheight*u_t) ! ALE
+
+            u_t = u_t - f/fprime
+
+            if (u_t>min_ut) then
+                errore_star=abs(u_t-tempv)
+            !   errore_star = abs(f/sqrt(u_t))
+            end if
+
+            contatore_star = contatore_star +1
+            ! coef_rough = 5.1
+
+        end do   !end loop do while
+    !end do !smooth surface
+
+    !-----------------------------------------------------------------------
+    !     CASE 2: rough surface
+
+    elseif (rough==1) then
+        u_t=vonKarman*umedia/log(distanza/rougheight)
     end if
+
+
     return
 end
-
-
-!      subroutine trovopunti
-
-
-
-
-
-
-
-
-
-
-
-
-

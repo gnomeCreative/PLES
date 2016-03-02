@@ -3,6 +3,7 @@ subroutine mixrho_para(inmod,rho)
    !***********************************************************************
    ! compute scale similar part for scalar equation
    !
+   use filter_module
    use mysending
    use turbo3bis
    use turbo2_data

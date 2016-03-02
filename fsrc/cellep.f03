@@ -3,10 +3,10 @@ subroutine cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
    !***********************************************************************
    ! periodic points out of the domain
    !
-   use myarrays_metri3
-   use mysending
-   use scala3
-   use period
+   use myarrays_metri3, only: x, y, z
+   use mysending, only: kparaend, kparasta, myid, nproc
+   use scala3, only: jx, jy, jz, n1, n2, n3
+   !use period
 
    implicit none
    !-----------------------------------------------------------------------

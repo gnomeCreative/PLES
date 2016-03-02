@@ -7,6 +7,7 @@ subroutine restart(ti,dbbx)
     use myarrays_velo3
     use mysending
     use scala3
+    use output_module, only: info_run_file
 
     implicit none
     !-----------------------------------------------------------------------
@@ -24,7 +25,7 @@ subroutine restart(ti,dbbx)
 
     kpsta_deep = kparasta - deepl
     kpend_deep = kparaend + deepr
-    write(11,*)myid,'DEEP',deepl,deepr
+    write(info_run_file,*)myid,'DEEP',deepl,deepr
 
     kpsta = kparasta
     if(myid.eq.0)kpsta=kparasta-1

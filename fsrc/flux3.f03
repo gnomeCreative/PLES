@@ -23,7 +23,7 @@ subroutine flux3(rc,cgra3,r,insc,tipo,body)
    !-----------------------------------------------------------------------
    !     array declaration
    integer ierr,status(MPI_STATUS_SIZE)
-   integer ncolperproc,m,insc
+   integer m,insc
    integer kparastal,kparaendl
    integer kparastall,kparaendll
    double precision bulk_loc,bulk3

@@ -33,8 +33,10 @@ extern ProblemName problemName;
 
 class IO{
 public:
-    // config file
-    string configFile;
+    // dem config file
+    string demConfigFile;
+    // les config file
+    string lesConfigFile;
     // time integration
     unsigned int currentTimeStep, maximumTimeSteps;
     // maximum real time for simulation

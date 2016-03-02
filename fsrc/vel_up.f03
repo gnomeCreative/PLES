@@ -1,6 +1,5 @@
 !***********************************************************************
-subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
-    bodyforce,freesurface)
+subroutine vel_up(kparasta,kparaend,rightpe,leftpe,bodyforce,freesurface)
     !***********************************************************************
     ! compute the cartesian and controvariant velocity at step n+1
     !
@@ -36,8 +35,8 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
     !-----------------------------------------------------------------------
     ! velocity  at step n+1 into the field
     !
-    if(freesurface.eq.0)then !no free surface <<<<<<<<<<<<<<<
-        if(potenziale == 0)then
+    if (freesurface.eq.0) then !no free surface <<<<<<<<<<<<<<<
+        if (potenziale == 0) then
       
             do k=kparasta,kparaend
                 do j=1,jy
@@ -47,11 +46,11 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
                         v(i,j,k)=v(i,j,k)+gra2(i,j,k)
                         w(i,j,k)=w(i,j,k)+gra3(i,j,k)
                     !
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
 
-        elseif(potenziale == 1)then
+        else if (potenziale == 1) then
 
             do k=kparasta,kparaend
                 do j=1,jy
@@ -61,13 +60,13 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
                         v(i,j,k)=gra2(i,j,k)
                         w(i,j,k)=gra3(i,j,k)
                     !
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
 
         end if
 
-    elseif(freesurface.eq.1)then !free surface on<<<<<<<<<<<<<<<<
+    else if (freesurface.eq.1) then !free surface on<<<<<<<<<<<<<<<<
         !
         do k=kparasta,kparaend
             do j=1,jy
@@ -75,9 +74,9 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
                     u(i,j,k)=u(i,j,k)+gra1(i,j,k)
                     v(i,j,k)=v(i,j,k)+gra2(i,j,k)
                     w(i,j,k)=w(i,j,k)+gra3(i,j,k)
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
     !
     end if !free surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -97,10 +96,10 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
                 v(jx+1,j,k)=v(1 ,j,k)
                 w(jx+1,j,k)=w(1 ,j,k)
             !
-            enddo
-        enddo
+            end do
+        end do
 
-    enddo
+    end do
     !
     !
     ! periodic cell in eta (also outside the domain)
@@ -126,9 +125,9 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
                 u(i,jy+1,k)=u(i,1 ,k)
                 v(i,jy+1,k)=v(i,1 ,k)
                 w(i,jy+1,k)=w(i,1 ,k)
-            enddo
-        enddo
-    enddo
+            end do
+        end do
+    end do
     !
     ! periodic cell in zita (also outside the domain)
     !
@@ -183,63 +182,63 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
 
         call MPI_TYPE_FREE(plantype,ierr)
 
-    enddo
+    end do
     !
     ! compute controvariant velocity: cycle 0,jx for Uc
     !                                 cycle 0,jz for Wc
     !
-    if(freesurface.eq.0)then !no free surface <<<<<<<<<<<<<<<
-        if(potenziale == 0)then
+    if (freesurface.eq.0) then !no free surface <<<<<<<<<<<<<<<
+        if (potenziale == 0) then
             do k=kparasta,kparaend
                 do j=1,jy
                     do i=ip,jx-ip
                         uc(i,j,k)=uc(i,j,k)-dt*cgra1(i,j,k)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
             !
             do k=kparasta,kparaend
                 do j=jp,jy-jp
                     do i=1,jx
                         vc(i,j,k)=vc(i,j,k)-dt*cgra2(i,j,k)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
       
-        elseif(potenziale==1)then
+        else if (potenziale==1) then
       
             do k=kparasta,kparaend
                 do j=1,jy
                     do i=ip,jx-ip
                         uc(i,j,k)=-dt*cgra1(i,j,k)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
             !
             do k=kparasta,kparaend
                 do j=jp,jy-jp
                     do i=1,jx
                         vc(i,j,k)=-dt*cgra2(i,j,k)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
         end if
-    elseif(freesurface.eq.1)then !free surface on<<<<<<<<<<<<<<<<
+    else if (freesurface.eq.1) then !free surface on<<<<<<<<<<<<<<<<
         do k=kparasta,kparaend
             do j=1,jy
                 do i=ip,jx-ip
                     uc(i,j,k)=uc(i,j,k)-dt*cgra1(i,j,k)
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         do k=kparasta,kparaend
             do j=0,jy  !including also the surface gradient
                 do i=1,jx
                     vc(i,j,k)=vc(i,j,k)-dt*cgra2(i,j,k)
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
     end if !free surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
       
@@ -257,51 +256,51 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe, &
         kparaendl=kparaend
     endif
 
-    if(freesurface.eq.0)then !no free surface <<<<<<<<<<<<<<<
-        if(potenziale==0)then
+    if (freesurface.eq.0) then !no free surface <<<<<<<<<<<<<<<
+        if (potenziale==0) then
             do k=kparastal,kparaendl
                 do j=1,jy
                     do i=1,jx
                         wc(i,j,k)=wc(i,j,k)-dt*cgra3(i,j,k)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
 
-        elseif(potenziale==1)then
+        else if (potenziale==1) then
 
             do k=kparastal,kparaendl
                 do j=1,jy
                     do i=1,jx
                         wc(i,j,k)=-dt*cgra3(i,j,k)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
         end if
 
-    elseif(freesurface.eq.1)then !free surface on<<<<<<<<<<<<<<<<
+    else if (freesurface.eq.1) then !free surface on<<<<<<<<<<<<<<<<
         do k=kparastal,kparaendl
             do j=1,jy
                 do i=1,jx
                     wc(i,j,k)=wc(i,j,k)-dt*cgra3(i,j,k)
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
     end if !free surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     !
     ! I need Wc(k-1) to compute divmax
     ! so sending procedure for kparaend
     !
-    if(myid.eq.0)then
+    if (myid.eq.0) then
         leftpem=MPI_PROC_NULL
         rightpem=rightpe
-    else if(myid.eq.nproc-1)then
+    else if (myid.eq.nproc-1) then
         leftpem=leftpe
         rightpem=MPI_PROC_NULL
-    else if((myid.ne.0).and.(myid.ne.nproc-1))then
+    else if ((myid.ne.0).and.(myid.ne.nproc-1)) then
         leftpem=leftpe
         rightpem=rightpe
-    endif
+    end if
 
     call MPI_SENDRECV(wc(1,1,kparaend),jx*jy, &
         MPI_REAL_SD,rightpem,71+myid, &

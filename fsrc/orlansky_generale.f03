@@ -30,7 +30,7 @@ subroutine orlansky_generale(ktime)
    i_ob = 0
    !-----------------------------------------------------------------------
 
-   !     initialization
+   ! initialization
    do k=1,jz
       do j=1,jy
          du_dx1(j,k)=0.

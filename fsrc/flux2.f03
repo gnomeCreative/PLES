@@ -22,7 +22,7 @@ subroutine flux2(rc,cgra2,r,insc,tipo,body)
    !-----------------------------------------------------------------------
    !     array declaration
    integer ierr,insc
-   integer ncolperproc,m
+   integer m
    integer kparastak,kparaendk
    double precision bulk_loc,bulk2
 

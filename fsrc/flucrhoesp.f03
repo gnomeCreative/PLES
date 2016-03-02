@@ -24,7 +24,7 @@ subroutine flucrhoesp(r,isc,tipo,body)
    !-----------------------------------------------------------------------
    !     array declaration
    integer ierr,status(MPI_STATUS_SIZE)
-   integer ncolperproc,m
+   integer m
    integer kparastal,kparaendl
    integer i,j,k,ii,jj,kk,isc
    real r(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr) !0:n3+1)

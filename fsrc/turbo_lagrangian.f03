@@ -11,6 +11,7 @@
 ! they are stored in gra1, gra2, gra3 (this matrix will be also used for pressure)
 
 !
+        use filter_module
       use turbo2_data
       use turbo3bis
       use mysending
@@ -43,7 +44,6 @@
       integer in_in1(n1  ,n2  ,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
 !
       integer ierr 
-      integer ncolperproc 
       integer status(MPI_STATUS_SIZE)
       integer req1,req2,req3,req4
       integer istatus(MPI_STATUS_SIZE)

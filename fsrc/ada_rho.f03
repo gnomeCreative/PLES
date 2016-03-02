@@ -21,7 +21,7 @@ subroutine ada_rho(ktime,rven,isc,rho,kdeg)
     real kdeg
     !
     integer ierr
-    integer ncolperproc,m
+    integer m
     !-----------------------------------------------------------------------
     ! compute convective term + explicit diffusive term
     !

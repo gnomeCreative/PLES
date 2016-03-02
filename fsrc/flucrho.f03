@@ -25,7 +25,7 @@ subroutine flucrho(ti,r,akaptV,akapt,isc,tipo,body)
    !-----------------------------------------------------------------------
    !     array declaration
    integer ierr,status(MPI_STATUS_SIZE)
-   integer ncolperproc,m
+   integer m
    integer kparastal,kparaendl
    integer i,j,k,ii,jj,kk,isc
 

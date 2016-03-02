@@ -8,6 +8,7 @@ subroutine contra_infout(kparasta,kparaend,rightpe,leftpe,nproc,myid,&
    use myarrays_metri3
    use myarrays_velo3
    use myarrays2
+   use output_module, only: info_run_file
    !
    use scala3
    use period
@@ -90,7 +91,7 @@ subroutine contra_infout(kparasta,kparaend,rightpe,leftpe,nproc,myid,&
    endif
    if(myid.eq.0)then
       write(*,*)'INFLOW/OUTFLOW'
-      write(11,*)'contatore pareti orlansky',contatore
+      write(info_run_file,*)'contatore pareti orlansky',contatore
    endif
 
    !-----------------------------------------------------------------------
@@ -385,12 +386,12 @@ subroutine contra_infout(kparasta,kparaend,rightpe,leftpe,nproc,myid,&
       write(*,*)'inflow',am_in
       write(*,*)'outflow',am_out
       write(*,*)'delta',del_mas
-      write(11,*)'massa attraverso faccia 1:',am_out1
-      write(11,*)'massa attraverso faccia 2:',am_out2
-      write(11,*)'massa attraverso faccia 3:',am_out3
-      write(11,*)'massa attraverso faccia 4:',am_out4
-      write(11,*)'massa attraverso faccia 5:',am_out5
-      write(11,*)'massa attraverso faccia 6:',am_out6
+      write(info_run_file,*)'massa attraverso faccia 1:',am_out1
+      write(info_run_file,*)'massa attraverso faccia 2:',am_out2
+      write(info_run_file,*)'massa attraverso faccia 3:',am_out3
+      write(info_run_file,*)'massa attraverso faccia 4:',am_out4
+      write(info_run_file,*)'massa attraverso faccia 5:',am_out5
+      write(info_run_file,*)'massa attraverso faccia 6:',am_out6
    endif
    !
    !-----------------------------------------------------------------------

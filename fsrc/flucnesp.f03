@@ -23,7 +23,7 @@ subroutine flucnesp(r,visualizzo,tau_wind,tipo,body)
    !-----------------------------------------------------------------------
    !     array declaration
    integer ierr,status(MPI_STATUS_SIZE)
-   integer ncolperproc,m
+   integer m
    integer kparastal,kparaendl
    double precision bulk_loc,bulkn
    integer i,j,k,ii,jj,kk

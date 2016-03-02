@@ -5,12 +5,14 @@ module myarrays_ibm
     !-----------------------------------------------------------------------
     !
 
-    use iso_c_binding
+    use,intrinsic :: iso_c_binding
 
     integer,bind(C) :: bodyforce,num_iter
-    integer MN,MP
-    integer numero_celle_IB,numero_celle_bloccate
-    integer num_ib,num_solide
+    logical,bind(C) :: bodyupdate
+    !MN,MP matrix dimension to store mesh: points and triangle
+    integer :: MN,MP
+    integer :: numero_celle_IB,numero_celle_bloccate,numero_celle_bloccate_real
+    integer :: num_ib,num_solide
 
     integer,allocatable :: indici_CELLE_IB(:,:)
     integer,allocatable :: indici_celle_bloccate(:,:)
@@ -18,21 +20,17 @@ module myarrays_ibm
     real,allocatable :: distanze_CELLE_IB(:,:)
     real,allocatable :: dist_pp_ib(:)
     real,allocatable :: dist_ib_parete(:)
-    real,allocatable :: dist_nulle(:)
-    real,allocatable :: ustar(:)
+    real,allocatable :: ustar(:),pressure_ib(:),shear_ib(:,:)
     real,allocatable :: proiezioni(:,:)
       
     !     array for rotation with eulerian angles c
-    real, allocatable :: rot(:,:,:)
-    real, allocatable :: rot_inverse(:,:,:)
-    integer, allocatable :: id_ib(:,:,:)
-    integer, allocatable :: id_ib_solide(:,:,:)
+    real, allocatable :: rot(:,:,:) ! PROBLEMATIC
+    real, allocatable :: rot_inverse(:,:,:) ! PROBLEMATIC
       
     !     array for trilinear
     real, allocatable :: tricoef(:,:)
     integer, allocatable :: trind(:,:,:)
       
-    !
     !     buffer
     real, allocatable :: sbuff_ibm(:)
     real, allocatable :: rbuff_ibm(:)
@@ -57,11 +55,29 @@ module myarrays_ibm
     !     initial scalar value at IB cells
     real, allocatable :: scalar_bottom_ib(:,:)
 
-
     real, allocatable :: r_solid(:,:)
 
+    integer :: ipressione_ibm
 
-    integer ipressione_ibm
+    ! ----------------------------------------------------
+    ! For particles
+
+    ! Identifier for the solid object the IB belongs to
+    integer,allocatable :: solidIndex(:,:,:,:)
+    ! Identifier for the solid object the IB belongs to
+    integer,allocatable :: solidIndexSize(:,:,:)
+    ! IP coordinates
+    real,allocatable :: nodo_vicino_x_array(:,:,:), nodo_vicino_y_array(:,:,:), nodo_vicino_z_array(:,:,:)
+
+    integer :: totParticles
+    real,allocatable :: radius(:)
+    real,allocatable :: radius2(:),surface_sphere(:)
+    real,allocatable :: x_sphere(:),y_sphere(:),z_sphere(:)
+    real,allocatable :: x_force_sphere(:),y_force_sphere(:),z_force_sphere(:)
+    real,allocatable :: x_moment_sphere(:),y_moment_sphere(:),z_moment_sphere(:)
+    integer,allocatable :: sphereIndex(:)
+
+
 !***********************************************************************
 end module myarrays_ibm
 !***********************************************************************

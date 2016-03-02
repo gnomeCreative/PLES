@@ -233,7 +233,7 @@ subroutine carico_immb(tipo)
 360 format(4e15.8)     ! tri_ibm
 370 format(4(i8,1x))
 
-   !      write(2000+myid,*)myid,'number of ib points: ',num_ib
+         write(*,*)myid,', number of ib points: ',num_ib !200+myid
    !.......................................................................
 
 
@@ -268,11 +268,11 @@ subroutine carico_immb(tipo)
    !      if(myid.eq.0)then
    !      write(*,*)'read solid cells ---> OK'
    !      end if
-   write(200,*)'border solid',contatore
+   write(*,*)'border solid',contatore
 
    num_solide_real=num_solide-contatore !without border cells
 
-   write(200,*)myid,'number of solid cells: ',num_solide
+  write(*,*)myid,'number of solid cells: ',num_solide
       
    !-----------------------------------------------------------------------
    !     check number of ibm for each proc
@@ -304,9 +304,9 @@ subroutine carico_immb(tipo)
       write(*,*)'--------------------------------------------'
    end if
 
-   write(200,*)'number IB proc --->',num_ib
-   write(200,*)'number solid cells proc --->',num_solide
-   write(200,*)'--------------------------------------------'
+   write(*,*)'number IB proc --->',num_ib
+   write(*,*)'number solid cells proc --->',num_solide
+   write(*,*)'--------------------------------------------'
 
    if(myid.eq.0)then
       write(*,*)'       LOAD IBM finished'
@@ -387,13 +387,6 @@ subroutine carico_immb(tipo)
    !     in closer right proc
    !
    !     step 1, comunication of counter, how much I send/recive
-
-
-
-
-
-
-
 
 
    !     comunicate left the point left has to send right

@@ -179,7 +179,6 @@ subroutine inflow(myid,nproc,lett,bodyforce,area1,area2,area3,area4,area5,area6,
       read(10013,*)nnx,nnz !jx,jz
       read(10013,*)npn3
       read(10013,*)npn
-		
       do k=1,jz
          do i=1,jx
             read(10013,102)up3(i,k),&
@@ -252,10 +251,16 @@ subroutine inflow(myid,nproc,lett,bodyforce,area1,area2,area3,area4,area5,area6,
             do isc=1,nscal
                rhovp5(isc,i,j)=rhovp5(isc,i,j)*real(index_out5(i,j))
             end do
+                           if (myid==nproc-1) then
+               write(*,*)i*j,up5(i,j),&
+               vp5(i,j),&
+               wp5(i,j),&
+               (rhovp5(isc,i,j),isc=1,nscal)
+                end if
          enddo
       enddo
       if(myid.eq.0) then
-         print*,myid,'inflow plane face 5'
+         print*,myid,' inflow plane face 5'
       endif
    endif
 104 format(10e13.5)

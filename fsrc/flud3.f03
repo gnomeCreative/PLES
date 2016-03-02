@@ -22,7 +22,7 @@ subroutine flud3(rc,cgra3,r,akapt,insc,isc,tipo,body)
    !-----------------------------------------------------------------------
    !     array declaration
    integer ierr,status(MPI_STATUS_SIZE)
-   integer ncolperproc,m,insc,isc
+   integer m,insc,isc
    integer kparastal,kparaendl
    integer kparastall,kparaendll
    integer i,j,k,ks,kss,ii,jj,kk,iii,jjj,kkk

@@ -1,6 +1,5 @@
 !***********************************************************************
-subroutine tridiag_trasp_para(akapt,g33_tr,giac_tr,del, &
-    icheck,ktime)
+subroutine tridiag_trasp_para(akapt,g33_tr,giac_tr,del,ktime)
     !***********************************************************************
     ! transpose operation for matrix.
     ! each plane XZ it is seen as two dimensional matrix and it is transposed,
@@ -49,7 +48,7 @@ subroutine tridiag_trasp_para(akapt,g33_tr,giac_tr,del, &
 
     integer ierr
       
-    integer nn,icheck,ktime
+    integer nn,ktime
     integer iparasta_tmp,iparaend_tmp,count,count_plane
     !-----------------------------------------------------------------------
     real, allocatable :: buffer(:),buffer_tot(:)
