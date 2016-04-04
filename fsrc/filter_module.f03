@@ -67,8 +67,7 @@ end
 subroutine filter01np(myid,nproc,kparasta,kparaend)
    !***********************************************************************
    ! apply test filter on csi and eta
-   use turbo2_data
-   use turbo3bis
+   use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3, rbuff1, sbuff1
    !
    implicit none
 
@@ -183,8 +182,7 @@ subroutine filter02np(myid,nproc,kparasta,kparaend)
    !***********************************************************************
    ! apply test filter in csi and eta for a product
    !
-   use turbo3bis
-   use turbo2_data
+   use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3, rbuff1, sbuff1
 
    implicit none
    !-----------------------------------------------------------------------
@@ -591,8 +589,8 @@ subroutine buffer1d_par(sbuff,var,n,kest,kparasta,kparaend)
    !-----------------------------------------------------------------------
    !     array declaration
    integer kparasta,kparaend
-   double precision var(0:n1+1,0:n2+1,kparasta-1:kparaend+1) !0:n3+1)
-   double precision sbuff((n1+2)*(n2+2)*40)
+   real var(0:n1+1,0:n2+1,kparasta-1:kparaend+1) !0:n3+1)
+   real sbuff((n1+2)*(n2+2)*40)
    integer i,j,n,kest,m
    !-----------------------------------------------------------------------
    do j=0,jy+1
@@ -612,10 +610,10 @@ subroutine buffer1g(var,n,kest,myid,nproc,kparasta,kparaend)
    !***********************************************************************
    ! update sbuff vector for sending variables
    !
-   use turbo3bis
+   !use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3,
+   use turbo_module, only: rbuff1, sbuff1
 
    implicit none
-   !
 
    !-----------------------------------------------------------------------
    !     array declaration
@@ -727,8 +725,8 @@ subroutine buffer2d_par(rbuff,var,n,kest)
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,n,kest,m
-   double precision var(0:n1+1,0:n2+1,kest:kest) !0:n3+1)
-   double precision rbuff((n1+2)*(n2+2)*40)
+   real var(0:n1+1,0:n2+1,kest:kest) !0:n3+1)
+   real rbuff((n1+2)*(n2+2)*40)
    !-----------------------------------------------------------------------
    do j=0,jy+1
       do i=0,jx+1
@@ -747,7 +745,7 @@ subroutine buffer2g(rbuff,var,n,myid,nproc,kparasta,kparaend)
    !**********************************************************************
    !     put data from buff to the variable
    !
-   use turbo3bis
+   use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3, rbuff1, sbuff1
 
 
    implicit none
@@ -776,7 +774,7 @@ subroutine buffer2gg(var,n,myid,nproc,kparasta,kparaend)
    !***********************************************************************
    ! put the variables from the reciving buff in the variables
 
-   use turbo3bis
+   use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3, rbuff1, sbuff1
 
    implicit none
    !-----------------------------------------------------------------------
@@ -857,8 +855,8 @@ subroutine buffvect1d(sbuff,var,n)
    ! aggiorna il vettore sbuffd per lo scambio di variabili
    implicit none
    !
-   double precision var(n2)
-   double precision sbuff((n1+2)*(n2+2)*40)
+   real var(n2)
+   real sbuff((n1+2)*(n2+2)*40)
    integer j,n,m
 
    do j=1,jy
@@ -881,8 +879,8 @@ subroutine buffvect2d(rbuff,var,n)
 
    implicit none
    !
-   double precision var(n2)
-   double precision rbuff((n1+2)*(n2+2)*40)
+   real var(n2)
+   real rbuff((n1+2)*(n2+2)*40)
    integer j,n,m
 
    do j=1,jy

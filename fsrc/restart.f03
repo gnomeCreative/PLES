@@ -1,5 +1,5 @@
 !***********************************************************************
-subroutine restart(ti,dbbx)
+subroutine restart(restart_file,ti)
     !***********************************************************************
     !
     ! read restart file old_res_form
@@ -8,18 +8,21 @@ subroutine restart(ti,dbbx)
     use mysending
     use scala3
     use output_module, only: info_run_file
+    use mysettings, only: bbx
 
     implicit none
     !-----------------------------------------------------------------------
     ! variables declaration
+    real,intent(out) :: ti
+    character(len=500),intent(in) :: restart_file
+
     integer i,j,k,isc
-    real ti
-    real bbx,dbbx
-    integer nscali
+    integer nscali ! dump variable
     integer kpsta,kpsta_deep,kpend_deep
+    integer,parameter :: oldresfile_id=10
     !
     real val_u,val_v,val_w,val_fi
-    real value
+    real value,dumpvalue
     real, allocatable :: val_rho(:)
     !-----------------------------------------------------------------------
 
@@ -28,14 +31,15 @@ subroutine restart(ti,dbbx)
     write(info_run_file,*)myid,'DEEP',deepl,deepr
 
     kpsta = kparasta
-    if(myid.eq.0)kpsta=kparasta-1
+    if(myid.eq.0) then
+        kpsta=kparasta-1
+    end if
 
+    open(oldresfile_id,file=trim(restart_file),status='old')
 
-    open(10,file='old_res_form',status='old')
-
-    read(10,*)nscali
-    read(10,*)ti
-    read(10,*)bbx,dbbx !bbx will be taken from Agenerale.in
+    read(oldresfile_id,*) nscali
+    read(oldresfile_id,*) ti
+    read(oldresfile_id,*) bbx,dumpvalue !bbx will be taken from Agenerale.in
 
     allocate(val_rho(nscal))
 
@@ -43,9 +47,9 @@ subroutine restart(ti,dbbx)
     do k=0,jz+1
         do j=0,jy+1
             do i=0,jx+1
-                !      read(10,1000)u(i,j,k),v(i,j,k),w(i,j,k),fi(i,j,k),
+                !      read(10,*)u(i,j,k),v(i,j,k),w(i,j,k),fi(i,j,k),
                 !     >             (rhov(isc,i,j,k),isc=1,nscal)
-                read(10,1000)val_u,val_v,val_w,val_fi, &
+                read(oldresfile_id,*)val_u,val_v,val_w,val_fi, &
                     (val_rho(isc),isc=1,nscal)
       
                 if(k.ge. kpsta_deep .and. k.le.kpend_deep)then
@@ -65,7 +69,7 @@ subroutine restart(ti,dbbx)
     do k=1,jz
         do j=1,jy
             do i=0,jx
-                read(10,1000)value
+                read(oldresfile_id,*)value
                 if(k.ge.kparasta .and. k.le.kparaend)then
                     uc(i,j,k) = value
                 end if
@@ -76,7 +80,7 @@ subroutine restart(ti,dbbx)
     do k=1,jz
         do j=0,jy
             do i=1,jx
-                read(10,1000)value
+                read(oldresfile_id,*)value
                 if(k.ge.kparasta .and. k.le.kparaend)then
                     vc(i,j,k) = value
                 end if
@@ -87,7 +91,7 @@ subroutine restart(ti,dbbx)
     do k=0,jz
         do j=1,jy
             do i=1,jx
-                read(10,1000)value
+                read(oldresfile_id,*)value
                 if(k.ge.kparasta-1 .and. k.le.kparaend)then
                     wc(i,j,k) = value
                 end if
@@ -95,8 +99,7 @@ subroutine restart(ti,dbbx)
             end do
         end do
     end do
-    close(10)
-1000 format(10e18.10)
-    !
+    close(oldresfile_id)
+
     return
 end

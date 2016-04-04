@@ -12,9 +12,9 @@
 
 !
         use filter_module
-      use turbo2_data
-      use turbo3bis
+      use turbo_module
       use mysending
+      use mysettings, only: cost,costH,costV
 
       use myarrays_metri3
       use myarrays_velo3
@@ -53,14 +53,14 @@
 !
       real sbuff((n1+2)*(n2+2)*40)
       real rbuff((n1+2)*(n2+2)*40)
-      double precision sbuffd((n1+2)*(n2+2)*40)
-      double precision rbuffd((n1+2)*(n2+2)*40)
+      real sbuffd((n1+2)*(n2+2)*40)
+      real rbuffd((n1+2)*(n2+2)*40)
 !
       real cb(n2)
       real cbrho(n2)
       real c1,c2
       real somma,delt,psp,alfa,alfa3
-      double precision grg,grgrho,costrho,rzer
+      real grg,grgrho,costrho,rzer
 !
       real xcsi,ycsi,zcsi
       real xeta,yeta,zeta
@@ -75,28 +75,28 @@
       real s1,s2,s3,s4,s5,s6
       real rho1,rho2,rho3,rho4,rho5,rho6
 !
-      double precision c(n2),crho(n2)
-      double precision den(n1,n2,kparasta:kparaend)
-      double precision num(n1,n2,kparasta:kparaend)
-      double precision denrho(n1,n2,kparasta:kparaend)
-      double precision numrho(n1,n2,kparasta:kparaend)
-      double precision nummed_loc(n2),denmed_loc(n2)
-      double precision numrhomed_loc(n2),denrhomed_loc(n2)
-      double precision nummed(n2),denmed(n2)
-      double precision numrhomed(n2),denrhomed(n2)
+      real c(n2),crho(n2)
+      real den(n1,n2,kparasta:kparaend)
+      real num(n1,n2,kparasta:kparaend)
+      real denrho(n1,n2,kparasta:kparaend)
+      real numrho(n1,n2,kparasta:kparaend)
+      real nummed_loc(n2),denmed_loc(n2)
+      real numrhomed_loc(n2),denrhomed_loc(n2)
+      real nummed(n2),denmed(n2)
+      real numrhomed(n2),denrhomed(n2)
 !
-      double precision sub11_loc(n2),sub12_loc(n2),sub13_loc(n2)
-      double precision sub22_loc(n2),sub23_loc(n2),sub33_loc(n2)
-      double precision sub_loc(n2)
-      double precision subrho_loc11(n2),subrho_loc22(n2), &
+      real sub11_loc(n2),sub12_loc(n2),sub13_loc(n2)
+      real sub22_loc(n2),sub23_loc(n2),sub33_loc(n2)
+      real sub_loc(n2)
+      real subrho_loc11(n2),subrho_loc22(n2), &
                        subrho_loc33(n2)
-      double precision sus_loc11(n2),sus_loc12(n2),sus_loc13(n2)
-      double precision sus_loc22(n2),sus_loc23(n2),sus_loc33(n2)
-      double precision sus_loc(n2)
-      double precision susrho_loc11(n2),susrho_loc22(n2), &
+      real sus_loc11(n2),sus_loc12(n2),sus_loc13(n2)
+      real sus_loc22(n2),sus_loc23(n2),sus_loc33(n2)
+      real sus_loc(n2)
+      real susrho_loc11(n2),susrho_loc22(n2), &
                        susrho_loc33(n2)
 !
-      double precision a1nu(n2),a1dn(n2),a1nurho(n2),a1dnrho(n2)
+      real a1nu(n2),a1dn(n2),a1nurho(n2),a1dnrho(n2)
 !
       real tp,ti
 
@@ -565,124 +565,124 @@
       do k=kparasta,kparaend      
       do j=1,jy
 !
-      s11(0,j,k)=(1-ip)*s11(jx,j,k) +  &
-                    ip*(2.*s11(1,j,k)-s11(2,j,k))
-      s12(0,j,k)=(1-ip)*s12(jx,j,k) +  &
-                    ip*(2.*s12(1,j,k)-s12(2,j,k))
-      s13(0,j,k)=(1-ip)*s13(jx,j,k) +  &
-                    ip*(2.*s13(1,j,k)-s13(2,j,k))
-      s21(0,j,k)=(1-ip)*s21(jx,j,k) +  &
-                    ip*(2.*s21(1,j,k)-s21(2,j,k))
-      s22(0,j,k)=(1-ip)*s22(jx,j,k) +  &
-                    ip*(2.*s22(1,j,k)-s22(2,j,k))
-      s23(0,j,k)=(1-ip)*s23(jx,j,k) +  &
-                    ip*(2.*s23(1,j,k)-s23(2,j,k))
-      s31(0,j,k)=(1-ip)*s31(jx,j,k) +  &
-                    ip*(2.*s31(1,j,k)-s31(2,j,k))
-      s32(0,j,k)=(1-ip)*s32(jx,j,k) +  &
-                    ip*(2.*s32(1,j,k)-s32(2,j,k))
-      s33(0,j,k)=(1-ip)*s33(jx,j,k) +  &
-                    ip*(2.*s33(1,j,k)-s33(2,j,k))
-      rho11(1,0,j,k)=(1-ip)*rho11(1,jx,j,k) + &
-                    ip*(2.*rho11(1,1,j,k)-rho11(1,2,j,k))
-      rho22(1,0,j,k)=(1-ip)*rho22(1,jx,j,k) + &
-                    ip*(2.*rho22(1,1,j,k)-rho22(1,2,j,k))
-      rho33(1,0,j,k)=(1-ip)*rho33(1,jx,j,k) + &
-                    ip*(2.*rho33(1,1,j,k)-rho33(1,2,j,k))
+      s11(0,j,k)=real(1-ip)*s11(jx,j,k) +  &
+                    real(ip)*(2.*s11(1,j,k)-s11(2,j,k))
+      s12(0,j,k)=real(1-ip)*s12(jx,j,k) +  &
+                    real(ip)*(2.*s12(1,j,k)-s12(2,j,k))
+      s13(0,j,k)=real(1-ip)*s13(jx,j,k) +  &
+                    real(ip)*(2.*s13(1,j,k)-s13(2,j,k))
+      s21(0,j,k)=real(1-ip)*s21(jx,j,k) +  &
+                    real(ip)*(2.*s21(1,j,k)-s21(2,j,k))
+      s22(0,j,k)=real(1-ip)*s22(jx,j,k) +  &
+                    real(ip)*(2.*s22(1,j,k)-s22(2,j,k))
+      s23(0,j,k)=real(1-ip)*s23(jx,j,k) +  &
+                    real(ip)*(2.*s23(1,j,k)-s23(2,j,k))
+      s31(0,j,k)=real(1-ip)*s31(jx,j,k) +  &
+                    real(ip)*(2.*s31(1,j,k)-s31(2,j,k))
+      s32(0,j,k)=real(1-ip)*s32(jx,j,k) +  &
+                    real(ip)*(2.*s32(1,j,k)-s32(2,j,k))
+      s33(0,j,k)=real(1-ip)*s33(jx,j,k) +  &
+                    real(ip)*(2.*s33(1,j,k)-s33(2,j,k))
+      rho11(1,0,j,k)=real(1-ip)*rho11(1,jx,j,k) + &
+                    real(ip)*(2.*rho11(1,1,j,k)-rho11(1,2,j,k))
+      rho22(1,0,j,k)=real(1-ip)*rho22(1,jx,j,k) + &
+                    real(ip)*(2.*rho22(1,1,j,k)-rho22(1,2,j,k))
+      rho33(1,0,j,k)=real(1-ip)*rho33(1,jx,j,k) + &
+                    real(ip)*(2.*rho33(1,1,j,k)-rho33(1,2,j,k))
 !
-      smod(0,j,k)=(1-ip)*smod(jx,j,k) +  &
-                    ip*(2.*smod(1,j,k)-smod(2,j,k))
-      smodV(0,j,k)=(1-ip)*smodV(jx,j,k) +  &
-                    ip*(2.*smodV(1,j,k)-smodV(2,j,k))
-      smodH(0,j,k)=(1-ip)*smodH(jx,j,k) +  &
-                    ip*(2.*smodH(1,j,k)-smodH(2,j,k))
+      smod(0,j,k)=real(1-ip)*smod(jx,j,k) +  &
+                    real(ip)*(2.*smod(1,j,k)-smod(2,j,k))
+      smodV(0,j,k)=real(1-ip)*smodV(jx,j,k) +  &
+                    real(ip)*(2.*smodV(1,j,k)-smodV(2,j,k))
+      smodH(0,j,k)=real(1-ip)*smodH(jx,j,k) +  &
+                    real(ip)*(2.*smodH(1,j,k)-smodH(2,j,k))
 
-      uco(0,j,k)=(1-ip)*uco(jx,j,k) +  &
-                    ip*(2.*uco(1,j,k)-uco(2,j,k))
-      vco(0,j,k)=(1-ip)*vco(jx,j,k) +  &
-                    ip*(2.*vco(1,j,k)-vco(2,j,k))
-      wco(0,j,k)=(1-ip)*wco(jx,j,k) +  &
-                    ip*(2.*wco(1,j,k)-wco(2,j,k))
+      uco(0,j,k)=real(1-ip)*uco(jx,j,k) +  &
+                    real(ip)*(2.*uco(1,j,k)-uco(2,j,k))
+      vco(0,j,k)=real(1-ip)*vco(jx,j,k) +  &
+                    real(ip)*(2.*vco(1,j,k)-vco(2,j,k))
+      wco(0,j,k)=real(1-ip)*wco(jx,j,k) +  &
+                    real(ip)*(2.*wco(1,j,k)-wco(2,j,k))
 !
 ! define border metric terms
 !
-      apcsx(0,j,k)=(1-ip)*apcsx(jx,j,k) + &
-                    ip*(2.*apcsx(1,j,k)-apcsx(2,j,k))
-      apcsy(0,j,k)=(1-ip)*apcsy(jx,j,k) + &
-                    ip*(2.*apcsy(1,j,k)-apcsy(2,j,k))
-      apcsz(0,j,k)=(1-ip)*apcsz(jx,j,k) + &
-                    ip*(2.*apcsz(1,j,k)-apcsz(2,j,k))
-      apetx(0,j,k)=(1-ip)*apetx(jx,j,k) + &
-                    ip*(2.*apetx(1,j,k)-apetx(2,j,k))
-      apety(0,j,k)=(1-ip)*apety(jx,j,k) + &
-                    ip*(2.*apety(1,j,k)-apety(2,j,k))
-      apetz(0,j,k)=(1-ip)*apetz(jx,j,k) + &
-                    ip*(2.*apetz(1,j,k)-apetz(2,j,k))
-      apztx(0,j,k)=(1-ip)*apztx(jx,j,k) + &
-                    ip*(2.*apztx(1,j,k)-apztx(2,j,k))
-      apzty(0,j,k)=(1-ip)*apzty(jx,j,k) + &
-                    ip*(2.*apzty(1,j,k)-apzty(2,j,k))
-      apztz(0,j,k)=(1-ip)*apztz(jx,j,k) + &
-                    ip*(2.*apztz(1,j,k)-apztz(2,j,k))
+      apcsx(0,j,k)=real(1-ip)*apcsx(jx,j,k) + &
+                    real(ip)*(2.*apcsx(1,j,k)-apcsx(2,j,k))
+      apcsy(0,j,k)=real(1-ip)*apcsy(jx,j,k) + &
+                    real(ip)*(2.*apcsy(1,j,k)-apcsy(2,j,k))
+      apcsz(0,j,k)=real(1-ip)*apcsz(jx,j,k) + &
+                    real(ip)*(2.*apcsz(1,j,k)-apcsz(2,j,k))
+      apetx(0,j,k)=real(1-ip)*apetx(jx,j,k) + &
+                    real(ip)*(2.*apetx(1,j,k)-apetx(2,j,k))
+      apety(0,j,k)=real(1-ip)*apety(jx,j,k) + &
+                    real(ip)*(2.*apety(1,j,k)-apety(2,j,k))
+      apetz(0,j,k)=real(1-ip)*apetz(jx,j,k) + &
+                    real(ip)*(2.*apetz(1,j,k)-apetz(2,j,k))
+      apztx(0,j,k)=real(1-ip)*apztx(jx,j,k) + &
+                    real(ip)*(2.*apztx(1,j,k)-apztx(2,j,k))
+      apzty(0,j,k)=real(1-ip)*apzty(jx,j,k) + &
+                    real(ip)*(2.*apzty(1,j,k)-apzty(2,j,k))
+      apztz(0,j,k)=real(1-ip)*apztz(jx,j,k) + &
+                    real(ip)*(2.*apztz(1,j,k)-apztz(2,j,k))
 !
-      apcsx(jx+1,j,k)=(1-ip)*apcsx(1,j,k) + &
-                    ip*(2.*apcsx(jx,j,k)-apcsx(jx-1,j,k))
-      apcsy(jx+1,j,k)=(1-ip)*apcsy(1,j,k) + &
-                    ip*(2.*apcsy(jx,j,k)-apcsy(jx-1,j,k))
-      apcsz(jx+1,j,k)=(1-ip)*apcsz(1,j,k) + &
-                    ip*(2.*apcsz(jx,j,k)-apcsz(jx-1,j,k))
-      apetx(jx+1,j,k)=(1-ip)*apetx(1,j,k) + &
-                    ip*(2.*apetx(jx,j,k)-apetx(jx-1,j,k))
-      apety(jx+1,j,k)=(1-ip)*apety(1,j,k) + &
-                    ip*(2.*apety(jx,j,k)-apety(jx-1,j,k))
-      apetz(jx+1,j,k)=(1-ip)*apetz(1,j,k) + &
-                    ip*(2.*apetz(jx,j,k)-apetz(jx-1,j,k))
-      apztx(jx+1,j,k)=(1-ip)*apztx(1,j,k) + &
-                    ip*(2.*apztx(jx,j,k)-apztx(jx-1,j,k))
-      apzty(jx+1,j,k)=(1-ip)*apzty(1,j,k) + &
-                    ip*(2.*apzty(jx,j,k)-apzty(jx-1,j,k))
-      apztz(jx+1,j,k)=(1-ip)*apztz(1,j,k) + &
-                    ip*(2.*apztz(jx,j,k)-apztz(jx-1,j,k))
+      apcsx(jx+1,j,k)=real(1-ip)*apcsx(1,j,k) + &
+                    real(ip)*(2.*apcsx(jx,j,k)-apcsx(jx-1,j,k))
+      apcsy(jx+1,j,k)=real(1-ip)*apcsy(1,j,k) + &
+                    real(ip)*(2.*apcsy(jx,j,k)-apcsy(jx-1,j,k))
+      apcsz(jx+1,j,k)=real(1-ip)*apcsz(1,j,k) + &
+                    real(ip)*(2.*apcsz(jx,j,k)-apcsz(jx-1,j,k))
+      apetx(jx+1,j,k)=real(1-ip)*apetx(1,j,k) + &
+                    real(ip)*(2.*apetx(jx,j,k)-apetx(jx-1,j,k))
+      apety(jx+1,j,k)=real(1-ip)*apety(1,j,k) + &
+                    real(ip)*(2.*apety(jx,j,k)-apety(jx-1,j,k))
+      apetz(jx+1,j,k)=real(1-ip)*apetz(1,j,k) + &
+                    real(ip)*(2.*apetz(jx,j,k)-apetz(jx-1,j,k))
+      apztx(jx+1,j,k)=real(1-ip)*apztx(1,j,k) + &
+                    real(ip)*(2.*apztx(jx,j,k)-apztx(jx-1,j,k))
+      apzty(jx+1,j,k)=real(1-ip)*apzty(1,j,k) + &
+                    real(ip)*(2.*apzty(jx,j,k)-apzty(jx-1,j,k))
+      apztz(jx+1,j,k)=real(1-ip)*apztz(1,j,k) + &
+                    real(ip)*(2.*apztz(jx,j,k)-apztz(jx-1,j,k))
 !
 !
-      s11(jx+1,j,k)=(1-ip)*s11(1,j,k) +  &
-                    ip*(2.*s11(jx,j,k)-s11(jx-1,j,k))
-      s12(jx+1,j,k)=(1-ip)*s12(1,j,k) +  &
-                    ip*(2.*s12(jx,j,k)-s12(jx-1,j,k))
-      s13(jx+1,j,k)=(1-ip)*s13(1,j,k) +  &
-                    ip*(2.*s13(jx,j,k)-s13(jx-1,j,k))
-      s21(jx+1,j,k)=(1-ip)*s21(1,j,k) +  &
-                    ip*(2.*s21(jx,j,k)-s21(jx-1,j,k))
-      s22(jx+1,j,k)=(1-ip)*s22(1,j,k) +  &
-                    ip*(2.*s22(jx,j,k)-s22(jx-1,j,k))
-      s23(jx+1,j,k)=(1-ip)*s23(1,j,k) +  &
-                    ip*(2.*s23(jx,j,k)-s23(jx-1,j,k))
-      s31(jx+1,j,k)=(1-ip)*s31(1,j,k) +  &
-                    ip*(2.*s31(jx,j,k)-s31(jx-1,j,k))
-      s32(jx+1,j,k)=(1-ip)*s32(1,j,k) +  &
-                    ip*(2.*s32(jx,j,k)-s32(jx-1,j,k))
-      s33(jx+1,j,k)=(1-ip)*s33(1,j,k) +  &
-                    ip*(2.*s33(jx,j,k)-s33(jx-1,j,k))
-      rho11(1,jx+1,j,k)=(1-ip)*rho11(1,1,j,k) +  &
-                    ip*(2.*rho11(1,jx,j,k)-rho11(1,jx-1,j,k))
-      rho22(1,jx+1,j,k)=(1-ip)*rho22(1,1,j,k) +  &
-                    ip*(2.*rho22(1,jx,j,k)-rho22(1,jx-1,j,k))
-      rho33(1,jx+1,j,k)=(1-ip)*rho33(1,1,j,k) +  &
-                    ip*(2.*rho33(1,jx,j,k)-rho33(1,jx-1,j,k))
+      s11(jx+1,j,k)=real(1-ip)*s11(1,j,k) +  &
+                    real(ip)*(2.*s11(jx,j,k)-s11(jx-1,j,k))
+      s12(jx+1,j,k)=real(1-ip)*s12(1,j,k) +  &
+                    real(ip)*(2.*s12(jx,j,k)-s12(jx-1,j,k))
+      s13(jx+1,j,k)=real(1-ip)*s13(1,j,k) +  &
+                    real(ip)*(2.*s13(jx,j,k)-s13(jx-1,j,k))
+      s21(jx+1,j,k)=real(1-ip)*s21(1,j,k) +  &
+                    real(ip)*(2.*s21(jx,j,k)-s21(jx-1,j,k))
+      s22(jx+1,j,k)=real(1-ip)*s22(1,j,k) +  &
+                    real(ip)*(2.*s22(jx,j,k)-s22(jx-1,j,k))
+      s23(jx+1,j,k)=real(1-ip)*s23(1,j,k) +  &
+                    real(ip)*(2.*s23(jx,j,k)-s23(jx-1,j,k))
+      s31(jx+1,j,k)=real(1-ip)*s31(1,j,k) +  &
+                    real(ip)*(2.*s31(jx,j,k)-s31(jx-1,j,k))
+      s32(jx+1,j,k)=real(1-ip)*s32(1,j,k) +  &
+                    real(ip)*(2.*s32(jx,j,k)-s32(jx-1,j,k))
+      s33(jx+1,j,k)=real(1-ip)*s33(1,j,k) +  &
+                    real(ip)*(2.*s33(jx,j,k)-s33(jx-1,j,k))
+      rho11(1,jx+1,j,k)=real(1-ip)*rho11(1,1,j,k) +  &
+                    real(ip)*(2.*rho11(1,jx,j,k)-rho11(1,jx-1,j,k))
+      rho22(1,jx+1,j,k)=real(1-ip)*rho22(1,1,j,k) +  &
+                    real(ip)*(2.*rho22(1,jx,j,k)-rho22(1,jx-1,j,k))
+      rho33(1,jx+1,j,k)=real(1-ip)*rho33(1,1,j,k) +  &
+                    real(ip)*(2.*rho33(1,jx,j,k)-rho33(1,jx-1,j,k))
 !
-      smod(jx+1,j,k)=(1-ip)*smod(1,j,k) +  &
-                    ip*(2.*smod(jx,j,k)-smod(jx-1,j,k))
-      smodV(jx+1,j,k)=(1-ip)*smodV(1,j,k) +  &
-                    ip*(2.*smodV(jx,j,k)-smodV(jx-1,j,k))
-      smodH(jx+1,j,k)=(1-ip)*smodH(1,j,k) +  &
-                    ip*(2.*smodH(jx,j,k)-smodH(jx-1,j,k))
+      smod(jx+1,j,k)=real(1-ip)*smod(1,j,k) +  &
+                    real(ip)*(2.*smod(jx,j,k)-smod(jx-1,j,k))
+      smodV(jx+1,j,k)=real(1-ip)*smodV(1,j,k) +  &
+                    real(ip)*(2.*smodV(jx,j,k)-smodV(jx-1,j,k))
+      smodH(jx+1,j,k)=real(1-ip)*smodH(1,j,k) +  &
+                    real(ip)*(2.*smodH(jx,j,k)-smodH(jx-1,j,k))
 
-      uco(jx+1,j,k)=(1-ip)*uco(1,j,k) +  &
-                    ip*(2.*uco(jx,j,k)-uco(jx-1,j,k))
-      vco(jx+1,j,k)=(1-ip)*vco(1,j,k) +  &
-                    ip*(2.*vco(jx,j,k)-vco(jx-1,j,k))
-      wco(jx+1,j,k)=(1-ip)*wco(1,j,k) +  &
-                    ip*(2.*wco(jx,j,k)-wco(jx-1,j,k))
+      uco(jx+1,j,k)=real(1-ip)*uco(1,j,k) +  &
+                    real(ip)*(2.*uco(jx,j,k)-uco(jx-1,j,k))
+      vco(jx+1,j,k)=real(1-ip)*vco(1,j,k) +  &
+                    real(ip)*(2.*vco(jx,j,k)-vco(jx-1,j,k))
+      wco(jx+1,j,k)=real(1-ip)*wco(1,j,k) +  &
+                    real(ip)*(2.*wco(jx,j,k)-wco(jx-1,j,k))
 !
       end do 
       end do 
@@ -693,124 +693,124 @@
       do k=kparasta,kparaend      
       do i=1,jx
 !
-      s11(i,0,k)=(1-jp)*s11(i,jy,k) +  &
-                    jp*(2.*s11(i,1,k)-s11(i,2,k))
-      s12(i,0,k)=(1-jp)*s12(i,jy,k) +  &
-                    jp*(2.*s12(i,1,k)-s12(i,2,k))
-      s13(i,0,k)=(1-jp)*s13(i,jy,k) +  &
-                    jp*(2.*s13(i,1,k)-s13(i,2,k))
-      s21(i,0,k)=(1-jp)*s21(i,jy,k) +  &
-                    jp*(2.*s21(i,1,k)-s21(i,2,k))
-      s22(i,0,k)=(1-jp)*s22(i,jy,k) +  &
-                    jp*(2.*s22(i,1,k)-s22(i,2,k))
-      s23(i,0,k)=(1-jp)*s23(i,jy,k) +  &
-                    jp*(2.*s23(i,1,k)-s23(i,2,k))
-      s31(i,0,k)=(1-jp)*s31(i,jy,k) +  &
-                    jp*(2.*s31(i,1,k)-s31(i,2,k))
-      s32(i,0,k)=(1-jp)*s32(i,jy,k) +  &
-                    jp*(2.*s32(i,1,k)-s32(i,2,k))
-      s33(i,0,k)=(1-jp)*s33(i,jy,k) +  &
-                    jp*(2.*s33(i,1,k)-s33(i,2,k))
-      rho11(1,i,0,k)=(1-jp)*rho11(1,i,jy,k) + &
-                    jp*(2.*rho11(1,i,1,k)-rho11(1,i,2,k))
-      rho22(1,i,0,k)=(1-jp)*rho22(1,i,jy,k) + &
-                    jp*(2.*rho22(1,i,1,k)-rho22(1,i,2,k))
-      rho33(1,i,0,k)=(1-jp)*rho33(1,i,jy,k) + &
-                    jp*(2.*rho33(1,i,1,k)-rho33(1,i,2,k))
+      s11(i,0,k)=real(1-jp)*s11(i,jy,k) +  &
+                    real(jp)*(2.*s11(i,1,k)-s11(i,2,k))
+      s12(i,0,k)=real(1-jp)*s12(i,jy,k) +  &
+                    real(jp)*(2.*s12(i,1,k)-s12(i,2,k))
+      s13(i,0,k)=real(1-jp)*s13(i,jy,k) +  &
+                    real(jp)*(2.*s13(i,1,k)-s13(i,2,k))
+      s21(i,0,k)=real(1-jp)*s21(i,jy,k) +  &
+                    real(jp)*(2.*s21(i,1,k)-s21(i,2,k))
+      s22(i,0,k)=real(1-jp)*s22(i,jy,k) +  &
+                    real(jp)*(2.*s22(i,1,k)-s22(i,2,k))
+      s23(i,0,k)=real(1-jp)*s23(i,jy,k) +  &
+                    real(jp)*(2.*s23(i,1,k)-s23(i,2,k))
+      s31(i,0,k)=real(1-jp)*s31(i,jy,k) +  &
+                    real(jp)*(2.*s31(i,1,k)-s31(i,2,k))
+      s32(i,0,k)=real(1-jp)*s32(i,jy,k) +  &
+                    real(jp)*(2.*s32(i,1,k)-s32(i,2,k))
+      s33(i,0,k)=real(1-jp)*s33(i,jy,k) +  &
+                    real(jp)*(2.*s33(i,1,k)-s33(i,2,k))
+      rho11(1,i,0,k)=real(1-jp)*rho11(1,i,jy,k) + &
+                    real(jp)*(2.*rho11(1,i,1,k)-rho11(1,i,2,k))
+      rho22(1,i,0,k)=real(1-jp)*rho22(1,i,jy,k) + &
+                    real(jp)*(2.*rho22(1,i,1,k)-rho22(1,i,2,k))
+      rho33(1,i,0,k)=real(1-jp)*rho33(1,i,jy,k) + &
+                    real(jp)*(2.*rho33(1,i,1,k)-rho33(1,i,2,k))
 !
-      smod(i,0,k)=(1-jp)*smod(i,jy,k) +  &
-                    jp*(2.*smod(i,1,k)-smod(i,2,k))
-      smodV(i,0,k)=(1-jp)*smodV(i,jy,k) +  &
-                    jp*(2.*smodV(i,1,k)-smodV(i,2,k))
-      smodH(i,0,k)=(1-jp)*smodH(i,jy,k) +  &
-                    jp*(2.*smodH(i,1,k)-smodH(i,2,k))
+      smod(i,0,k)=real(1-jp)*smod(i,jy,k) +  &
+                    real(jp)*(2.*smod(i,1,k)-smod(i,2,k))
+      smodV(i,0,k)=real(1-jp)*smodV(i,jy,k) +  &
+                    real(jp)*(2.*smodV(i,1,k)-smodV(i,2,k))
+      smodH(i,0,k)=real(1-jp)*smodH(i,jy,k) +  &
+                    real(jp)*(2.*smodH(i,1,k)-smodH(i,2,k))
 
-      uco(i,0,k)=(1-jp)*uco(i,jy,k) +  &
-                    jp*(2.*uco(i,1,k)-uco(i,2,k))
-      vco(i,0,k)=(1-jp)*vco(i,jy,k) +  &
-                    jp*(2.*vco(i,1,k)-vco(i,2,k))
-      wco(i,0,k)=(1-jp)*wco(i,jy,k) +  &
-                    jp*(2.*wco(i,1,k)-wco(i,2,k))
+      uco(i,0,k)=real(1-jp)*uco(i,jy,k) +  &
+                    real(jp)*(2.*uco(i,1,k)-uco(i,2,k))
+      vco(i,0,k)=real(1-jp)*vco(i,jy,k) +  &
+                    real(jp)*(2.*vco(i,1,k)-vco(i,2,k))
+      wco(i,0,k)=real(1-jp)*wco(i,jy,k) +  &
+                    real(jp)*(2.*wco(i,1,k)-wco(i,2,k))
 !
 ! define border metric term
 !
-      apcsx(i,0,k)=(1-jp)*apcsx(i,jy,k) + &
-                    jp*(2.*apcsx(i,1,k)-apcsx(i,2,k))
-      apcsy(i,0,k)=(1-jp)*apcsy(i,jy,k) + &
-                    jp*(2.*apcsy(i,1,k)-apcsy(i,2,k))
-      apcsz(i,0,k)=(1-jp)*apcsz(i,jy,k) + &
-                    jp*(2.*apcsz(i,1,k)-apcsz(i,2,k))
-      apetx(i,0,k)=(1-jp)*apetx(i,jy,k) + &
-                    jp*(2.*apetx(i,1,k)-apetx(i,2,k))
-      apety(i,0,k)=(1-jp)*apety(i,jy,k) + &
-                    jp*(2.*apety(i,1,k)-apety(i,2,k))
-      apetz(i,0,k)=(1-jp)*apetz(i,jy,k) + &
-                    jp*(2.*apetz(i,1,k)-apetz(i,2,k))
-      apztx(i,0,k)=(1-jp)*apztx(i,jy,k) + &
-                    jp*(2.*apztx(i,1,k)-apztx(i,2,k))
-      apzty(i,0,k)=(1-jp)*apzty(i,jy,k) + &
-                    jp*(2.*apzty(i,1,k)-apzty(i,2,k))
-      apztz(i,0,k)=(1-jp)*apztz(i,jy,k) + &
-                    jp*(2.*apztz(i,1,k)-apztz(i,2,k))
+      apcsx(i,0,k)=real(1-jp)*apcsx(i,jy,k) + &
+                    real(jp)*(2.*apcsx(i,1,k)-apcsx(i,2,k))
+      apcsy(i,0,k)=real(1-jp)*apcsy(i,jy,k) + &
+                    real(jp)*(2.*apcsy(i,1,k)-apcsy(i,2,k))
+      apcsz(i,0,k)=real(1-jp)*apcsz(i,jy,k) + &
+                    real(jp)*(2.*apcsz(i,1,k)-apcsz(i,2,k))
+      apetx(i,0,k)=real(1-jp)*apetx(i,jy,k) + &
+                    real(jp)*(2.*apetx(i,1,k)-apetx(i,2,k))
+      apety(i,0,k)=real(1-jp)*apety(i,jy,k) + &
+                    real(jp)*(2.*apety(i,1,k)-apety(i,2,k))
+      apetz(i,0,k)=real(1-jp)*apetz(i,jy,k) + &
+                    real(jp)*(2.*apetz(i,1,k)-apetz(i,2,k))
+      apztx(i,0,k)=real(1-jp)*apztx(i,jy,k) + &
+                    real(jp)*(2.*apztx(i,1,k)-apztx(i,2,k))
+      apzty(i,0,k)=real(1-jp)*apzty(i,jy,k) + &
+                    real(jp)*(2.*apzty(i,1,k)-apzty(i,2,k))
+      apztz(i,0,k)=real(1-jp)*apztz(i,jy,k) + &
+                    real(jp)*(2.*apztz(i,1,k)-apztz(i,2,k))
 !
-      apcsx(i,jy+1,k)=(1-jp)*apcsx(i,1,k) + &
-                    jp*(2.*apcsx(i,jy,k)-apcsx(i,jy-1,k))
-      apcsy(i,jy+1,k)=(1-jp)*apcsy(i,1,k) + &
-                    jp*(2.*apcsy(i,jy,k)-apcsy(i,jy-1,k))
-      apcsz(i,jy+1,k)=(1-jp)*apcsz(i,1,k) + &
-                    jp*(2.*apcsz(i,jy,k)-apcsz(i,jy-1,k))
-      apetx(i,jy+1,k)=(1-jp)*apetx(i,1,k) + &
-                    jp*(2.*apetz(i,jy,k)-apetx(i,jy-1,k))
-      apety(i,jy+1,k)=(1-jp)*apety(i,1,k) + &
-                    jp*(2.*apety(i,jy,k)-apety(i,jy-1,k))
-      apetz(i,jy+1,k)=(1-jp)*apetz(i,1,k) + &
-                    jp*(2.*apetz(i,jy,k)-apetz(i,jy-1,k))
-      apztx(i,jy+1,k)=(1-jp)*apztx(i,1,k) + &
-                    jp*(2.*apztx(i,jy,k)-apztx(i,jy-1,k))
-      apzty(i,jy+1,k)=(1-jp)*apzty(i,1,k) + &
-                    jp*(2.*apzty(i,jy,k)-apzty(i,jy-1,k))
-      apztz(i,jy+1,k)=(1-jp)*apztz(i,1,k) + &
-                    jp*(2.*apztz(i,jy,k)-apztz(i,jy-1,k))
+      apcsx(i,jy+1,k)=real(1-jp)*apcsx(i,1,k) + &
+                    real(jp)*(2.*apcsx(i,jy,k)-apcsx(i,jy-1,k))
+      apcsy(i,jy+1,k)=real(1-jp)*apcsy(i,1,k) + &
+                    real(jp)*(2.*apcsy(i,jy,k)-apcsy(i,jy-1,k))
+      apcsz(i,jy+1,k)=real(1-jp)*apcsz(i,1,k) + &
+                    real(jp)*(2.*apcsz(i,jy,k)-apcsz(i,jy-1,k))
+      apetx(i,jy+1,k)=real(1-jp)*apetx(i,1,k) + &
+                    real(jp)*(2.*apetz(i,jy,k)-apetx(i,jy-1,k))
+      apety(i,jy+1,k)=real(1-jp)*apety(i,1,k) + &
+                    real(jp)*(2.*apety(i,jy,k)-apety(i,jy-1,k))
+      apetz(i,jy+1,k)=real(1-jp)*apetz(i,1,k) + &
+                    real(jp)*(2.*apetz(i,jy,k)-apetz(i,jy-1,k))
+      apztx(i,jy+1,k)=real(1-jp)*apztx(i,1,k) + &
+                    real(jp)*(2.*apztx(i,jy,k)-apztx(i,jy-1,k))
+      apzty(i,jy+1,k)=real(1-jp)*apzty(i,1,k) + &
+                    real(jp)*(2.*apzty(i,jy,k)-apzty(i,jy-1,k))
+      apztz(i,jy+1,k)=real(1-jp)*apztz(i,1,k) + &
+                    real(jp)*(2.*apztz(i,jy,k)-apztz(i,jy-1,k))
 !
 !
-      s11(i,jy+1,k)=(1-jp)*s11(i,1,k) +  &
-                    jp*(2.*s11(i,jy,k)-s11(i,jy-1,k))
-      s12(i,jy+1,k)=(1-jp)*s12(i,1,k) +  &
-                    jp*(2.*s12(i,jy,k)-s12(i,jy-1,k))
-      s13(i,jy+1,k)=(1-jp)*s13(i,1,k) +  &
-                    jp*(2.*s13(i,jy,k)-s13(i,jy-1,k))
-      s21(i,jy+1,k)=(1-jp)*s21(i,1,k) +  &
-                    jp*(2.*s21(i,jy,k)-s21(i,jy-1,k))
-      s22(i,jy+1,k)=(1-jp)*s22(i,1,k) +  &
-                    jp*(2.*s22(i,jy,k)-s22(i,jy-1,k))
-      s23(i,jy+1,k)=(1-jp)*s23(i,1,k) +  &
-                    jp*(2.*s23(i,jy,k)-s23(i,jy-1,k))
-      s31(i,jy+1,k)=(1-jp)*s31(i,1,k) +  &
-                    jp*(2.*s31(i,jy,k)-s31(i,jy-1,k))
-      s32(i,jy+1,k)=(1-jp)*s32(i,1,k) +  &
-                    jp*(2.*s32(i,jy,k)-s32(i,jy-1,k))
-      s33(i,jy+1,k)=(1-jp)*s33(i,1,k) +  &
-                    jp*(2.*s33(i,jy,k)-s33(i,jy-1,k))
-      rho11(1,i,jy+1,k)=(1-jp)*rho11(1,i,1,k) +  &
-                    jp*(2.*rho11(1,i,jy,k)-rho11(1,i,jy-1,k))
-      rho22(1,i,jy+1,k)=(1-jp)*rho22(1,i,1,k) +  &
-                    jp*(2.*rho22(1,i,jy,k)-rho22(1,i,jy-1,k))
-      rho33(1,i,jy+1,k)=(1-jp)*rho33(1,i,1,k) +  &
-                    jp*(2.*rho33(1,i,jy,k)-rho33(1,i,jy-1,k))
+      s11(i,jy+1,k)=real(1-jp)*s11(i,1,k) +  &
+                    real(jp)*(2.*s11(i,jy,k)-s11(i,jy-1,k))
+      s12(i,jy+1,k)=real(1-jp)*s12(i,1,k) +  &
+                    real(jp)*(2.*s12(i,jy,k)-s12(i,jy-1,k))
+      s13(i,jy+1,k)=real(1-jp)*s13(i,1,k) +  &
+                    real(jp)*(2.*s13(i,jy,k)-s13(i,jy-1,k))
+      s21(i,jy+1,k)=real(1-jp)*s21(i,1,k) +  &
+                    real(jp)*(2.*s21(i,jy,k)-s21(i,jy-1,k))
+      s22(i,jy+1,k)=real(1-jp)*s22(i,1,k) +  &
+                    real(jp)*(2.*s22(i,jy,k)-s22(i,jy-1,k))
+      s23(i,jy+1,k)=real(1-jp)*s23(i,1,k) +  &
+                    real(jp)*(2.*s23(i,jy,k)-s23(i,jy-1,k))
+      s31(i,jy+1,k)=real(1-jp)*s31(i,1,k) +  &
+                    real(jp)*(2.*s31(i,jy,k)-s31(i,jy-1,k))
+      s32(i,jy+1,k)=real(1-jp)*s32(i,1,k) +  &
+                    real(jp)*(2.*s32(i,jy,k)-s32(i,jy-1,k))
+      s33(i,jy+1,k)=real(1-jp)*s33(i,1,k) +  &
+                    real(jp)*(2.*s33(i,jy,k)-s33(i,jy-1,k))
+      rho11(1,i,jy+1,k)=real(1-jp)*rho11(1,i,1,k) +  &
+                    real(jp)*(2.*rho11(1,i,jy,k)-rho11(1,i,jy-1,k))
+      rho22(1,i,jy+1,k)=real(1-jp)*rho22(1,i,1,k) +  &
+                    real(jp)*(2.*rho22(1,i,jy,k)-rho22(1,i,jy-1,k))
+      rho33(1,i,jy+1,k)=real(1-jp)*rho33(1,i,1,k) +  &
+                    real(jp)*(2.*rho33(1,i,jy,k)-rho33(1,i,jy-1,k))
 !
-      smod(i,jy+1,k)=(1-jp)*smod(i,1,k) +  &
-                    jp*(2.*smod(i,jy,k)-smod(i,jy-1,k))
-      smodV(i,jy+1,k)=(1-jp)*smodV(i,1,k) +  &
-                    jp*(2.*smodV(i,jy,k)-smodV(i,jy-1,k))
-      smodH(i,jy+1,k)=(1-jp)*smodH(i,1,k) +  &
-                    jp*(2.*smodH(i,jy,k)-smodH(i,jy-1,k))
+      smod(i,jy+1,k)=real(1-jp)*smod(i,1,k) +  &
+                    real(jp)*(2.*smod(i,jy,k)-smod(i,jy-1,k))
+      smodV(i,jy+1,k)=real(1-jp)*smodV(i,1,k) +  &
+                    real(jp)*(2.*smodV(i,jy,k)-smodV(i,jy-1,k))
+      smodH(i,jy+1,k)=real(1-jp)*smodH(i,1,k) +  &
+                    real(jp)*(2.*smodH(i,jy,k)-smodH(i,jy-1,k))
 
-      uco(i,jy+1,k)=(1-jp)*uco(i,1,k) +  &
-                    jp*(2.*uco(i,jy,k)-uco(i,jy-1,k))
-      vco(i,jy+1,k)=(1-jp)*vco(i,1,k) +  &
-                    jp*(2.*vco(i,jy,k)-vco(i,jy-1,k))
-      wco(i,jy+1,k)=(1-jp)*wco(i,1,k) +  &
-                    jp*(2.*wco(i,jy,k)-wco(i,jy-1,k))
+      uco(i,jy+1,k)=real(1-jp)*uco(i,1,k) +  &
+                    real(jp)*(2.*uco(i,jy,k)-uco(i,jy-1,k))
+      vco(i,jy+1,k)=real(1-jp)*vco(i,1,k) +  &
+                    real(jp)*(2.*vco(i,jy,k)-vco(i,jy-1,k))
+      wco(i,jy+1,k)=real(1-jp)*wco(i,1,k) +  &
+                    real(jp)*(2.*wco(i,jy,k)-wco(i,jy-1,k))
 !
       end do 
       end do 
@@ -998,67 +998,67 @@
       do j=1,jy
       do i=1,jx
       
-      s11(i,j,0)=(1-kp)*piano1(i,j) +  &
-                    kp*(2.*s11(i,j,1)-s11(i,j,2))
-      s12(i,j,0)=(1-kp)*piano2(i,j) +  &
-                    kp*(2.*s12(i,j,1)-s12(i,j,2))
-      s13(i,j,0)=(1-kp)*piano3(i,j) +  &
-                    kp*(2.*s13(i,j,1)-s13(i,j,2))
-      s21(i,j,0)=(1-kp)*piano4(i,j) +  &
-                    kp*(2.*s21(i,j,1)-s21(i,j,2))
-      s22(i,j,0)=(1-kp)*piano5(i,j) +  &
-                    kp*(2.*s22(i,j,1)-s22(i,j,2))
-      s23(i,j,0)=(1-kp)*piano6(i,j) +  &
-                    kp*(2.*s23(i,j,1)-s23(i,j,2))
-      s31(i,j,0)=(1-kp)*piano7(i,j) +  &
-                    kp*(2.*s31(i,j,1)-s31(i,j,2))
-      s32(i,j,0)=(1-kp)*piano8(i,j) +  &
-                    kp*(2.*s32(i,j,1)-s32(i,j,2))
-      s33(i,j,0)=(1-kp)*piano9(i,j) +  &
-                    kp*(2.*s33(i,j,1)-s33(i,j,2))
-      rho11(1,i,j,0)=(1-kp)*piano10(i,j) + &
-                    kp*(2.*rho11(1,i,j,1)-rho11(1,i,j,2))
-      rho22(1,i,j,0)=(1-kp)*piano11(i,j) + &
-                    kp*(2.*rho22(1,i,j,1)-rho22(1,i,j,2))
-      rho33(1,i,j,0)=(1-kp)*piano12(i,j) + &
-                    kp*(2.*rho33(1,i,j,1)-rho33(1,i,j,2))
+      s11(i,j,0)=real(1-kp)*piano1(i,j) +  &
+                    real(kp)*(2.*s11(i,j,1)-s11(i,j,2))
+      s12(i,j,0)=real(1-kp)*piano2(i,j) +  &
+                    real(kp)*(2.*s12(i,j,1)-s12(i,j,2))
+      s13(i,j,0)=real(1-kp)*piano3(i,j) +  &
+                    real(kp)*(2.*s13(i,j,1)-s13(i,j,2))
+      s21(i,j,0)=real(1-kp)*piano4(i,j) +  &
+                    real(kp)*(2.*s21(i,j,1)-s21(i,j,2))
+      s22(i,j,0)=real(1-kp)*piano5(i,j) +  &
+                    real(kp)*(2.*s22(i,j,1)-s22(i,j,2))
+      s23(i,j,0)=real(1-kp)*piano6(i,j) +  &
+                    real(kp)*(2.*s23(i,j,1)-s23(i,j,2))
+      s31(i,j,0)=real(1-kp)*piano7(i,j) +  &
+                    real(kp)*(2.*s31(i,j,1)-s31(i,j,2))
+      s32(i,j,0)=real(1-kp)*piano8(i,j) +  &
+                    real(kp)*(2.*s32(i,j,1)-s32(i,j,2))
+      s33(i,j,0)=real(1-kp)*piano9(i,j) +  &
+                    real(kp)*(2.*s33(i,j,1)-s33(i,j,2))
+      rho11(1,i,j,0)=real(1-kp)*piano10(i,j) + &
+                    real(kp)*(2.*rho11(1,i,j,1)-rho11(1,i,j,2))
+      rho22(1,i,j,0)=real(1-kp)*piano11(i,j) + &
+                    real(kp)*(2.*rho22(1,i,j,1)-rho22(1,i,j,2))
+      rho33(1,i,j,0)=real(1-kp)*piano12(i,j) + &
+                    real(kp)*(2.*rho33(1,i,j,1)-rho33(1,i,j,2))
 
-      smod(i,j,0)=(1-kp)*piano13(i,j) +  &
-                    kp*(2.*smod(i,j,1)-smod(i,j,2))
-      smodV(i,j,0)=(1-kp)*piano26(i,j) +  &
-                    kp*(2.*smodV(i,j,1)-smodV(i,j,2))
-      smodH(i,j,0)=(1-kp)*piano27(i,j) +  &
-                    kp*(2.*smodH(i,j,1)-smodH(i,j,2))
+      smod(i,j,0)=real(1-kp)*piano13(i,j) +  &
+                    real(kp)*(2.*smod(i,j,1)-smod(i,j,2))
+      smodV(i,j,0)=real(1-kp)*piano26(i,j) +  &
+                    real(kp)*(2.*smodV(i,j,1)-smodV(i,j,2))
+      smodH(i,j,0)=real(1-kp)*piano27(i,j) +  &
+                    real(kp)*(2.*smodH(i,j,1)-smodH(i,j,2))
 
 
 
-      uco(i,j,0)=(1-kp)*piano14(i,j) +  &
-                    kp*(2.*uco(i,j,1)-uco(i,j,2))
-      vco(i,j,0)=(1-kp)*piano15(i,j) +  &
-                    kp*(2.*vco(i,j,1)-vco(i,j,2))
-      wco(i,j,0)=(1-kp)*piano16(i,j) +  &
-                    kp*(2.*wco(i,j,1)-wco(i,j,2))
+      uco(i,j,0)=real(1-kp)*piano14(i,j) +  &
+                    real(kp)*(2.*uco(i,j,1)-uco(i,j,2))
+      vco(i,j,0)=real(1-kp)*piano15(i,j) +  &
+                    real(kp)*(2.*vco(i,j,1)-vco(i,j,2))
+      wco(i,j,0)=real(1-kp)*piano16(i,j) +  &
+                    real(kp)*(2.*wco(i,j,1)-wco(i,j,2))
 !
 ! define border metric term
 !
-      apcsx(i,j,0)=(1-kp)*piano17(i,j) + &
-                    kp*(2.*apcsx(i,j,1)-apcsx(i,j,2))
-      apcsy(i,j,0)=(1-kp)*piano18(i,j) + &
-                    kp*(2.*apcsy(i,j,1)-apcsy(i,j,2))
-      apcsz(i,j,0)=(1-kp)*piano19(i,j) + &
-                    kp*(2.*apcsz(i,j,1)-apcsz(i,j,2))
-      apetx(i,j,0)=(1-kp)*piano20(i,j) + &
-                    kp*(2.*apetx(i,j,1)-apetx(i,j,2))
-      apety(i,j,0)=(1-kp)*piano21(i,j) + &
-                    kp*(2.*apety(i,j,1)-apety(i,j,2))
-      apetz(i,j,0)=(1-kp)*piano22(i,j) + &
-                    kp*(2.*apetz(i,j,1)-apetz(i,j,2))
-      apztx(i,j,0)=(1-kp)*piano23(i,j) + &
-                    kp*(2.*apztx(i,j,1)-apztx(i,j,2))
-      apzty(i,j,0)=(1-kp)*piano24(i,j) + &
-                    kp*(2.*apzty(i,j,1)-apzty(i,j,2))
-      apztz(i,j,0)=(1-kp)*piano25(i,j) + &
-                    kp*(2.*apztz(i,j,1)-apztz(i,j,2))
+      apcsx(i,j,0)=real(1-kp)*piano17(i,j) + &
+                    real(kp)*(2.*apcsx(i,j,1)-apcsx(i,j,2))
+      apcsy(i,j,0)=real(1-kp)*piano18(i,j) + &
+                    real(kp)*(2.*apcsy(i,j,1)-apcsy(i,j,2))
+      apcsz(i,j,0)=real(1-kp)*piano19(i,j) + &
+                    real(kp)*(2.*apcsz(i,j,1)-apcsz(i,j,2))
+      apetx(i,j,0)=real(1-kp)*piano20(i,j) + &
+                    real(kp)*(2.*apetx(i,j,1)-apetx(i,j,2))
+      apety(i,j,0)=real(1-kp)*piano21(i,j) + &
+                    real(kp)*(2.*apety(i,j,1)-apety(i,j,2))
+      apetz(i,j,0)=real(1-kp)*piano22(i,j) + &
+                    real(kp)*(2.*apetz(i,j,1)-apetz(i,j,2))
+      apztx(i,j,0)=real(1-kp)*piano23(i,j) + &
+                    real(kp)*(2.*apztx(i,j,1)-apztx(i,j,2))
+      apzty(i,j,0)=real(1-kp)*piano24(i,j) + &
+                    real(kp)*(2.*apzty(i,j,1)-apzty(i,j,2))
+      apztz(i,j,0)=real(1-kp)*piano25(i,j) + &
+                    real(kp)*(2.*apztz(i,j,1)-apztz(i,j,2))
 
 
       end do
@@ -1073,66 +1073,66 @@
       do i=1,jx
       
 
-      s11(i,j,jz+1)=(1-kp)*piano1(i,j) +  &
-                    kp*(2.*s11(i,j,jz)-s11(i,j,jz-1))
-      s12(i,j,jz+1)=(1-kp)*piano2(i,j) +  &
-                    kp*(2.*s12(i,j,jz)-s12(i,j,jz-1))
-      s13(i,j,jz+1)=(1-kp)*piano3(i,j) +  &
-                    kp*(2.*s13(i,j,jz)-s13(i,j,jz-1))
-      s21(i,j,jz+1)=(1-kp)*piano4(i,j) +  &
-                    kp*(2.*s21(i,j,jz)-s21(i,j,jz-1))
-      s22(i,j,jz+1)=(1-kp)*piano5(i,j) +  &
-                    kp*(2.*s22(i,j,jz)-s22(i,j,jz-1))
-      s23(i,j,jz+1)=(1-kp)*piano6(i,j) +  &
-                    kp*(2.*s23(i,j,jz)-s23(i,j,jz-1))
-      s31(i,j,jz+1)=(1-kp)*piano7(i,j) +  &
-                    kp*(2.*s31(i,j,jz)-s31(i,j,jz-1))
-      s32(i,j,jz+1)=(1-kp)*piano8(i,j) +  &
-                    kp*(2.*s32(i,j,jz)-s32(i,j,jz-1))
-      s33(i,j,jz+1)=(1-kp)*piano9(i,j) +  &
-                    kp*(2.*s33(i,j,jz)-s33(i,j,jz-1))
-      rho11(1,i,j,jz+1)=(1-kp)*piano10(i,j) + &
-                    kp*(2.*rho11(1,i,j,jz)-rho11(1,i,j,jz-1))
-      rho22(1,i,j,jz+1)=(1-kp)*piano11(i,j) + &
-                    kp*(2.*rho22(1,i,j,jz)-rho22(1,i,j,jz-1))
-      rho33(1,i,j,jz+1)=(1-kp)*piano12(i,j) + &
-                    kp*(2.*rho33(1,i,j,jz)-rho33(1,i,j,jz-1))
+      s11(i,j,jz+1)=real(1-kp)*piano1(i,j) +  &
+                    real(kp)*(2.*s11(i,j,jz)-s11(i,j,jz-1))
+      s12(i,j,jz+1)=real(1-kp)*piano2(i,j) +  &
+                    real(kp)*(2.*s12(i,j,jz)-s12(i,j,jz-1))
+      s13(i,j,jz+1)=real(1-kp)*piano3(i,j) +  &
+                    real(kp)*(2.*s13(i,j,jz)-s13(i,j,jz-1))
+      s21(i,j,jz+1)=real(1-kp)*piano4(i,j) +  &
+                    real(kp)*(2.*s21(i,j,jz)-s21(i,j,jz-1))
+      s22(i,j,jz+1)=real(1-kp)*piano5(i,j) +  &
+                    real(kp)*(2.*s22(i,j,jz)-s22(i,j,jz-1))
+      s23(i,j,jz+1)=real(1-kp)*piano6(i,j) +  &
+                    real(kp)*(2.*s23(i,j,jz)-s23(i,j,jz-1))
+      s31(i,j,jz+1)=real(1-kp)*piano7(i,j) +  &
+                    real(kp)*(2.*s31(i,j,jz)-s31(i,j,jz-1))
+      s32(i,j,jz+1)=real(1-kp)*piano8(i,j) +  &
+                    real(kp)*(2.*s32(i,j,jz)-s32(i,j,jz-1))
+      s33(i,j,jz+1)=real(1-kp)*piano9(i,j) +  &
+                    real(kp)*(2.*s33(i,j,jz)-s33(i,j,jz-1))
+      rho11(1,i,j,jz+1)=real(1-kp)*piano10(i,j) + &
+                    real(kp)*(2.*rho11(1,i,j,jz)-rho11(1,i,j,jz-1))
+      rho22(1,i,j,jz+1)=real(1-kp)*piano11(i,j) + &
+                    real(kp)*(2.*rho22(1,i,j,jz)-rho22(1,i,j,jz-1))
+      rho33(1,i,j,jz+1)=real(1-kp)*piano12(i,j) + &
+                    real(kp)*(2.*rho33(1,i,j,jz)-rho33(1,i,j,jz-1))
 !
 
-      smod(i,j,jz+1)=(1-kp)*piano13(i,j) +  &
-                    kp*(2.*smod(i,j,jz)-smod(i,j,jz-1))
-      smodV(i,j,jz+1)=(1-kp)*piano26(i,j) +  &
-                    kp*(2.*smodV(i,j,jz)-smodV(i,j,jz-1))
-      smodH(i,j,jz+1)=(1-kp)*piano27(i,j) +  &
-                    kp*(2.*smodH(i,j,jz)-smodH(i,j,jz-1))
+      smod(i,j,jz+1)=real(1-kp)*piano13(i,j) +  &
+                    real(kp)*(2.*smod(i,j,jz)-smod(i,j,jz-1))
+      smodV(i,j,jz+1)=real(1-kp)*piano26(i,j) +  &
+                    real(kp)*(2.*smodV(i,j,jz)-smodV(i,j,jz-1))
+      smodH(i,j,jz+1)=real(1-kp)*piano27(i,j) +  &
+                    real(kp)*(2.*smodH(i,j,jz)-smodH(i,j,jz-1))
 
-      uco(i,j,jz+1)=(1-kp)*piano14(i,j) +  &
-                    kp*(2.*uco(i,j,jz)-uco(i,j,jz-1))
-      vco(i,j,jz+1)=(1-kp)*piano15(i,j) +  &
-                    kp*(2.*vco(i,j,jz)-vco(i,j,jz-1))
-      wco(i,j,jz+1)=(1-kp)*piano16(i,j) +  &
-                    kp*(2.*wco(i,j,jz)-wco(i,j,jz-1))
+      uco(i,j,jz+1)=real(1-kp)*piano14(i,j) +  &
+                    real(kp)*(2.*uco(i,j,jz)-uco(i,j,jz-1))
+      vco(i,j,jz+1)=real(1-kp)*piano15(i,j) +  &
+                    real(kp)*(2.*vco(i,j,jz)-vco(i,j,jz-1))
+      wco(i,j,jz+1)=real(1-kp)*piano16(i,j) +  &
+                    real(kp)*(2.*wco(i,j,jz)-wco(i,j,jz-1))
 !
 ! define metric border term
 !
-      apcsx(i,j,jz+1)=(1-kp)*piano17(i,j) + &
-                    kp*(2.*apcsx(i,j,jz)-apcsx(i,j,jz-1))
-      apcsy(i,j,jz+1)=(1-kp)*piano18(i,j) + &
-                    kp*(2.*apcsy(i,j,jz)-apcsy(i,j,jz-1))
-      apcsz(i,j,jz+1)=(1-kp)*piano19(i,j) + &
-                    kp*(2.*apcsz(i,j,jz)-apcsz(i,j,jz-1))
-      apetx(i,j,jz+1)=(1-kp)*piano20(i,j) + &
-                    kp*(2.*apetx(i,j,jz)-apetx(i,j,jz-1))
-      apety(i,j,jz+1)=(1-kp)*piano21(i,j) + &
-                    kp*(2.*apety(i,j,jz)-apety(i,j,jz-1))
-      apetz(i,j,jz+1)=(1-kp)*piano22(i,j) + &
-                    kp*(2.*piano23(i,j)-apetz(i,j,jz-1))
-      apztx(i,j,jz+1)=(1-kp)*piano23(i,j) + &
-                    kp*(2.*apztx(i,j,jz)-apztx(i,j,jz-1))
-      apzty(i,j,jz+1)=(1-kp)*piano24(i,j) + &
-                    kp*(2.*apzty(i,j,jz)-apzty(i,j,jz-1))
-      apztz(i,j,jz+1)=(1-kp)*piano25(i,j) + &
-                    kp*(2.*apztz(i,j,jz)-apztz(i,j,jz-1))
+      apcsx(i,j,jz+1)=real(1-kp)*piano17(i,j) + &
+                    real(kp)*(2.*apcsx(i,j,jz)-apcsx(i,j,jz-1))
+      apcsy(i,j,jz+1)=real(1-kp)*piano18(i,j) + &
+                    real(kp)*(2.*apcsy(i,j,jz)-apcsy(i,j,jz-1))
+      apcsz(i,j,jz+1)=real(1-kp)*piano19(i,j) + &
+                    real(kp)*(2.*apcsz(i,j,jz)-apcsz(i,j,jz-1))
+      apetx(i,j,jz+1)=real(1-kp)*piano20(i,j) + &
+                    real(kp)*(2.*apetx(i,j,jz)-apetx(i,j,jz-1))
+      apety(i,j,jz+1)=real(1-kp)*piano21(i,j) + &
+                    real(kp)*(2.*apety(i,j,jz)-apety(i,j,jz-1))
+      apetz(i,j,jz+1)=real(1-kp)*piano22(i,j) + &
+                    real(kp)*(2.*piano23(i,j)-apetz(i,j,jz-1))
+      apztx(i,j,jz+1)=real(1-kp)*piano23(i,j) + &
+                    real(kp)*(2.*apztx(i,j,jz)-apztx(i,j,jz-1))
+      apzty(i,j,jz+1)=real(1-kp)*piano24(i,j) + &
+                    real(kp)*(2.*apzty(i,j,jz)-apzty(i,j,jz-1))
+      apztz(i,j,jz+1)=real(1-kp)*piano25(i,j) + &
+                    real(kp)*(2.*apztz(i,j,jz)-apztz(i,j,jz-1))
 
       end do
       end do
@@ -7780,15 +7780,15 @@
 !
       do k=kparasta,kparaend
       do j=1,jy
-      appo1(0,j,k)=(1-ip)*appo1(jx,j,k)+ip*appo1(1,j,k)
-      appo2(0,j,k)=(1-ip)*appo2(jx,j,k)+ip*appo2(1,j,k)
-      appo1rho(0,j,k)=(1-ip)*appo1rho(jx,j,k)+ip*appo1rho(1,j,k)
-      appo2rho(0,j,k)=(1-ip)*appo2rho(jx,j,k)+ip*appo2rho(1,j,k)
+      appo1(0,j,k)=real(1-ip)*appo1(jx,j,k)+real(ip)*appo1(1,j,k)
+      appo2(0,j,k)=real(1-ip)*appo2(jx,j,k)+real(ip)*appo2(1,j,k)
+      appo1rho(0,j,k)=real(1-ip)*appo1rho(jx,j,k)+real(ip)*appo1rho(1,j,k)
+      appo2rho(0,j,k)=real(1-ip)*appo2rho(jx,j,k)+real(ip)*appo2rho(1,j,k)
 !
-      appo1(jx+1,j,k)=(1-ip)*appo1(1,j,k)+ip*appo1(jx,j,k)
-      appo2(jx+1,j,k)=(1-ip)*appo2(1,j,k)+ip*appo2(jx,j,k)
-      appo1rho(jx+1,j,k)=(1-ip)*appo1rho(1,j,k)+ip*appo1rho(jx,j,k)
-      appo2rho(jx+1,j,k)=(1-ip)*appo2rho(1,j,k)+ip*appo2rho(jx,j,k)
+      appo1(jx+1,j,k)=real(1-ip)*appo1(1,j,k)+real(ip)*appo1(jx,j,k)
+      appo2(jx+1,j,k)=real(1-ip)*appo2(1,j,k)+real(ip)*appo2(jx,j,k)
+      appo1rho(jx+1,j,k)=real(1-ip)*appo1rho(1,j,k)+real(ip)*appo1rho(jx,j,k)
+      appo2rho(jx+1,j,k)=real(1-ip)*appo2rho(1,j,k)+real(ip)*appo2rho(jx,j,k)
       enddo
       enddo
 !
@@ -7859,10 +7859,10 @@
 
       do j=1,jy
       do i=1,jx
-         appo1(i,j,0)=(1-kp)*   appo1_piano(i,j,jz)+   kp*appo1(i,j,1)
-         appo2(i,j,0)=(1-kp)*   appo2_piano(i,j,jz)+   kp*appo2(i,j,1)
-      appo1rho(i,j,0)=(1-kp)*appo1rho_piano(i,j,jz)+kp*appo1rho(i,j,1)
-      appo2rho(i,j,0)=(1-kp)*appo2rho_piano(i,j,jz)+kp*appo2rho(i,j,1)
+         appo1(i,j,0)=real(1-kp)*   appo1_piano(i,j,jz)+   real(kp)*appo1(i,j,1)
+         appo2(i,j,0)=real(1-kp)*   appo2_piano(i,j,jz)+   real(kp)*appo2(i,j,1)
+      appo1rho(i,j,0)=real(1-kp)*appo1rho_piano(i,j,jz)+real(kp)*appo1rho(i,j,1)
+      appo2rho(i,j,0)=real(1-kp)*appo2rho_piano(i,j,jz)+real(kp)*appo2rho(i,j,1)
       enddo
       enddo
 
@@ -7870,12 +7870,12 @@
 
       do j=1,jy
       do i=1,jx
-         appo1(i,j,jz+1)=(1-kp)*appo1_piano(i,j,1)+kp*appo1(i,j,jz)
-         appo2(i,j,jz+1)=(1-kp)*appo2_piano(i,j,1)+kp*appo2(i,j,jz)
-      appo1rho(i,j,jz+1)=(1-kp)*appo1rho_piano(i,j,1) &
-                            +kp*appo1rho(i,j,jz)
-      appo2rho(i,j,jz+1)=(1-kp)*appo2rho_piano(i,j,1) &
-                            +kp*appo2rho(i,j,jz)
+         appo1(i,j,jz+1)=real(1-kp)*appo1_piano(i,j,1)+real(kp)*appo1(i,j,jz)
+         appo2(i,j,jz+1)=real(1-kp)*appo2_piano(i,j,1)+real(kp)*appo2(i,j,jz)
+      appo1rho(i,j,jz+1)=real(1-kp)*appo1rho_piano(i,j,1) &
+                            +real(kp)*appo1rho(i,j,jz)
+      appo2rho(i,j,jz+1)=real(1-kp)*appo2rho_piano(i,j,1) &
+                            +real(kp)*appo2rho(i,j,jz)
       enddo
       enddo
 
@@ -7930,14 +7930,14 @@
 !
       do k=kparasta,kparaend
       do j=1,jy
-      annit(0,j,k)   =(1-ip)*annit(jx,j,k)+ip*annit(1,j,k)
-      annit(jx+1,j,k)=(1-ip)*annit(1,j,k)+ip*annit(jx,j,k)
+      annit(0,j,k)   =real(1-ip)*annit(jx,j,k)+real(ip)*annit(1,j,k)
+      annit(jx+1,j,k)=real(1-ip)*annit(1,j,k)+real(ip)*annit(jx,j,k)
 !
         do isc=1,nscal
-           akapt(isc,0,j,k)   =(1-ip)*akapt(isc,jx,j,k) &
-      	                  +ip*akapt(isc,1,j,k)
-           akapt(isc,jx+1,j,k)=(1-ip)*akapt(isc,1,j,k) &
-      	                  +ip*akapt(isc,jx,j,k)
+           akapt(isc,0,j,k)   =real(1-ip)*akapt(isc,jx,j,k) &
+      	                  +real(ip)*akapt(isc,1,j,k)
+           akapt(isc,jx+1,j,k)=real(1-ip)*akapt(isc,1,j,k) &
+      	                  +real(ip)*akapt(isc,jx,j,k)
         end do
       end do
       end do
@@ -8016,10 +8016,10 @@
 
       do j=1,jy
       do i=1,jx
-      annit(i,j,0)=(1-kp)*annit_piano(i,j,jz)+kp*annit(i,j,1)
+      annit(i,j,0)=real(1-kp)*annit_piano(i,j,jz)+real(kp)*annit(i,j,1)
          do isc=1,nscal
-            akapt(isc,i,j,0)=(1-kp)*akapt_piano(isc,i,j,jz) &
-      	                +kp*akapt(isc,i,j,1)
+            akapt(isc,i,j,0)=real(1-kp)*akapt_piano(isc,i,j,jz) &
+      	                +real(kp)*akapt(isc,i,j,1)
          end do
       end do
       end do
@@ -8028,10 +8028,10 @@
 
       do j=1,jy
       do i=1,jx
-      annit(i,j,jz+1)=(1-kp)*annit_piano(i,j,1)+kp*annit(i,j,jz)
+      annit(i,j,jz+1)=real(1-kp)*annit_piano(i,j,1)+real(kp)*annit(i,j,jz)
          do isc=1,nscal
-            akapt(isc,i,j,jz+1)=(1-kp)*akapt_piano(isc,i,j,1) &
-      	                   +kp*akapt(isc,i,j,jz)
+            akapt(isc,i,j,jz+1)=real(1-kp)*akapt_piano(isc,i,j,1) &
+      	                   +real(kp)*akapt(isc,i,j,jz)
          end do
       end do
       end do

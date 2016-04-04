@@ -1,9 +1,10 @@
 !***********************************************************************
-subroutine carico_immb(tipo)
+subroutine carico_immb()
    !***********************************************************************
    !     read ibm input file
    use myarrays_ibm
    use mysending
+   use ricerca_module, only: tipo
    !
    use scala3
    use period
@@ -41,9 +42,6 @@ subroutine carico_immb(tipo)
    integer j_tri1,j_tri2,j_tri3,j_tri4
    integer k_tri1,k_tri2,k_tri3,k_tri4
       
-   !      integer tipo(0:n1+1,0:n2+1,0:n3+1)
-   integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
-
    logical icheck
    integer np
    !-----------------------------------------------------------------------

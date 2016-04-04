@@ -20,7 +20,7 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
     real x3,y3,z3
     real a,b,c,d
       
-    real distanza,alfa,cor
+    real distanza,alfa
 
     real u_t_sotto,u_t_sopra
     real tau_sotto,tau_sopra
@@ -146,7 +146,7 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
                         y3 = y1 + v(i,j,k)
                         z3 = z1 + w(i,j,k)
      
-                        call angolo(x1,y1,z1,x2,y2,z2,x1,y1,z1,x3,y3,z3,alfa,cor)
+                        call angolo(x1,y1,z1,x2,y2,z2,x1,y1,z1,x3,y3,z3,alfa)
            
                         distanza = punto_wfp3(3,1,i,k)
              
@@ -167,9 +167,10 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
                             att_mod_par(i,1,k)=0
                         end if
                     else !punto solido
-                        u_t = 1.
-                        utangente = 1.
-                        att_mod_par = 0
+                        ! ALE: I add (i,1,k) to the variables
+                        u_t(i,1,k) = 1.
+                        utangente(i,1,k) = 1.
+                        att_mod_par(i,1,k) = 0
                     end if
                 end do
             end do
@@ -287,7 +288,7 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
                         y3 = y1 + v(i,j,k)
                         z3 = z1 + w(i,j,k)
       
-                        call angolo(x1,y1,z1,x2,y2,z2,x1,y1,z1,x3,y3,z3,alfa,cor)
+                        call angolo(x1,y1,z1,x2,y2,z2,x1,y1,z1,x3,y3,z3,alfa)
             
                         distanza = punto_wfp4(3,1,i,k)
             
@@ -438,6 +439,84 @@ subroutine compute_ustar(distanza,reynol,umedia,u_t,rough,rougheight)
 
     elseif (rough==1) then
         u_t=vonKarman*umedia/log(distanza/rougheight)
+    end if
+
+
+    return
+end
+
+
+!***********************************************************************
+subroutine angolo (x1,y1,z1,x2,y2,z2,x3,y3,z3,x4,y4,z4,angle_deg)
+    !***********************************************************************
+    ! THIS SUBROUTINE IS TAKEN FROM LIBRARY GEOMETRY PACK
+    !
+    !c LINES_EXP_ANGLE_3D finds the angle between two explicit lines in 3D.
+    !
+    !  Formula:
+    !
+    !    The explicit form of a line in 3D is:
+    !
+    !      (X1,Y1,Z1), (X2,Y2,Z2).
+    !
+    !  Modified:
+    !
+    !    24 January 1999
+    !
+    !  Author:
+    !
+    !    John Burkardt
+    !
+    !  Parameters:
+    !
+    !    Input, real X1, Y1, Z1, X2, Y2, Z2, two distince points on the first line.
+    !
+    !    Input, real X3, Y3, Z3, X4, Y4, Z4, two distinct points on the second line.
+    !
+    !    Output, real ANGLE, the angle in radians between the two lines.
+    !    ANGLE is computed using the ACOS function, and so lies between 0 and PI.
+    !    But if one of the lines is degenerate, ANGLE is returned as -1.0.
+    !
+    implicit none
+    !
+    real,intent(in) :: x1,x2,x3,x4
+    real,intent(in) :: y1,y2,y3,y4
+    real,intent(in) :: z1,z2,z3,z4
+    real,intent(out) :: angle_deg
+
+
+    real :: angle,arc_cosine
+    real :: ctheta,enorm0_3d,pdotq,pnorm,qnorm
+    real,parameter :: tol=0.000001
+    real,parameter :: pi=acos(-1.0)
+
+    pnorm = sqrt ( ( x1 - x2 )**2 + ( y1 - y2 )**2 + ( z1 - z2 )**2 )
+    qnorm = sqrt ( ( x3 - x4 )**2 + ( y3 - y4 )**2 + ( z3 - z4 )**2 )
+
+    pdotq =    ( x2 - x1 ) * ( x4 - x3 ) &
+        + ( y2 - y1 ) * ( y4 - y3 ) &
+        + ( z2 - z1 ) * ( z4 - z3 )
+
+    if (pnorm==0.0 .or. qnorm==0.0) then
+        write (*,*) ' '
+        write (*,*) 'LINES_EXP_ANGLE_3D - Fatal error!'
+        write (*,*) '  One of the lines is degenerate!'
+        angle = - 1.0
+    else
+
+        !      write(*,*)'pi: ',pi
+        ctheta = pdotq / ( pnorm * qnorm )
+
+        if(abs(ctheta).ge.1.)then
+            write(1000,*)'TROVATO ANGOLO DEGENERE',ctheta
+            angle_deg = 0.0
+        else
+            angle =abs(acos(ctheta)) ! arc_cosine ( ctheta )
+            !         write(*,*)'angolo',angle
+            angle_deg=angle*180./pi
+            angle_deg=angle
+        !         write(*,*)'angolo deg: ',angle_deg
+        end if
     end if
 
 

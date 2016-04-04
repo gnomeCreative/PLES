@@ -30,7 +30,53 @@ module myarrays_metri3
     real,allocatable :: g_co31(:,:),g_co32(:,:),g_co33(:,:)
 
     real :: box_vol,solid_vol,fluid_vol
+
 contains
+
+    subroutine communication_viscosity()
+
+        use mysending
+        use scala3, only: jx,jy
+        use tipologia
+
+        use mpi
+
+        implicit none
+
+        integer :: ierror
+        integer :: status(MPI_STATUS_SIZE)
+
+        ! send to left
+        if (myid/=0) then
+            call MPI_SSEND(annit(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
+        end if
+        if (myid/=nproc-1) then
+            call MPI_RECV(annit(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
+        end if
+        ! send to right
+        if (myid/=nproc-1) then
+            call MPI_SSEND(annit(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
+        end if
+        if (myid/=0) then
+            call MPI_RECV(annit(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
+        end if
+        !-----------------------------------------------------------------------
+        ! send to left
+        if (myid/=0) then
+            call MPI_SSEND(annitV(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
+        end if
+        if (myid/=nproc-1) then
+            call MPI_RECV(annitV(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
+        end if
+        ! send to right
+        if (myid/=nproc-1) then
+            call MPI_SSEND(annitV(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
+        end if
+        if (myid/=0) then
+            call MPI_RECV(annitV(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
+        end if
+
+    end subroutine communication_viscosity
 
     subroutine compute_centroids(jx,jy,jz,myid,nproc,kparasta,kparaend)
 
@@ -460,10 +506,10 @@ contains
                     vol_loc=vol_loc+giac(i,j,k)
                     if (tipo(i,j,k)/=0) then
                         fluid_loc=fluid_loc+giac(i,j,k)
-                        end if
-                        if (tipo(i,j,k)==0) then
+                    end if
+                    if (tipo(i,j,k)==0) then
                         solid_loc=solid_loc+giac(i,j,k)
-                        end if
+                    end if
                 end do
             end do
         end do

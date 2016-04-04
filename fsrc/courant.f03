@@ -1,11 +1,13 @@
 !***********************************************************************
-subroutine courant(ind_cou,cou,kparasta,kparaend,nproc,myid,espl,i_rest,ktime)
+subroutine courant(ktime)
     !***********************************************************************
     ! compute the time step of the simulation or the max courant number
     ! depending on the simulation settings
     !
-    use myarrays_metri3
-    use myarrays_velo3
+    use myarrays_metri3, only: annit, g11, g22, g33, giac
+    use myarrays_velo3, only: uc, vc, wc
+    use mysending, only: kparasta,kparaend,nproc,myid
+    use mysettings, only: ind_cou,cou,espl,i_rest
     !
     use scala3
     use tipologia
@@ -14,15 +16,15 @@ subroutine courant(ind_cou,cou,kparasta,kparaend,nproc,myid,espl,i_rest,ktime)
 
     implicit none
 
+    integer,intent(in) :: ktime
+
     !-----------------------------------------------------------------------
     !     array declaration
-    integer kparasta,kparaend
-    integer ierr,myid,nproc
-    integer i,j,k,ind_cou,lll,espl,i_rest,ktime
+    integer ierr,i,j,k,lll
     integer imax,jmax,kmax
       
     real auc,avc,awc
-    real cou_int,dtint,epp,den,cou
+    real cou_int,dtint,epp,den
     real cou_loc,cou_int_loc
     real dt_loc,dt_loc2,dtint_loc
     real dtc,dtd,coef
@@ -68,90 +70,90 @@ subroutine courant(ind_cou,cou,kparasta,kparaend,nproc,myid,espl,i_rest,ktime)
             ! put a control, if cou greater than a value, move from
             ! fixed dt to fixed courant
 
-            if (cou>0.75) then
-                cou = 0.75
-                if(ktime==1.and.i_rest==0)then
-                    dt_loc=0.01
-                    do k=kparasta,kparaend
-                        do j=1,jy
-                            do i=1,jx
-                                auc=abs(uc(i,j,k))
-                                avc=abs(vc(i,j,k))
-                                awc=abs(wc(i,j,k))
-                                den=auc+avc+awc
-                                epp=0.000001
-                                den=max(epp,den)
-                                dtint_loc=cou*giac(i,j,k)/den
-                                dt_loc=min(dt_loc,dtint_loc)
-                            end do
-                        end do
-                    end do
-                else
-                    auc=abs(uc(1,1,kparasta))
-                    avc=abs(vc(1,1,kparasta))
-                    awc=abs(wc(1,1,kparasta))
-                    den=auc+avc+awc
-                    epp=0.000001
-                    den=max(epp,den)
-                    dt_loc=cou*giac(1,1,kparasta)/den
-                    do k=kparasta,kparaend
-                        do j=1,jy
-                            do i=1,jx
-                                auc=abs(uc(i,j,k))
-                                avc=abs(vc(i,j,k))
-                                awc=abs(wc(i,j,k))
-                                den=auc+avc+awc
-                                epp=0.000001
-                                den=max(epp,den)
-                                dtint_loc=cou*giac(i,j,k)/den
-                                dt_loc=min(dt_loc,dtint_loc)
-                            end do
-                        end do
-                    end do
-
-                end if
-	 
-                ! I need to find the min dt
-                call MPI_ALLREDUCE(dt_loc,dtc,1,MPI_REAL_SD,MPI_MIN, &
-                    MPI_COMM_WORLD,ierr)
-                if(myid==0)then
-                    write(*,*)'PAY ATTENTION dt MOVE TO NOT CONSTANT '
-                    write(*,*)'dt convective = ',dtc
-                endif
-	 
-                dt=dtc
-	 
-                if(espl==1)then
-                    !          0.4<0.5 requested diffusive condition
-                    coef=0.4
-                else
-                    coef=10.
-                end if
-	 
-                ! now the diffusive time step
-                do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=1,jx
-                            epp=0.000001
-                            den=( (g11(i,j,k)+g22(i,j,k)+g33(i,j,k))* &
-                                annit(i,j,k) )/giac(i,j,k)
-                            den=max(epp,den)
-                            dt_loc2=coef/den
-                            dt=min(dt,dt_loc2)
-                        end do
-                    end do
-                end do
-                !        the min value between all procs
-                dtd=0.
-                call MPI_ALLREDUCE(dt,dtd,1,MPI_REAL_SD,MPI_MIN, &
-                    MPI_COMM_WORLD,ierr)
-                dt=dtd
-                if(myid==0)then
-                    write(*,*)'dt diffusive = ',dt
-                    write(*,*)'time step dt = ',dt
-                endif
-
-            end if
+!            if (cou>0.75) then
+!                cou = 0.75
+!                if(ktime==1.and.i_rest==0)then
+!                    dt_loc=0.01
+!                    do k=kparasta,kparaend
+!                        do j=1,jy
+!                            do i=1,jx
+!                                auc=abs(uc(i,j,k))
+!                                avc=abs(vc(i,j,k))
+!                                awc=abs(wc(i,j,k))
+!                                den=auc+avc+awc
+!                                epp=0.000001
+!                                den=max(epp,den)
+!                                dtint_loc=cou*giac(i,j,k)/den
+!                                dt_loc=min(dt_loc,dtint_loc)
+!                            end do
+!                        end do
+!                    end do
+!                else
+!                    auc=abs(uc(1,1,kparasta))
+!                    avc=abs(vc(1,1,kparasta))
+!                    awc=abs(wc(1,1,kparasta))
+!                    den=auc+avc+awc
+!                    epp=0.000001
+!                    den=max(epp,den)
+!                    dt_loc=cou*giac(1,1,kparasta)/den
+!                    do k=kparasta,kparaend
+!                        do j=1,jy
+!                            do i=1,jx
+!                                auc=abs(uc(i,j,k))
+!                                avc=abs(vc(i,j,k))
+!                                awc=abs(wc(i,j,k))
+!                                den=auc+avc+awc
+!                                epp=0.000001
+!                                den=max(epp,den)
+!                                dtint_loc=cou*giac(i,j,k)/den
+!                                dt_loc=min(dt_loc,dtint_loc)
+!                            end do
+!                        end do
+!                    end do
+!
+!                end if
+!
+!                ! I need to find the min dt
+!                call MPI_ALLREDUCE(dt_loc,dtc,1,MPI_REAL_SD,MPI_MIN, &
+!                    MPI_COMM_WORLD,ierr)
+!                if(myid==0)then
+!                    write(*,*)'PAY ATTENTION dt MOVE TO NOT CONSTANT '
+!                    write(*,*)'dt convective = ',dtc
+!                endif
+!
+!                dt=dtc
+!
+!                if(espl==1)then
+!                    !          0.4<0.5 requested diffusive condition
+!                    coef=0.4
+!                else
+!                    coef=10.
+!                end if
+!
+!                ! now the diffusive time step
+!                do k=kparasta,kparaend
+!                    do j=1,jy
+!                        do i=1,jx
+!                            epp=0.000001
+!                            den=( (g11(i,j,k)+g22(i,j,k)+g33(i,j,k))* &
+!                                annit(i,j,k) )/giac(i,j,k)
+!                            den=max(epp,den)
+!                            dt_loc2=coef/den
+!                            dt=min(dt,dt_loc2)
+!                        end do
+!                    end do
+!                end do
+!                !        the min value between all procs
+!                dtd=0.
+!                call MPI_ALLREDUCE(dt,dtd,1,MPI_REAL_SD,MPI_MIN, &
+!                    MPI_COMM_WORLD,ierr)
+!                dt=dtd
+!                if(myid==0)then
+!                    write(*,*)'dt diffusive = ',dt
+!                    write(*,*)'time step dt = ',dt
+!                endif
+!
+!            end if
         !
         !-----------------------------------------------------------------------
         !     CONSTANT COURANT NUMBER

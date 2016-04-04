@@ -6,8 +6,7 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
    ! compute scale similar part for momentum eq.
    !
    use filter_module
-   use turbo3bis
-   use turbo2_data
+   use turbo_module
    use myarrays_velo3
    use myarrays_metri3
    !
@@ -31,8 +30,8 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
    integer req1,req2,req3,req4,req5,req6
    integer istatus(MPI_STATUS_SIZE)
    !
-   double precision sbuff((n1+2)*(n2+2)*40)
-   double precision rbuff((n1+2)*(n2+2)*40)
+   real sbuff((n1+2)*(n2+2)*40)
+   real rbuff((n1+2)*(n2+2)*40)
    !
    integer i,j,k,kparastal,iq,inmod,m,lll
    integer kparastan
@@ -41,9 +40,9 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
    integer ktime,i_print,lagr
    real somma
    !
-   double precision,allocatable :: sus_loc11(:),sus_loc12(:),sus_loc13(:)
-   double precision,allocatable :: sus_loc21(:),sus_loc22(:),sus_loc23(:)
-   double precision,allocatable :: sus_loc31(:),sus_loc32(:),sus_loc33(:)
+   real,allocatable :: sus_loc11(:),sus_loc12(:),sus_loc13(:)
+   real,allocatable :: sus_loc21(:),sus_loc22(:),sus_loc23(:)
+   real,allocatable :: sus_loc31(:),sus_loc32(:),sus_loc33(:)
    !-----------------------------------------------------------------------
    debugg = 0
 

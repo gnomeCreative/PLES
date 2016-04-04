@@ -9,7 +9,7 @@ subroutine check_divergence(tipo)
    !
    use scala3, only: jx, jy, jz, n1, n2
    use tipologia
-   use orl, only: infout1, infout2, infout3, infout4, infout5, infout6
+   use orlansky_module, only: infout1, infout2, infout3, infout4, infout5, infout6
    !
    use mpi
 
@@ -128,7 +128,7 @@ subroutine check_divergence(tipo)
    !-----------------------------------------------------------------------
    !     without IBM bodyforce=0
 
-   if(bodyforce==0)then
+   if (.not.bodyforce) then
       divmax_loc=0.
       divgmax_loc=0.
       
@@ -203,7 +203,7 @@ subroutine check_divergence(tipo)
    !-----------------------------------------------------------------------
 
    !     with IBM bodyforce=1
-   if(bodyforce==1)then
+   if (bodyforce) then
 
       divmax_loc=0.
       divgmax_loc=0.

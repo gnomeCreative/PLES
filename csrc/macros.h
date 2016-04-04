@@ -56,7 +56,7 @@
 			ostringstream convert; \
 			convert<<correctIndex; \
 			string stringIndex = convert.str(); \
-			string stringName = stringIndex + "/" + name; \
+			string stringName = stringIndex + "_" + name; \
 			string optionName = "-" + stringName; \
 			if (!cfg.have_variable(stringName) && !command_line.search(optionName)) { \
 				cout << INFO << "WARNING: Parameter " << stringName << " is missing! Using default: " << def << std::endl;\

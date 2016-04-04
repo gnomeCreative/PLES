@@ -22,6 +22,14 @@
 
 using namespace std;
 extern ProblemName problemName;
+extern double alx,aly,alz;
+
+// stuff from Fortran
+extern "C" {
+void pass_geometry(int*,double*,double*,double*,double*,bool*);
+void pass_forces(double*,double*,double*,double*,double*,double*);
+}
+extern int myid;
 
 class DEM{
 private:
@@ -111,7 +119,8 @@ public:
 		//
 		numVisc=0.0;
 	}
-	void discreteElementStep();
+	void discreteElementStep1();
+	void discreteElementStep2();
 	void discreteElementGet(GetPot& lbmCfgFile, GetPot& command_line);
 	void discreteElementInit();
 	void evolveBoundaries();
@@ -122,6 +131,9 @@ private:
 	void initializeWalls();
 	void initializeCylinders();
 	void initializePbcs();
+	// communication with Fortran
+	void communicateGeometry();
+	void communicateForces();
 	// integration functions
 	void predictor();
 	void corrector();

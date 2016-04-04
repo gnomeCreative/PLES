@@ -125,8 +125,6 @@ void elmt::predict(const double c[]) {
     wpGlobal=2.0*quat2vec( qp1.multiply(qp0adj) );
     wpLocal=2.0*quat2vec( qp0adj.multiply(qp1) );
 
-//    MWall.show();
-//    cout<<"\n";
 }
 
 void elmt::correct(const double coeff[]) {
@@ -180,7 +178,7 @@ void elmt::translate(const tVect& transVec) {
 void particle::updatePredicted(const elmt& motherElmt, const std::vector <vecList>& prototypes) {
         // updating position
         x0=motherElmt.xp0+r*project(prototypes[motherElmt.size][protoIndex],motherElmt.qp0);
-        // updating radius (distance of particle barycentre from element barycentre)
+        // updating radius (distance of particle center of mass to element center of mass)
         radiusVec=x0-motherElmt.xp0;
         // updating particle speed
         x1=motherElmt.xp1+motherElmt.wpGlobal.cross(radiusVec);
@@ -189,7 +187,7 @@ void particle::updatePredicted(const elmt& motherElmt, const std::vector <vecLis
 void particle::updateCorrected(const elmt& motherElmt, const std::vector <vecList>& prototypes) {
         // updating position
         x0=motherElmt.x0+r*project(prototypes[motherElmt.size][protoIndex],motherElmt.q0);
-        // updating radius (distance of particle barycentre from element barycentre)
+        // updating radius (distance of particle center of mass to element center of mass)
         radiusVec=x0-motherElmt.x0;
         // updating particle speed
         x1=motherElmt.x1+motherElmt.wGlobal.cross(radiusVec);
@@ -198,7 +196,7 @@ void particle::updateCorrected(const elmt& motherElmt, const std::vector <vecLis
 void particle::ghostUpdate(particle& originParticle, tVect& pbcVector) {
         // updating position
         x0=originParticle.x0+pbcVector;
-        // updating radius (distance of particle barycentre from element barycentre)
+        // updating radius (distance of particle center of mass to element center of mass)
         radiusVec=originParticle.radiusVec;
         // updating particle speed
         x1=originParticle.x1;

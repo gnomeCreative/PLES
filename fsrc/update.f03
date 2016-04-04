@@ -20,8 +20,6 @@ subroutine update()
     integer ierr
     integer status(MPI_STATUS_SIZE)
     integer plantypee
-    integer req1,req2,req3,req4,req5,req6
-    integer istatus(MPI_STATUS_SIZE)
     integer i,j,k,ii,jj,kk
     !-----------------------------------------------------------------------
     real,parameter :: pcoef1=1.875
@@ -195,29 +193,18 @@ subroutine update()
         call MPI_RECV(w(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
     endif
 
-    ! ALESSANDRO
-    if(leftpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(u(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-        call MPI_SSEND(v(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-        call MPI_SSEND(w(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-    endif
-    if(rightpem /= MPI_PROC_NULL) then
-        call MPI_RECV(u(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-        call MPI_RECV(v(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-        call MPI_RECV(w(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-    endif
+!    ! ALESSANDRO
+!    if(leftpem /= MPI_PROC_NULL) then
+!        call MPI_SSEND(u(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+!        call MPI_SSEND(v(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+!        call MPI_SSEND(w(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+!    endif
+!    if(rightpem /= MPI_PROC_NULL) then
+!        call MPI_RECV(u(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
+!        call MPI_RECV(v(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
+!        call MPI_RECV(w(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
+!    endif
 
-
-    if(leftpem /= MPI_PROC_NULL) then
-    !      call MPI_WAIT(req1,istatus,ierr)
-    !      call MPI_WAIT(req3,istatus,ierr)
-    !      call MPI_WAIT(req5,istatus,ierr)
-    endif
-    if(rightpem /= MPI_PROC_NULL) then
-    !      call MPI_WAIT(req2,istatus,ierr)
-    !      call MPI_WAIT(req4,istatus,ierr)
-    !      call MPI_WAIT(req6,istatus,ierr)
-    endif
 
     return
 end

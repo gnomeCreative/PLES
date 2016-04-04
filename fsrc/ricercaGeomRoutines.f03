@@ -841,276 +841,6 @@ subroutine ptpolg ( dim, vcl, qx, qy, qz, nrml, dtol, inout )
    !--------------------------------------------------------------------------------
    !********************************************************************************
    !--------------------------------------------------------------------------------
-   subroutine centroidi(jx,jy,jz,xc,yc,zc,formatted,FMT1)
-       implicit none
-
-       integer :: jx,jy,jz
-       integer :: jjx,jjy,jjz
-       integer :: i,j,k
-       real(8),allocatable :: x(:,:,:),y(:,:,:),z(:,:,:)
-       !real(8) :: x(0:jx,0:jy,0:jz),y(0:jx,0:jy,0:jz),z(0:jx,0:jy,0:jz)
-       real(8) :: xc(0:jx+1,0:jy+1,0:jz+1),yc(0:jx+1,0:jy+1,0:jz+1),zc(0:jx+1,0:jy+1,0:jz+1)
-       real(8) :: alx,aly,alz
-       character*15 :: FMT1
-       integer :: formatted
-
-
-
-       allocate(x(0:jx,0:jy,0:jz))
-       allocate(y(0:jx,0:jy,0:jz))
-       allocate(z(0:jx,0:jy,0:jz))
-       open(1932,file='gri3dp_in.dat',status='old')
-       read(1932,*)alx,aly,alz
-       read(1932,*)jjx,jjy,jjz
-       if(formatted==1)then
-           do k=0,jz
-               do j=0,jy
-                   do i=0,jx
-                       read(1932,FMT1)x(i,j,k)
-                       read(1932,FMT1)y(i,j,k)
-                       read(1932,FMT1)z(i,j,k)
-                   end do
-               end do
-           end do
-       else
-           do k=0,jz
-               do j=0,jy
-                   do i=0,jx
-                       read(1932,*)x(i,j,k)
-                       read(1932,*)y(i,j,k)
-                       read(1932,*)z(i,j,k)
-                   end do
-               end do
-           end do
-       end if
-       close(1932)
-
-       !100 format(3e13.5)
-
-       ! calcolo centroidi
-       do k=1,jz
-           do j=1,jy
-               do i=1,jx
-
-                   yc(i,j,k)=0.125*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k)+y(i,j-1,k)+y(i,j-1,k-1)+y(i-1,j-1,k-1)+y(i-1,j-1,k))
-                   xc(i,j,k)=0.125*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k)+x(i,j-1,k)+x(i,j-1,k-1)+x(i-1,j-1,k-1)+x(i-1,j-1,k))
-                   zc(i,j,k)=0.125*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k)+z(i,j-1,k)+z(i,j-1,k-1)+z(i-1,j-1,k-1)+z(i-1,j-1,k))
-
-               end do
-           end do
-       end do
-       ! parete 1 e 2
-       do k=1,jz
-           do j=1,jy
-
-               i=0
-
-               xc(i,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i,j-1,k-1)+x(i,j-1,k))
-               yc(i,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i,j-1,k-1)+y(i,j-1,k))
-               zc(i,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i,j-1,k-1)+z(i,j-1,k))
-
-               i=jx
-
-               xc(i+1,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i,j-1,k-1)+x(i,j-1,k))
-               yc(i+1,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i,j-1,k-1)+y(i,j-1,k))
-               zc(i+1,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i,j-1,k-1)+z(i,j-1,k))
-
-           end do
-       end do
-
-       do i=1,jx
-           j=0
-           k=0
-           xc(i,j,k)=0.5*(x(i,j,k)+x(i-1,j,k))
-           yc(i,j,k)=0.5*(y(i,j,k)+y(i-1,j,k))
-           zc(i,j,k)=0.5*(z(i,j,k)+z(i-1,j,k))
-
-           j=0
-           k=jz
-           xc(i,j,k+1)=0.5*(x(i,j,k)+x(i-1,j,k))
-           yc(i,j,k+1)=0.5*(y(i,j,k)+y(i-1,j,k))
-           zc(i,j,k+1)=0.5*(z(i,j,k)+z(i-1,j,k))
-
-           j=jy
-           k=jz
-           xc(i,j+1,k+1)=0.5*(x(i,j,k)+x(i-1,j,k))
-           yc(i,j+1,k+1)=0.5*(y(i,j,k)+y(i-1,j,k))
-           zc(i,j+1,k+1)=0.5*(z(i,j,k)+z(i-1,j,k))
-
-           j=jy
-           k=0
-           xc(i,j+1,k)=0.5*(x(i,j,k)+x(i-1,j,k))
-           yc(i,j+1,k)=0.5*(y(i,j,k)+y(i-1,j,k))
-           zc(i,j+1,k)=0.5*(z(i,j,k)+z(i-1,j,k))
-       end do
-       !...........................................................
-       ! parete 3 e 4 e spigoli
-       do k=1,jz
-           do i=1,jx
-
-               j=0
-
-               xc(i,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k))
-               yc(i,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k))
-               zc(i,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k))
-
-               j=jy
-
-               xc(i,j+1,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k))
-               yc(i,j+1,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k))
-               zc(i,j+1,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k))
-
-           end do
-       end do
-
-       do j=1,jy
-
-           k=0
-           i=0
-           xc(i,j,k)=0.5*(x(i,j,k)+x(i,j-1,k))
-           yc(i,j,k)=0.5*(y(i,j,k)+y(i,j-1,k))
-           zc(i,j,k)=0.5*(z(i,j,k)+z(i,j-1,k))
-
-           k=0
-           i=jx
-           xc(i+1,j,k)=0.5*(x(i,j,k)+x(i,j-1,k))
-           yc(i+1,j,k)=0.5*(y(i,j,k)+y(i,j-1,k))
-           zc(i+1,j,k)=0.5*(z(i,j,k)+z(i,j-1,k))
-
-           k=jz
-           i=jx
-           xc(i+1,j,k+1)=0.5*(x(i,j,k)+x(i,j-1,k))
-           yc(i+1,j,k+1)=0.5*(y(i,j,k)+y(i,j-1,k))
-           zc(i+1,j,k+1)=0.5*(z(i,j,k)+z(i,j-1,k))
-
-           k=jz
-           i=0
-           xc(i,j,k+1)=0.5*(x(i,j,k)+x(i,j-1,k))
-           yc(i,j,k+1)=0.5*(y(i,j,k)+y(i,j-1,k))
-           zc(i,j,k+1)=0.5*(z(i,j,k)+z(i,j-1,k))
-
-       end do
-       !..........................................................
-       ! parete 5 e 6 e spigoli
-       do j=1,jy
-           do i=1,jx
-
-               k=0
-
-               xc(i,j,k)=0.25*(x(i,j,k)+x(i,j-1,k)+x(i-1,j-1,k)+x(i-1,j,k))
-               yc(i,j,k)=0.25*(y(i,j,k)+y(i,j-1,k)+y(i-1,j-1,k)+y(i-1,j,k))
-               zc(i,j,k)=0.25*(z(i,j,k)+z(i,j-1,k)+z(i-1,j-1,k)+z(i-1,j,k))
-
-               k=jz
-
-               xc(i,j,k+1)=0.25*(x(i,j,k)+x(i,j-1,k)+x(i-1,j-1,k)+x(i-1,j,k))
-               yc(i,j,k+1)=0.25*(y(i,j,k)+y(i,j-1,k)+y(i-1,j-1,k)+y(i-1,j,k))
-               zc(i,j,k+1)=0.25*(z(i,j,k)+z(i,j-1,k)+z(i-1,j-1,k)+z(i-1,j,k))
-
-           end do
-       end do
-
-       do k=1,jz
-           j=0
-           i=0
-           xc(i,j,k)=0.5*(x(i,j,k)+x(i,j,k-1))
-           yc(i,j,k)=0.5*(y(i,j,k)+y(i,j,k-1))
-           zc(i,j,k)=0.5*(z(i,j,k)+z(i,j,k-1))
-
-           j=0
-           i=jx
-           xc(i+1,j,k)=0.5*(x(i,j,k)+x(i,j,k-1))
-           yc(i+1,j,k)=0.5*(y(i,j,k)+y(i,j,k-1))
-           zc(i+1,j,k)=0.5*(z(i,j,k)+z(i,j,k-1))
-
-           j=jy
-           i=jx
-           xc(i+1,j+1,k)=0.5*(x(i,j,k)+x(i,j,k-1))
-           yc(i+1,j+1,k)=0.5*(y(i,j,k)+y(i,j,k-1))
-           zc(i+1,j+1,k)=0.5*(z(i,j,k)+z(i,j,k-1))
-
-           j=jy
-           i=0
-           xc(i,j+1,k)=0.5*(x(i,j,k)+x(i,j,k-1))
-           yc(i,j+1,k)=0.5*(y(i,j,k)+y(i,j,k-1))
-           zc(i,j+1,k)=0.5*(z(i,j,k)+z(i,j,k-1))
-       end do
-
-
-       i=0
-       j=0
-       k=0
-       xc(i,j,k)=x(i,j,k)
-       yc(i,j,k)=y(i,j,k)
-       zc(i,j,k)=z(i,j,k)
-
-       i=0
-       j=0
-       k=jz
-
-       xc(i,j,k+1)=x(i,j,k)
-       yc(i,j,k+1)=y(i,j,k)
-       zc(i,j,k+1)=z(i,j,k)
-
-       i=0
-       j=jy
-       k=jz
-       xc(i,j+1,k+1)=x(i,j,k)
-       yc(i,j+1,k+1)=y(i,j,k)
-       zc(i,j+1,k+1)=z(i,j,k)
-
-       i=0
-       j=jy
-       k=0
-       xc(i,j+1,k)=x(i,j,k)
-       yc(i,j+1,k)=y(i,j,k)
-       zc(i,j+1,k)=z(i,j,k)
-       !.....................
-       i=jx
-       j=0
-       k=0
-       xc(i+1,j,k)=x(i,j,k)
-       yc(i+1,j,k)=y(i,j,k)
-       zc(i+1,j,k)=z(i,j,k)
-
-       i=jx
-       j=0
-       k=jz
-
-       xc(i+1,j,k+1)=x(i,j,k)
-       yc(i+1,j,k+1)=y(i,j,k)
-       zc(i+1,j,k+1)=z(i,j,k)
-
-       i=jx
-       j=jy
-       k=jz
-       xc(i+1,j+1,k+1)=x(i,j,k)
-       yc(i+1,j+1,k+1)=y(i,j,k)
-       zc(i+1,j+1,k+1)=z(i,j,k)
-
-       i=jx
-       j=jy
-       k=0
-       xc(i+1,j+1,k)=x(i,j,k)
-       yc(i+1,j+1,k)=y(i,j,k)
-       zc(i+1,j+1,k)=z(i,j,k)
-
-       deallocate(x)
-       deallocate(y)
-       deallocate(z)
-        !write(*,*)'centroids computed'
-
-       return
-   end
-
-
-
-
-
-
-   !--------------------------------------------------------------------------------
-   !********************************************************************************
-   !--------------------------------------------------------------------------------
    function parallelepiped_contains_point_3d ( p1, p2, p3, p4, p )
 
        !*********************************************************************
@@ -2017,928 +1747,928 @@ subroutine ptpolg ( dim, vcl, qx, qy, qz, nrml, dtol, inout )
        return
    end
 
-    subroutine rotation2(sx,sy,sz,ipx,ipy,ipz,rot,rot_inverse)
-!-----------------------------------------------------------------------
-! this subroutine compute a rotation matrix with eulerian angles between
-! two catersian system 123 and 1'2'3' with angles phi,theta,psi.
-! It uses x-convention and the right hand rules.
-!
-! phi is the rotation around 3 that bring axis 1 to N the line of Nodes,
-! where the line N is the intersection between plane 12 and 1'2'
-!
-! theta is the rotation from 3 to 3' around N
-!
-! psi is the rotation from N to 1' around 3
-!-----------------------------------------------------------------------
- implicit none
-!-----------------------------------------------------------------------
-! declaration
- real*8 p0(3),p1(3),p2(3),p3(3)
- real*8 p0p(3),p1p(3),p2p(3),p3p(3)
- real*8 p1_tan(3),p2_tan(3),p3_tan(3)
- real*8 pN0(3),pNa(3)
- real*8 p_base(3),F,G,H
- real*8 normal_12(3),normal_1p2p(3),node_line(3)
+   subroutine rotation2(sx,sy,sz,ipx,ipy,ipz,rot,rot_inverse)
+       !-----------------------------------------------------------------------
+       ! this subroutine compute a rotation matrix with eulerian angles between
+       ! two catersian system 123 and 1'2'3' with angles phi,theta,psi.
+       ! It uses x-convention and the right hand rules.
+       !
+       ! phi is the rotation around 3 that bring axis 1 to N the line of Nodes,
+       ! where the line N is the intersection between plane 12 and 1'2'
+       !
+       ! theta is the rotation from 3 to 3' around N
+       !
+       ! psi is the rotation from N to 1' around 3
+       !-----------------------------------------------------------------------
+       implicit none
+       !-----------------------------------------------------------------------
+       ! declaration
+       real*8 p0(3),p1(3),p2(3),p3(3)
+       real*8 p0p(3),p1p(3),p2p(3),p3p(3)
+       real*8 p1_tan(3),p2_tan(3),p3_tan(3)
+       real*8 pN0(3),pNa(3)
+       real*8 p_base(3),F,G,H
+       real*8 normal_12(3),normal_1p2p(3),node_line(3)
 
- real*8 check1,check2,check3
- real*8 traslo_1,traslo_2,traslo_3
- real*8 ip1,ip2,ip3
- real*8 ipx,ipy,ipz
- real*8 s1,s2,s3
- real*8 sx,sy,sz
+       real*8 check1,check2,check3
+       real*8 traslo_1,traslo_2,traslo_3
+       real*8 ip1,ip2,ip3
+       real*8 ipx,ipy,ipz
+       real*8 s1,s2,s3
+       real*8 sx,sy,sz
 
- real*8 rot(3,3),rot_inverse(3,3),det
+       real*8 rot(3,3),rot_inverse(3,3),det
 
- real*8 phi,theta,psi,pi,alfa
+       real*8 phi,theta,psi,pi,alfa
 
- real*8 c_phi,c_theta,c_psi
- real*8 s_phi,s_theta,s_psi
+       real*8 c_phi,c_theta,c_psi
+       real*8 s_phi,s_theta,s_psi
 
- real*8 angle_rad_3d
+       real*8 angle_rad_3d
 
- real*8 p1_p1p,p2_p1p,p3_p1p
- real*8 p1_p3p,p2_p3p,p3_p3p
- real*8 pp1_p1p,pp2_p1p,pp3_p1p
-!-----------------------------------------------------------------------
- pi = acos(-1.)
-!-----------------------------------------------------------------------
-! points on the general cartesian system 123
+       real*8 p1_p1p,p2_p1p,p3_p1p
+       real*8 p1_p3p,p2_p3p,p3_p3p
+       real*8 pp1_p1p,pp2_p1p,pp3_p1p
+       !-----------------------------------------------------------------------
+       pi = acos(-1.)
+       !-----------------------------------------------------------------------
+       ! points on the general cartesian system 123
 
- p0(1)= 0.
- p0(2)= 0.
- p0(3)= 0.
+       p0(1)= 0.
+       p0(2)= 0.
+       p0(3)= 0.
 
- p1(1)= 1.
- p1(2)= 0.
- p1(3)= 0.
+       p1(1)= 1.
+       p1(2)= 0.
+       p1(3)= 0.
 
- p2(1)= 0.
- p2(2)= 1.
- p2(3)= 0.
+       p2(1)= 0.
+       p2(2)= 1.
+       p2(3)= 0.
 
- p3(1)= 0.
- p3(2)= 0.
- p3(3)= 1.
+       p3(1)= 0.
+       p3(2)= 0.
+       p3(3)= 1.
 
- !find the normal to plane 012
- call plane_exp_normal_3dbis( p0,p1,p2,normal_12)
-!-----------------------------------------------------------------------
-! I need to work with right hand rule therefore I change y to z
- ip1 = ipx
- ip2 = ipz
- ip3 = ipy
+       !find the normal to plane 012
+       call plane_exp_normal_3dbis( p0,p1,p2,normal_12)
+       !-----------------------------------------------------------------------
+       ! I need to work with right hand rule therefore I change y to z
+       ip1 = ipx
+       ip2 = ipz !ipz
+       ip3 = ipy !ipy
 
- s1 = sx
- s2 = sz
- s3 = sy
-!-----------------------------------------------------------------------
-! points on the local cartesian axys 1'2'3' but written in the general
-! coordinates system
- traslo_1 = ip1
- traslo_2 = ip2
- traslo_3 = ip3
+       s1 = sx
+       s2 = sz !sz
+       s3 = sy !sy
+       !-----------------------------------------------------------------------
+       ! points on the local cartesian axys 1'2'3' but written in the general
+       ! coordinates system
+       traslo_1 = ip1
+       traslo_2 = ip2
+       traslo_3 = ip3
 
- p0p(1)= ip1 - traslo_1
- p0p(2)= ip2 - traslo_2
- p0p(3)= ip3 - traslo_3
+       p0p(1)= ip1 - traslo_1
+       p0p(2)= ip2 - traslo_2
+       p0p(3)= ip3 - traslo_3
 
- p3p(1)= s1 - traslo_1
- p3p(2)= s2 - traslo_2
- p3p(3)= s3 - traslo_3
+       p3p(1)= s1 - traslo_1
+       p3p(2)= s2 - traslo_2
+       p3p(3)= s3 - traslo_3
 
- call line_exp2par_3d (p0p(1),p0p(2),p0p(3),p3p(1),p3p(2),p3p(3), &
-                F, G, H, p_base(1), p_base(2), p_base(3) )
+       call line_exp2par_3d (p0p(1),p0p(2),p0p(3),p3p(1),p3p(2),p3p(3), &
+           F, G, H, p_base(1), p_base(2), p_base(3) )
 
- normal_1p2p(1)=F
- normal_1p2p(2)=G
- normal_1p2p(3)=H
+       normal_1p2p(1)=F
+       normal_1p2p(2)=G
+       normal_1p2p(3)=H
 
- call plane_normal2exp_3d ( p0p, normal_1p2p,p1_tan,p2_tan,p3_tan)
+       call plane_normal2exp_3d ( p0p, normal_1p2p,p1_tan,p2_tan,p3_tan)
 
-! fix a point on axys 1'
- check1 = abs(p0p(1)-p1_tan(1)) &
-        + abs(p0p(2)-p1_tan(2)) &
-        + abs(p0p(3)-p1_tan(3))
+       ! fix a point on axys 1'
+       check1 = abs(p0p(1)-p1_tan(1)) &
+           + abs(p0p(2)-p1_tan(2)) &
+           + abs(p0p(3)-p1_tan(3))
 
- check2 = abs(p0p(1)-p2_tan(1)) &
-        + abs(p0p(2)-p2_tan(2)) &
-        + abs(p0p(3)-p2_tan(3))
+       check2 = abs(p0p(1)-p2_tan(1)) &
+           + abs(p0p(2)-p2_tan(2)) &
+           + abs(p0p(3)-p2_tan(3))
 
- check3 = abs(p0p(1)-p3_tan(1)) &
-        + abs(p0p(2)-p3_tan(2)) &
-        + abs(p0p(3)-p3_tan(3))
+       check3 = abs(p0p(1)-p3_tan(1)) &
+           + abs(p0p(2)-p3_tan(2)) &
+           + abs(p0p(3)-p3_tan(3))
 
 
- if(check1 /= 0)then
-    p1p(1) = p1_tan(1)
-    p1p(2) = p1_tan(2)
-    p1p(3) = p1_tan(3)
- else
-    if(check2 /= 0)then
-       p1p(1) = p2_tan(1)
-       p1p(2) = p2_tan(2)
-       p1p(3) = p2_tan(3)
-    else
-       if(check2 /= 0)then
-          p1p(1) = p3_tan(1)
-          p1p(2) = p3_tan(2)
-          p1p(3) = p3_tan(3)
+       if(check1 /= 0)then
+           p1p(1) = p1_tan(1)
+           p1p(2) = p1_tan(2)
+           p1p(3) = p1_tan(3)
+       else
+           if(check2 /= 0)then
+               p1p(1) = p2_tan(1)
+               p1p(2) = p2_tan(2)
+               p1p(3) = p2_tan(3)
+           else
+               if(check2 /= 0)then
+                   p1p(1) = p3_tan(1)
+                   p1p(2) = p3_tan(2)
+                   p1p(3) = p3_tan(3)
+               end if
+           end if
        end if
-    end if
- end if
-
-!-----------------------------------------------------------------------
-! construct N the line of node, intersection between 12 and 1'2'
-
- !vector product between normal to the plane
- call r8vec_cross_3d ( normal_1p2p, normal_12, node_line )
-
- pN0 = p0
- pNa(1) = node_line(1)*3.
- pNa(2) = node_line(2)*3.
- pNa(3) = node_line(3)*3.
-
-!-----------------------------------------------------------------------
-! phi rotation from 1 to N
-! phi0 = angle_rad_3d ( p1, p0, pNa )
-!-----------------------------------------------------------------------
-! theta rotation from 3 to 3' [0,pi]
-! theta0 = angle_rad_3d ( p3, p0, p3p )
-!-----------------------------------------------------------------------
-! psi rotation from N to 1'
-! psi0 = angle_rad_3d ( pNa, p0, p1p )
-!-----------------------------------------------------------------------
-
-! phi rotate 1 to N around 3
- phi = atan2(pNa(2),pNa(1))
- c_phi = cos(phi)
- s_phi = sin(phi)
-
-!rotate points p1p and p3p using phi
- p1_p3p = c_phi*p3p(1) + s_phi*p3p(2)
- p2_p3p =-s_phi*p3p(1) + c_phi*p3p(2)
- p3_p3p = p3p(3)
-
- p1_p1p = c_phi*p1p(1) + s_phi*p1p(2)
- p2_p1p =-s_phi*p1p(1) + c_phi*p1p(2)
- p3_p1p = p1p(3)
-
-
-!------------------------------------------------------------------------
-! theta rotate 3 to 3' around N [0,pi] or [-pi/2,pi/2]
-!the angle between 3 and 3', using atan2 I need to change the sign
- theta = -atan2(p2_p3p,p3_p3p)
- c_theta = cos(theta)
- s_theta = sin(theta)
-
-! rotate p_p1p with theta to obtain pp_p1p
- pp1_p1p = p1_p1p
- pp2_p1p = c_theta*p2_p1p + s_theta*p3_p1p
- pp3_p1p =-s_theta*p2_p1p + c_theta*p3_p1p
-
-!psi rotate N to 1' around 3
- psi = atan2(pp2_p1p,pp1_p1p)
-
- c_psi = cos(psi)
- s_psi = sin(psi)
-
-! rotation matrix construction
- rot(1,1) =  c_psi * c_phi  -  s_psi * c_theta * s_phi
- rot(1,2) =  c_psi * s_phi  +  s_psi * c_theta * c_phi
- rot(1,3) =  s_theta * s_psi
-
- rot(2,1) = -s_psi * c_phi  -  c_psi * c_theta * s_phi
- rot(2,2) = -s_psi * s_phi  +  c_psi * c_theta * c_phi
- rot(2,3) =  s_theta * c_psi
-
- rot(3,1) =  s_theta * s_phi
- rot(3,2) = -s_theta * c_phi
- rot(3,3) =  c_theta
-
- call r8mat_inverse_3d ( rot, rot_inverse, det )
-
- return
- end
-
-
-
-subroutine plane_exp_normal_3dbis ( p1,p2,p3, normal )
-!! PLANE_EXP_NORMAL_3D finds the normal to an explicit plane in 3D.
-!
-!  Discussion:
-!    The explicit form of a plane in 3D is
-!      the plane through P1, P2 and P3.
-!  Modified:
-!    10 February 2005
-!  Author:
-!    John Burkardt
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) P1(3), P2(3), P3(3), three points on the plane.
-!
-!    Output, real ( kind = 8 ) NORMAL(3), the coordinates of the unit normal
-!    vector to the plane containing the three points.
-!
-  implicit none
-
-  integer, parameter :: dim_num = 3
-  integer :: i
-
-  real ( kind = 8 ) normal(dim_num)
-  real ( kind = 8 ) normal_norm
-  real ( kind = 8 ) p1(dim_num)
-  real ( kind = 8 ) p2(dim_num)
-  real ( kind = 8 ) p3(dim_num)
-  real ( kind = 8 ) vertice(3,3)
-
-!  do i=1,3
-!   p1(i)=vertice(i,1)
-!   p2(i)=vertice(i,2)
-!   p3(i)=vertice(i,3)
-!  end do
-!
-!  The cross product (P2-P1) x (P3-P1) is normal to (P2-P1) and (P3-P1).
-!
-  normal(1) = ( p2(2) - p1(2) ) * ( p3(3) - p1(3) ) &
-            - ( p2(3) - p1(3) ) * ( p3(2) - p1(2) )
-
-  normal(2) = ( p2(3) - p1(3) ) * ( p3(1) - p1(1) ) &
-            - ( p2(1) - p1(1) ) * ( p3(3) - p1(3) )
-
-  normal(3) = ( p2(1) - p1(1) ) * ( p3(2) - p1(2) ) &
-            - ( p2(2) - p1(2) ) * ( p3(1) - p1(1) )
-
-  normal_norm = sqrt ( sum ( normal(1:dim_num)**2 ) )
-
-  if ( normal_norm == 0.0D+00 ) then
-    write ( *, '(a)' ) ' '
-    write ( *, '(a)' ) 'PLANE_EXP_NORMAL_3D - Fatal error!'
-    write ( *, '(a)' ) '  The plane is poorly defined.'
-    stop
-  end if
-
-  normal(1:dim_num) = normal(1:dim_num) / normal_norm
-
-  return
-end
-
-
-
-
-function angle_rad_3d ( p1, p2, p3 )
-
-!*****************************************************************************80
-!
-!! ANGLE_RAD_3D returns the angle in radians between two rays in 3D.
-!
-!  Discussion:
-!
-!    The routine always computes the SMALLER of the two angles between
-!    two rays.  Thus, if the rays make an (exterior) angle of
-!    1.5 pi radians, the (interior) angle of 0.5 pi radians will be reported.
-!
-!    X dot Y = Norm(X) * Norm(Y) * Cos ( Angle(X,Y) )
-!
-!  Modified:
-!
-!    21 January 2005
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) P1(3), P2(3), P3(3), points defining an angle.
-!    The rays are P1 - P2 and P3 - P2.
-!
-!    Output, real ( kind = 8 ) ANGLE_RAD_3D, the angle between the two rays,
-!    in radians.  This value will always be between 0 and PI.  If either ray has
-!    zero length, then the angle is returned as zero.
-!
-  implicit none
-
-  integer, parameter :: dim_num = 3
-
-  real ( kind = 8 ) angle_rad_3d
-  real ( kind = 8 ) arc_cosine
-  real ( kind = 8 ) dot
-  real ( kind = 8 ) p1(dim_num)
-  real ( kind = 8 ) p2(dim_num)
-  real ( kind = 8 ) p3(dim_num)
-  real ( kind = 8 ) v1norm
-  real ( kind = 8 ) v2norm
-
-  v1norm = sqrt ( sum ( ( p1(1:dim_num) - p2(1:dim_num) )**2 ) )
-
-  if ( v1norm == 0.0D+00 ) then
-    angle_rad_3d = 0.0D+00
-    return
-  end if
-
-  v2norm = sqrt ( sum ( ( p3(1:dim_num) - p2(1:dim_num) )**2 ) )
-
-  if ( v2norm == 0.0D+00 ) then
-    angle_rad_3d = 0.0D+00
-    return
-  end if
-
-  dot = sum ( ( p1(1:dim_num) - p2(1:dim_num) ) &
-            * ( p3(1:dim_num) - p2(1:dim_num) ) )
-
-  angle_rad_3d = arc_cosine ( dot / ( v1norm * v2norm ) )
-
-  return
-end
-
-
-
-
-
-
-
-!***********************************************************************
-!***********************************************************************
-!***********************************************************************
-subroutine plane_normal2imp_3d ( pp, normal, a, b, c, d )
-
-!*****************************************************************************80
-!
-!! PLANE_NORMAL2IMP_3D converts a normal form plane to implicit form in 3D.
-!
-!  Discussion:
-!
-!    The normal form of a plane in 3D is
-!
-!      PP, a point on the plane, and
-!      N, the unit normal to the plane.
-!
-!    The implicit form of a plane in 3D is
-!
-!      A * X + B * Y + C * Z + D = 0.
-!
-!  Modified:
-!
-!    26 February 2005
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) PP(3), a point on the plane.
-!
-!    Input, real ( kind = 8 ) NORMAL(3), the unit normal vector to the plane.
-!
-!    Output, real ( kind = 8 ) A, B, C, D, the implicit plane parameters.
-!
-  implicit none
-
-  integer, parameter :: dim_num = 3
-
-  real ( kind = 8 ) a
-  real ( kind = 8 ) b
-  real ( kind = 8 ) c
-  real ( kind = 8 ) d
-  real ( kind = 8 ) normal(dim_num)
-  real ( kind = 8 ) pp(dim_num)
-
-  a = normal(1)
-  b = normal(2)
-  c = normal(3)
-  d = - a * pp(1) - b * pp(2) - c * pp(3)
-
-  return
-end
-
-
-
-
-!***********************************************************************
-!***********************************************************************
-!***********************************************************************
-subroutine plane_exp2normal_3d ( p1, p2, p3, pp, normal )
-
-!*****************************************************************************80
-!
-!! PLANE_EXP2NORMAL_3D converts an explicit plane to normal form in 3D.
-!
-!  Discussion:
-!
-!    The explicit form of a plane in 3D is
-!
-!      the plane through P1, P2 and P3.
-!
-!    The normal form of a plane in 3D is
-!
-!      PP, a point on the plane, and
-!      N, the unit normal to the plane.
-!
-!  Modified:
-!
-!    26 February 2005
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) P1(3), P2(3), P3(3), three points on the plane.
-!
-!    Output, real ( kind = 8 ) PP(3), a point on the plane.
-!
-!    Output, real ( kind = 8 ) NORMAL(3), a unit normal vector to the plane.
-!
-  implicit none
-
-  integer, parameter :: dim_num = 3
-
-  real ( kind = 8 ) norm
-  real ( kind = 8 ) normal(dim_num)
-  real ( kind = 8 ) p1(dim_num)
-  real ( kind = 8 ) p2(dim_num)
-  real ( kind = 8 ) p3(dim_num)
-  real ( kind = 8 ) pp(dim_num)
-
-  pp(1:dim_num) = p1(1:dim_num)
-
-  normal(1) = ( p2(2) - p1(2) ) * ( p3(3) - p1(3) ) &
-            - ( p2(3) - p1(3) ) * ( p3(2) - p1(2) )
-
-  normal(2) = ( p2(3) - p1(3) ) * ( p3(1) - p1(1) ) &
-            - ( p2(1) - p1(1) ) * ( p3(3) - p1(3) )
-
-  normal(3) = ( p2(1) - p1(1) ) * ( p3(2) - p1(2) ) &
-            - ( p2(2) - p1(2) ) * ( p3(1) - p1(1) )
-
-  norm = sqrt ( sum ( normal(1:dim_num)**2 ) )
-
-  if ( norm == 0.0D+00 ) then
-    write ( *, '(a)' ) ' '
-    write ( *, '(a)' ) 'PLANE_EXP2NORMAL_3D - Fatal error!'
-    write ( *, '(a)' ) '  The normal vector is null.'
-    write ( *, '(a)' ) '  Two points coincide, or nearly so.'
-    stop
-  end if
-
-  normal(1:dim_num) = normal(1:dim_num) / norm
-
-  return
-end
-
-
-
-
-
-
-!***********************************************************************
-!***********************************************************************
-!***********************************************************************
-subroutine plane_normal2exp_3d ( pp, normal, p1, p2, p3 )
-
-!*****************************************************************************80
-!
-!! PLANE_NORMAL2EXP_3D converts a normal plane to explicit form in 3D.
-!
-!  Discussion:
-!
-!    The normal form of a plane in 3D is
-!
-!      PP, a point on the plane, and
-!      N, the unit normal to the plane.
-!
-!    The explicit form of a plane in 3D is
-!
-!      the plane through P1, P2 and P3.
-!
-!  Modified:
-!
-!    26 February 2005
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) PP(3), a point on the plane.
-!
-!    Input, real ( kind = 8 ) NORMAL(3), a normal vector N to the plane.  The
-!    vector must not have zero length, but it is not necessary for N
-!    to have unit length.
-!
-!    Output, real ( kind = 8 ) P1(3), P2(3), P3(3), three points on the plane.
-!
-  implicit none
-
-  integer, parameter :: dim_num = 3
-
-  real ( kind = 8 ) normal(dim_num)
-  real ( kind = 8 ) p1(dim_num)
-  real ( kind = 8 ) p2(dim_num)
-  real ( kind = 8 ) p3(dim_num)
-  real ( kind = 8 ) pp(dim_num)
-  real ( kind = 8 ) pq(dim_num)
-  real ( kind = 8 ) pr(dim_num)
-
-  call plane_normal_basis_3d ( pp, normal, pq, pr )
-
-  p1(1:dim_num) = pp(1:dim_num)
-  p2(1:dim_num) = pp(1:dim_num) + pq(1:dim_num)
-  p3(1:dim_num) = pp(1:dim_num) + pr(1:dim_num)
-
-  return
-end
-
-
-
-
-!***********************************************************************
-!***********************************************************************
-!***********************************************************************
-subroutine plane_normal_basis_3d ( pp, normal, pq, pr )
-
-!*****************************************************************************80
-!
-!! PLANE_NORMAL_BASIS_3D finds two perpendicular vectors in a plane in 3D.
-!
-!  Discussion:
-!
-!    The normal form of a plane in 3D is:
-!
-!      PP is a point on the plane,
-!      N is a normal vector to the plane.
-!
-!    The two vectors to be computed, PQ and PR, can be regarded as
-!    the basis of a Cartesian coordinate system for points in the plane.
-!    Any point in the plane can be described in terms of the "origin"
-!    point PP plus a weighted sum of the two vectors PQ and PR:
-!
-!      P = PP + a * PQ + b * PR.
-!
-!    The vectors PQ and PR have unit length, and are perpendicular to N
-!    and to each other.
-!
-!  Modified:
-!
-!    27 August 2005
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) PP(3), a point on the plane.  (Actually,
-!    we never need to know these values to do the calculation!)
-!
-!    Input, real ( kind = 8 ) NORMAL(3), a normal vector N to the plane.  The
-!    vector must not have zero length, but it is not necessary for N
-!    to have unit length.
-!
-!    Output, real ( kind = 8 ) PQ(3), a vector of unit length,
-!    perpendicular to the vector N and the vector PR.
-!
-!    Output, real ( kind = 8 ) PR(3), a vector of unit length,
-!    perpendicular to the vector N and the vector PQ.
-!
-  implicit none
-
-  integer, parameter :: dim_num = 3
-
-  real ( kind = 8 ) r8vec_length
-  real ( kind = 8 ) normal(dim_num)
-  real ( kind = 8 ) normal_norm
-  real ( kind = 8 ) pp(dim_num)
-  real ( kind = 8 ) pq(dim_num)
-  real ( kind = 8 ) pr(dim_num)
-  real ( kind = 8 ) pr_norm
-!
-!  Compute the length of NORMAL.
-!
-  normal_norm = r8vec_length ( dim_num, normal )
-
-  if ( normal_norm == 0.0D+00 ) then
-    write ( *, '(a)' ) ' '
-    write ( *, '(a)' ) 'PLANE_NORMAL_BASIS_3D - Fatal error!'
-    write ( *, '(a)' ) '  The normal vector is 0.'
-    stop
-  end if
-!
-!  Find a vector PQ that is normal to NORMAL and has unit length.
-!
-  call r8vec_any_normal ( dim_num, normal, pq )
-!
-!  Now just take the cross product NORMAL x PQ to get the PR vector.
-!
-  call r8vec_cross_3d ( normal, pq, pr )
-
-  pr_norm = r8vec_length ( dim_num, pr )
-
-  pr(1:dim_num) = pr(1:dim_num) / pr_norm
-
-  return
-end
-
-
-
-
-!***********************************************************************
-!***********************************************************************
-!***********************************************************************
-subroutine r8vec_any_normal ( dim_num, v1, v2 )
-
-!*****************************************************************************
-!
-!! R8VEC_ANY_NORMAL returns some normal vector to V1.
-!
-!  Discussion:
-!
-!    If DIM_NUM < 2, then no normal vector can be returned.
-!
-!    If V1 is the zero vector, then any unit vector will do.
-!
-!    No doubt, there are better, more robust algorithms.  But I will take
-!    just about ANY reasonable unit vector that is normal to V1.
-!
-!  Modified:
-!
-!    23 August 2005
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, integer DIM_NUM, the spatial dimension.
-!
-!    Input, real ( kind = 8 ) V1(DIM_NUM), the vector.
-!
-!    Output, real ( kind = 8 ) V2(DIM_NUM), a vector that is
-!    normal to V2, and has unit Euclidean length.
-!
-  implicit none
-
-  integer dim_num
-
-  real ( kind = 8 ) r8vec_length
-  integer i
-  integer j
-  integer k
-  real ( kind = 8 ) v1(dim_num)
-  real ( kind = 8 ) v2(dim_num)
-  real ( kind = 8 ) vj
-  real ( kind = 8 ) vk
-
-  if ( dim_num < 2 ) then
-    write ( *, '(a)' ) ' '
-    write ( *, '(a)' ) 'R8VEC_ANY_NORMAL - Fatal error!'
-    write ( *, '(a)' ) '  Called with DIM_NUM < 2.'
-    stop
-  end if
-
-  if ( r8vec_length ( dim_num, v1 ) == 0.0D+00 ) then
-    v2(1) = 1.0D+00
-    v2(2:dim_num) = 0.0D+00
-    return
-  end if
-!
-!  Seek the largest entry in V1, VJ = V1(J), and the
-!  second largest, VK = V1(K).
-!
-!  Since V1 does not have zero norm, we are guaranteed that
-!  VJ, at least, is not zero.
-!
-  j = -1
-  vj = 0.0D+00
-
-  k = -1
-  vk = 0.0D+00
-
-  do i = 1, dim_num
-
-    if ( abs ( vk ) < abs ( v1(i) ) .or. k < 1 ) then
-
-      if ( abs ( vj ) < abs ( v1(i) ) .or. j < 1 ) then
-        k = j
-        vk = vj
-        j = i
-        vj = v1(i)
-      else
-        k = i
-        vk = v1(i)
-      end if
-
-    end if
-
-  end do
-!
-!  Setting V2 to zero, except that V2(J) = -VK, and V2(K) = VJ,
-!  will just about do the trick.
-!
-  v2(1:dim_num) = 0.0D+00
-
-  v2(j) = -vk / sqrt ( vk * vk + vj * vj )
-  v2(k) =  vj / sqrt ( vk * vk + vj * vj )
-
-  return
-end
-
-
-
-
-!***********************************************************************
-!***********************************************************************
-!***********************************************************************
-subroutine lines_exp_angle_3d ( p1, p2, q1, q2, angle )
-
-!*****************************************************************************80
-!
-!! LINES_EXP_ANGLE_3D finds the angle between two explicit lines in 3D.
-!
-!  Discussion:
-!
-!    The explicit form of a line in 3D is:
-!
-!      the line through the points P1 and P2.
-!
-!  Modified:
-!
-!    02 January 2005
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) P1(3), P2(3), two points on the first line.
-!
-!    Input, real ( kind = 8 ) Q1(3), Q2(3), two points on the second line.
-!
-!    Output, real ( kind = 8 ) ANGLE, the angle in radians between the two
-!    lines.  The angle is computed using the ACOS function, and so lies between
-!    0 and PI.  But if one of the lines is degenerate, the angle is
-!    returned as -1.0.
-!
-  implicit none
-
-  integer, parameter :: dim_num = 3
-
-  real ( kind = 8 ) angle
-  real ( kind = 8 ) arc_cosine
-  real ( kind = 8 ) ctheta
-  logical line_exp_is_degenerate_nd
-  real ( kind = 8 ) p1(dim_num)
-  real ( kind = 8 ) p2(dim_num)
-  real ( kind = 8 ) pdotq
-  real ( kind = 8 ) pnorm
-  real ( kind = 8 ) q1(dim_num)
-  real ( kind = 8 ) q2(dim_num)
-  real ( kind = 8 ) qnorm
-
-  if ( line_exp_is_degenerate_nd ( dim_num, p1, p2 ) ) then
-!   write ( *, '(a)' ) ' '
-!   write ( *, '(a)' ) 'LINES_EXP_ANGLE_3D - Fatal error!'
-!   write ( *, '(a)' ) '  The line (P1,P2) is degenerate!'
-    angle = -1.0D+00
-    return
-  end if
-
-  if ( line_exp_is_degenerate_nd ( dim_num, q1, q2 ) ) then
-!   write ( *, '(a)' ) ' '
-!   write ( *, '(a)' ) 'LINES_EXP_ANGLE_3D - Fatal error!'
-!   write ( *, '(a)' ) '  The line (Q1,Q2) is degenerate!'
-    angle = -1.0D+00
-    return
-  end if
-
-  pnorm = sqrt ( sum ( ( p2(1:dim_num) - p1(1:dim_num) )**2 ) )
-
-  qnorm = sqrt ( sum ( ( q2(1:dim_num) - q1(1:dim_num) )**2 ) )
-
-  pdotq = sum ( ( p2(1:dim_num) - p1(1:dim_num) ) * ( q2(1:dim_num) - q1(1:dim_num) ) )
-
-  ctheta = pdotq / ( pnorm * qnorm )
-
-  angle = arc_cosine ( ctheta )
-
-  return
-end
-
-
-
-
-!***********************************************************************
-!***********************************************************************
-!***********************************************************************
-subroutine r8mat_inverse_3d ( a, b, det )
-
-!*****************************************************************************80
-!
-!! R8MAT_INVERSE_3D inverts a 3 by 3 real matrix using Cramer's rule.
-!
-!  Discussion:
-!
-!    If DET is zero, then A is singular, and does not have an
-!    inverse.  In that case, B is simply set to zero, and a
-!    message is printed.
-!
-!    If DET is nonzero, then its value is roughly an estimate
-!    of how nonsingular the matrix A is.
-!
-!  Modified:
-!
-!    16 April 1999
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) A(3,3), the matrix to be inverted.
-!
-!    Output, real ( kind = 8 ) B(3,3), the inverse of the matrix A.
-!
-!    Output, real ( kind = 8 ) DET, the determinant of the matrix A.
-!
-  implicit none
-
-  real ( kind = 8 ) a(3,3)
-  real ( kind = 8 ) b(3,3)
-  real ( kind = 8 ) det
-!
-!  Compute the determinant of A
-!
-  det =   a(1,1) * ( a(2,2) * a(3,3) - a(2,3) * a(3,2) ) &
-        + a(1,2) * ( a(2,3) * a(3,1) - a(2,1) * a(3,3) ) &
-        + a(1,3) * ( a(2,1) * a(3,2) - a(2,2) * a(3,1) )
-!
-!  If the determinant is zero, bail out.
-!
-  if ( det == 0.0D+00 ) then
-
-    b(1:3,1:3) = 0.0D+00
-
-    return
-  end if
-!
-!  Compute the entries of the inverse matrix using an explicit
-!  formula.
-!
-  b(1,1) = + ( a(2,2) * a(3,3) - a(2,3) * a(3,2) ) / det
-  b(1,2) = - ( a(1,2) * a(3,3) - a(1,3) * a(3,2) ) / det
-  b(1,3) = + ( a(1,2) * a(2,3) - a(1,3) * a(2,2) ) / det
-
-  b(2,1) = - ( a(2,1) * a(3,3) - a(2,3) * a(3,1) ) / det
-  b(2,2) = + ( a(1,1) * a(3,3) - a(1,3) * a(3,1) ) / det
-  b(2,3) = - ( a(1,1) * a(2,3) - a(1,3) * a(2,1) ) / det
-
-  b(3,1) = + ( a(2,1) * a(3,2) - a(2,2) * a(3,1) ) / det
-  b(3,2) = - ( a(1,1) * a(3,2) - a(1,2) * a(3,1) ) / det
-  b(3,3) = + ( a(1,1) * a(2,2) - a(1,2) * a(2,1) ) / det
-
-  return
-end
-
-
-
-
-subroutine rotation_mat_vector_3d ( a, v, w )
-
-!*****************************************************************************80
-!
-!! ROTATION_MAT_VECTOR_3D applies a marix rotation to a vector in 3d.
-!
-!  Modified:
-!
-!    30 July 1999
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) A(3,3), the matrix defining the rotation.
-!
-!    Input, real ( kind = 8 ) V(3), the vector to be rotated.
-!
-!    Output, real ( kind = 8 ) W(3), the rotated vector.
-!
-  implicit none
-
-  integer, parameter :: dim_num = 3
-
-  real ( kind = 8 ) a(dim_num,dim_num)
-  real ( kind = 8 ) v(dim_num)
-  real ( kind = 8 ) w(dim_num)
-
-  w(1:dim_num) = matmul ( a(1:dim_num,1:dim_num), v(1:dim_num) )
-
-  return
-end
+
+       !-----------------------------------------------------------------------
+       ! construct N the line of node, intersection between 12 and 1'2'
+
+       !vector product between normal to the plane
+       call r8vec_cross_3d ( normal_1p2p, normal_12, node_line )
+
+       pN0 = p0
+       pNa(1) = node_line(1)*3.
+       pNa(2) = node_line(2)*3.
+       pNa(3) = node_line(3)*3.
+
+       !-----------------------------------------------------------------------
+       ! phi rotation from 1 to N
+       ! phi0 = angle_rad_3d ( p1, p0, pNa )
+       !-----------------------------------------------------------------------
+       ! theta rotation from 3 to 3' [0,pi]
+       ! theta0 = angle_rad_3d ( p3, p0, p3p )
+       !-----------------------------------------------------------------------
+       ! psi rotation from N to 1'
+       ! psi0 = angle_rad_3d ( pNa, p0, p1p )
+       !-----------------------------------------------------------------------
+
+       ! phi rotate 1 to N around 3
+       phi = atan2(pNa(2),pNa(1))
+       c_phi = cos(phi)
+       s_phi = sin(phi)
+
+       !rotate points p1p and p3p using phi
+       p1_p3p = c_phi*p3p(1) + s_phi*p3p(2)
+       p2_p3p =-s_phi*p3p(1) + c_phi*p3p(2)
+       p3_p3p = p3p(3)
+
+       p1_p1p = c_phi*p1p(1) + s_phi*p1p(2)
+       p2_p1p =-s_phi*p1p(1) + c_phi*p1p(2)
+       p3_p1p = p1p(3)
+
+
+       !------------------------------------------------------------------------
+       ! theta rotate 3 to 3' around N [0,pi] or [-pi/2,pi/2]
+       !the angle between 3 and 3', using atan2 I need to change the sign
+       theta = -atan2(p2_p3p,p3_p3p)
+       c_theta = cos(theta)
+       s_theta = sin(theta)
+
+       ! rotate p_p1p with theta to obtain pp_p1p
+       pp1_p1p = p1_p1p
+       pp2_p1p = c_theta*p2_p1p + s_theta*p3_p1p
+       pp3_p1p =-s_theta*p2_p1p + c_theta*p3_p1p
+
+       !psi rotate N to 1' around 3
+       psi = atan2(pp2_p1p,pp1_p1p)
+
+       c_psi = cos(psi)
+       s_psi = sin(psi)
+
+       ! rotation matrix construction
+       rot(1,1) =  c_psi * c_phi  -  s_psi * c_theta * s_phi
+       rot(1,2) =  c_psi * s_phi  +  s_psi * c_theta * c_phi
+       rot(1,3) =  s_theta * s_psi
+
+       rot(2,1) = -s_psi * c_phi  -  c_psi * c_theta * s_phi
+       rot(2,2) = -s_psi * s_phi  +  c_psi * c_theta * c_phi
+       rot(2,3) =  s_theta * c_psi
+
+       rot(3,1) =  s_theta * s_phi
+       rot(3,2) = -s_theta * c_phi
+       rot(3,3) =  c_theta
+
+       call r8mat_inverse_3d ( rot, rot_inverse, det )
+
+       return
+   end subroutine rotation2
+
+
+
+   subroutine plane_exp_normal_3dbis ( p1,p2,p3, normal )
+       !! PLANE_EXP_NORMAL_3D finds the normal to an explicit plane in 3D.
+       !
+       !  Discussion:
+       !    The explicit form of a plane in 3D is
+       !      the plane through P1, P2 and P3.
+       !  Modified:
+       !    10 February 2005
+       !  Author:
+       !    John Burkardt
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) P1(3), P2(3), P3(3), three points on the plane.
+       !
+       !    Output, real ( kind = 8 ) NORMAL(3), the coordinates of the unit normal
+       !    vector to the plane containing the three points.
+       !
+       implicit none
+
+       integer, parameter :: dim_num = 3
+       integer :: i
+
+       real ( kind = 8 ) normal(dim_num)
+       real ( kind = 8 ) normal_norm
+       real ( kind = 8 ) p1(dim_num)
+       real ( kind = 8 ) p2(dim_num)
+       real ( kind = 8 ) p3(dim_num)
+       real ( kind = 8 ) vertice(3,3)
+
+       !  do i=1,3
+       !   p1(i)=vertice(i,1)
+       !   p2(i)=vertice(i,2)
+       !   p3(i)=vertice(i,3)
+       !  end do
+       !
+       !  The cross product (P2-P1) x (P3-P1) is normal to (P2-P1) and (P3-P1).
+       !
+       normal(1) = ( p2(2) - p1(2) ) * ( p3(3) - p1(3) ) &
+           - ( p2(3) - p1(3) ) * ( p3(2) - p1(2) )
+
+       normal(2) = ( p2(3) - p1(3) ) * ( p3(1) - p1(1) ) &
+           - ( p2(1) - p1(1) ) * ( p3(3) - p1(3) )
+
+       normal(3) = ( p2(1) - p1(1) ) * ( p3(2) - p1(2) ) &
+           - ( p2(2) - p1(2) ) * ( p3(1) - p1(1) )
+
+       normal_norm = sqrt ( sum ( normal(1:dim_num)**2 ) )
+
+       if ( normal_norm == 0.0D+00 ) then
+           write ( *, '(a)' ) ' '
+           write ( *, '(a)' ) 'PLANE_EXP_NORMAL_3D - Fatal error!'
+           write ( *, '(a)' ) '  The plane is poorly defined.'
+           stop
+       end if
+
+       normal(1:dim_num) = normal(1:dim_num) / normal_norm
+
+       return
+   end
+
+
+
+
+   function angle_rad_3d ( p1, p2, p3 )
+
+       !*****************************************************************************80
+       !
+       !! ANGLE_RAD_3D returns the angle in radians between two rays in 3D.
+       !
+       !  Discussion:
+       !
+       !    The routine always computes the SMALLER of the two angles between
+       !    two rays.  Thus, if the rays make an (exterior) angle of
+       !    1.5 pi radians, the (interior) angle of 0.5 pi radians will be reported.
+       !
+       !    X dot Y = Norm(X) * Norm(Y) * Cos ( Angle(X,Y) )
+       !
+       !  Modified:
+       !
+       !    21 January 2005
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) P1(3), P2(3), P3(3), points defining an angle.
+       !    The rays are P1 - P2 and P3 - P2.
+       !
+       !    Output, real ( kind = 8 ) ANGLE_RAD_3D, the angle between the two rays,
+       !    in radians.  This value will always be between 0 and PI.  If either ray has
+       !    zero length, then the angle is returned as zero.
+       !
+       implicit none
+
+       integer, parameter :: dim_num = 3
+
+       real ( kind = 8 ) angle_rad_3d
+       real ( kind = 8 ) arc_cosine
+       real ( kind = 8 ) dot
+       real ( kind = 8 ) p1(dim_num)
+       real ( kind = 8 ) p2(dim_num)
+       real ( kind = 8 ) p3(dim_num)
+       real ( kind = 8 ) v1norm
+       real ( kind = 8 ) v2norm
+
+       v1norm = sqrt ( sum ( ( p1(1:dim_num) - p2(1:dim_num) )**2 ) )
+
+       if ( v1norm == 0.0D+00 ) then
+           angle_rad_3d = 0.0D+00
+           return
+       end if
+
+       v2norm = sqrt ( sum ( ( p3(1:dim_num) - p2(1:dim_num) )**2 ) )
+
+       if ( v2norm == 0.0D+00 ) then
+           angle_rad_3d = 0.0D+00
+           return
+       end if
+
+       dot = sum ( ( p1(1:dim_num) - p2(1:dim_num) ) &
+           * ( p3(1:dim_num) - p2(1:dim_num) ) )
+
+       angle_rad_3d = arc_cosine ( dot / ( v1norm * v2norm ) )
+
+       return
+   end
+
+
+
+
+
+
+
+   !***********************************************************************
+   !***********************************************************************
+   !***********************************************************************
+   subroutine plane_normal2imp_3d ( pp, normal, a, b, c, d )
+
+       !*****************************************************************************80
+       !
+       !! PLANE_NORMAL2IMP_3D converts a normal form plane to implicit form in 3D.
+       !
+       !  Discussion:
+       !
+       !    The normal form of a plane in 3D is
+       !
+       !      PP, a point on the plane, and
+       !      N, the unit normal to the plane.
+       !
+       !    The implicit form of a plane in 3D is
+       !
+       !      A * X + B * Y + C * Z + D = 0.
+       !
+       !  Modified:
+       !
+       !    26 February 2005
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) PP(3), a point on the plane.
+       !
+       !    Input, real ( kind = 8 ) NORMAL(3), the unit normal vector to the plane.
+       !
+       !    Output, real ( kind = 8 ) A, B, C, D, the implicit plane parameters.
+       !
+       implicit none
+
+       integer, parameter :: dim_num = 3
+
+       real ( kind = 8 ) a
+       real ( kind = 8 ) b
+       real ( kind = 8 ) c
+       real ( kind = 8 ) d
+       real ( kind = 8 ) normal(dim_num)
+       real ( kind = 8 ) pp(dim_num)
+
+       a = normal(1)
+       b = normal(2)
+       c = normal(3)
+       d = - a * pp(1) - b * pp(2) - c * pp(3)
+
+       return
+   end
+
+
+
+
+   !***********************************************************************
+   !***********************************************************************
+   !***********************************************************************
+   subroutine plane_exp2normal_3d ( p1, p2, p3, pp, normal )
+
+       !*****************************************************************************80
+       !
+       !! PLANE_EXP2NORMAL_3D converts an explicit plane to normal form in 3D.
+       !
+       !  Discussion:
+       !
+       !    The explicit form of a plane in 3D is
+       !
+       !      the plane through P1, P2 and P3.
+       !
+       !    The normal form of a plane in 3D is
+       !
+       !      PP, a point on the plane, and
+       !      N, the unit normal to the plane.
+       !
+       !  Modified:
+       !
+       !    26 February 2005
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) P1(3), P2(3), P3(3), three points on the plane.
+       !
+       !    Output, real ( kind = 8 ) PP(3), a point on the plane.
+       !
+       !    Output, real ( kind = 8 ) NORMAL(3), a unit normal vector to the plane.
+       !
+       implicit none
+
+       integer, parameter :: dim_num = 3
+
+       real ( kind = 8 ) norm
+       real ( kind = 8 ) normal(dim_num)
+       real ( kind = 8 ) p1(dim_num)
+       real ( kind = 8 ) p2(dim_num)
+       real ( kind = 8 ) p3(dim_num)
+       real ( kind = 8 ) pp(dim_num)
+
+       pp(1:dim_num) = p1(1:dim_num)
+
+       normal(1) = ( p2(2) - p1(2) ) * ( p3(3) - p1(3) ) &
+           - ( p2(3) - p1(3) ) * ( p3(2) - p1(2) )
+
+       normal(2) = ( p2(3) - p1(3) ) * ( p3(1) - p1(1) ) &
+           - ( p2(1) - p1(1) ) * ( p3(3) - p1(3) )
+
+       normal(3) = ( p2(1) - p1(1) ) * ( p3(2) - p1(2) ) &
+           - ( p2(2) - p1(2) ) * ( p3(1) - p1(1) )
+
+       norm = sqrt ( sum ( normal(1:dim_num)**2 ) )
+
+       if ( norm == 0.0D+00 ) then
+           write ( *, '(a)' ) ' '
+           write ( *, '(a)' ) 'PLANE_EXP2NORMAL_3D - Fatal error!'
+           write ( *, '(a)' ) '  The normal vector is null.'
+           write ( *, '(a)' ) '  Two points coincide, or nearly so.'
+           stop
+       end if
+
+       normal(1:dim_num) = normal(1:dim_num) / norm
+
+       return
+   end
+
+
+
+
+
+
+   !***********************************************************************
+   !***********************************************************************
+   !***********************************************************************
+   subroutine plane_normal2exp_3d ( pp, normal, p1, p2, p3 )
+
+       !*****************************************************************************80
+       !
+       !! PLANE_NORMAL2EXP_3D converts a normal plane to explicit form in 3D.
+       !
+       !  Discussion:
+       !
+       !    The normal form of a plane in 3D is
+       !
+       !      PP, a point on the plane, and
+       !      N, the unit normal to the plane.
+       !
+       !    The explicit form of a plane in 3D is
+       !
+       !      the plane through P1, P2 and P3.
+       !
+       !  Modified:
+       !
+       !    26 February 2005
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) PP(3), a point on the plane.
+       !
+       !    Input, real ( kind = 8 ) NORMAL(3), a normal vector N to the plane.  The
+       !    vector must not have zero length, but it is not necessary for N
+       !    to have unit length.
+       !
+       !    Output, real ( kind = 8 ) P1(3), P2(3), P3(3), three points on the plane.
+       !
+       implicit none
+
+       integer, parameter :: dim_num = 3
+
+       real ( kind = 8 ) normal(dim_num)
+       real ( kind = 8 ) p1(dim_num)
+       real ( kind = 8 ) p2(dim_num)
+       real ( kind = 8 ) p3(dim_num)
+       real ( kind = 8 ) pp(dim_num)
+       real ( kind = 8 ) pq(dim_num)
+       real ( kind = 8 ) pr(dim_num)
+
+       call plane_normal_basis_3d ( pp, normal, pq, pr )
+
+       p1(1:dim_num) = pp(1:dim_num)
+       p2(1:dim_num) = pp(1:dim_num) + pq(1:dim_num)
+       p3(1:dim_num) = pp(1:dim_num) + pr(1:dim_num)
+
+       return
+   end
+
+
+
+
+   !***********************************************************************
+   !***********************************************************************
+   !***********************************************************************
+   subroutine plane_normal_basis_3d ( pp, normal, pq, pr )
+
+       !*****************************************************************************80
+       !
+       !! PLANE_NORMAL_BASIS_3D finds two perpendicular vectors in a plane in 3D.
+       !
+       !  Discussion:
+       !
+       !    The normal form of a plane in 3D is:
+       !
+       !      PP is a point on the plane,
+       !      N is a normal vector to the plane.
+       !
+       !    The two vectors to be computed, PQ and PR, can be regarded as
+       !    the basis of a Cartesian coordinate system for points in the plane.
+       !    Any point in the plane can be described in terms of the "origin"
+       !    point PP plus a weighted sum of the two vectors PQ and PR:
+       !
+       !      P = PP + a * PQ + b * PR.
+       !
+       !    The vectors PQ and PR have unit length, and are perpendicular to N
+       !    and to each other.
+       !
+       !  Modified:
+       !
+       !    27 August 2005
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) PP(3), a point on the plane.  (Actually,
+       !    we never need to know these values to do the calculation!)
+       !
+       !    Input, real ( kind = 8 ) NORMAL(3), a normal vector N to the plane.  The
+       !    vector must not have zero length, but it is not necessary for N
+       !    to have unit length.
+       !
+       !    Output, real ( kind = 8 ) PQ(3), a vector of unit length,
+       !    perpendicular to the vector N and the vector PR.
+       !
+       !    Output, real ( kind = 8 ) PR(3), a vector of unit length,
+       !    perpendicular to the vector N and the vector PQ.
+       !
+       implicit none
+
+       integer, parameter :: dim_num = 3
+
+       real ( kind = 8 ) r8vec_length
+       real ( kind = 8 ) normal(dim_num)
+       real ( kind = 8 ) normal_norm
+       real ( kind = 8 ) pp(dim_num)
+       real ( kind = 8 ) pq(dim_num)
+       real ( kind = 8 ) pr(dim_num)
+       real ( kind = 8 ) pr_norm
+       !
+       !  Compute the length of NORMAL.
+       !
+       normal_norm = r8vec_length ( dim_num, normal )
+
+       if ( normal_norm == 0.0D+00 ) then
+           write ( *, '(a)' ) ' '
+           write ( *, '(a)' ) 'PLANE_NORMAL_BASIS_3D - Fatal error!'
+           write ( *, '(a)' ) '  The normal vector is 0.'
+           stop
+       end if
+       !
+       !  Find a vector PQ that is normal to NORMAL and has unit length.
+       !
+       call r8vec_any_normal ( dim_num, normal, pq )
+       !
+       !  Now just take the cross product NORMAL x PQ to get the PR vector.
+       !
+       call r8vec_cross_3d ( normal, pq, pr )
+
+       pr_norm = r8vec_length ( dim_num, pr )
+
+       pr(1:dim_num) = pr(1:dim_num) / pr_norm
+
+       return
+   end
+
+
+
+
+   !***********************************************************************
+   !***********************************************************************
+   !***********************************************************************
+   subroutine r8vec_any_normal ( dim_num, v1, v2 )
+
+       !*****************************************************************************
+       !
+       !! R8VEC_ANY_NORMAL returns some normal vector to V1.
+       !
+       !  Discussion:
+       !
+       !    If DIM_NUM < 2, then no normal vector can be returned.
+       !
+       !    If V1 is the zero vector, then any unit vector will do.
+       !
+       !    No doubt, there are better, more robust algorithms.  But I will take
+       !    just about ANY reasonable unit vector that is normal to V1.
+       !
+       !  Modified:
+       !
+       !    23 August 2005
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, integer DIM_NUM, the spatial dimension.
+       !
+       !    Input, real ( kind = 8 ) V1(DIM_NUM), the vector.
+       !
+       !    Output, real ( kind = 8 ) V2(DIM_NUM), a vector that is
+       !    normal to V2, and has unit Euclidean length.
+       !
+       implicit none
+
+       integer dim_num
+
+       real ( kind = 8 ) r8vec_length
+       integer i
+       integer j
+       integer k
+       real ( kind = 8 ) v1(dim_num)
+       real ( kind = 8 ) v2(dim_num)
+       real ( kind = 8 ) vj
+       real ( kind = 8 ) vk
+
+       if ( dim_num < 2 ) then
+           write ( *, '(a)' ) ' '
+           write ( *, '(a)' ) 'R8VEC_ANY_NORMAL - Fatal error!'
+           write ( *, '(a)' ) '  Called with DIM_NUM < 2.'
+           stop
+       end if
+
+       if ( r8vec_length ( dim_num, v1 ) == 0.0D+00 ) then
+           v2(1) = 1.0D+00
+           v2(2:dim_num) = 0.0D+00
+           return
+       end if
+       !
+       !  Seek the largest entry in V1, VJ = V1(J), and the
+       !  second largest, VK = V1(K).
+       !
+       !  Since V1 does not have zero norm, we are guaranteed that
+       !  VJ, at least, is not zero.
+       !
+       j = -1
+       vj = 0.0D+00
+
+       k = -1
+       vk = 0.0D+00
+
+       do i = 1, dim_num
+
+           if ( abs ( vk ) < abs ( v1(i) ) .or. k < 1 ) then
+
+               if ( abs ( vj ) < abs ( v1(i) ) .or. j < 1 ) then
+                   k = j
+                   vk = vj
+                   j = i
+                   vj = v1(i)
+               else
+                   k = i
+                   vk = v1(i)
+               end if
+
+           end if
+
+       end do
+       !
+       !  Setting V2 to zero, except that V2(J) = -VK, and V2(K) = VJ,
+       !  will just about do the trick.
+       !
+       v2(1:dim_num) = 0.0D+00
+
+       v2(j) = -vk / sqrt ( vk * vk + vj * vj )
+       v2(k) =  vj / sqrt ( vk * vk + vj * vj )
+
+       return
+   end
+
+
+
+
+   !***********************************************************************
+   !***********************************************************************
+   !***********************************************************************
+   subroutine lines_exp_angle_3d ( p1, p2, q1, q2, angle )
+
+       !*****************************************************************************80
+       !
+       !! LINES_EXP_ANGLE_3D finds the angle between two explicit lines in 3D.
+       !
+       !  Discussion:
+       !
+       !    The explicit form of a line in 3D is:
+       !
+       !      the line through the points P1 and P2.
+       !
+       !  Modified:
+       !
+       !    02 January 2005
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) P1(3), P2(3), two points on the first line.
+       !
+       !    Input, real ( kind = 8 ) Q1(3), Q2(3), two points on the second line.
+       !
+       !    Output, real ( kind = 8 ) ANGLE, the angle in radians between the two
+       !    lines.  The angle is computed using the ACOS function, and so lies between
+       !    0 and PI.  But if one of the lines is degenerate, the angle is
+       !    returned as -1.0.
+       !
+       implicit none
+
+       integer, parameter :: dim_num = 3
+
+       real ( kind = 8 ) angle
+       real ( kind = 8 ) arc_cosine
+       real ( kind = 8 ) ctheta
+       logical line_exp_is_degenerate_nd
+       real ( kind = 8 ) p1(dim_num)
+       real ( kind = 8 ) p2(dim_num)
+       real ( kind = 8 ) pdotq
+       real ( kind = 8 ) pnorm
+       real ( kind = 8 ) q1(dim_num)
+       real ( kind = 8 ) q2(dim_num)
+       real ( kind = 8 ) qnorm
+
+       if ( line_exp_is_degenerate_nd ( dim_num, p1, p2 ) ) then
+           !   write ( *, '(a)' ) ' '
+           !   write ( *, '(a)' ) 'LINES_EXP_ANGLE_3D - Fatal error!'
+           !   write ( *, '(a)' ) '  The line (P1,P2) is degenerate!'
+           angle = -1.0D+00
+           return
+       end if
+
+       if ( line_exp_is_degenerate_nd ( dim_num, q1, q2 ) ) then
+           !   write ( *, '(a)' ) ' '
+           !   write ( *, '(a)' ) 'LINES_EXP_ANGLE_3D - Fatal error!'
+           !   write ( *, '(a)' ) '  The line (Q1,Q2) is degenerate!'
+           angle = -1.0D+00
+           return
+       end if
+
+       pnorm = sqrt ( sum ( ( p2(1:dim_num) - p1(1:dim_num) )**2 ) )
+
+       qnorm = sqrt ( sum ( ( q2(1:dim_num) - q1(1:dim_num) )**2 ) )
+
+       pdotq = sum ( ( p2(1:dim_num) - p1(1:dim_num) ) * ( q2(1:dim_num) - q1(1:dim_num) ) )
+
+       ctheta = pdotq / ( pnorm * qnorm )
+
+       angle = arc_cosine ( ctheta )
+
+       return
+   end
+
+
+
+
+   !***********************************************************************
+   !***********************************************************************
+   !***********************************************************************
+   subroutine r8mat_inverse_3d ( a, b, det )
+
+       !*****************************************************************************80
+       !
+       !! R8MAT_INVERSE_3D inverts a 3 by 3 real matrix using Cramer's rule.
+       !
+       !  Discussion:
+       !
+       !    If DET is zero, then A is singular, and does not have an
+       !    inverse.  In that case, B is simply set to zero, and a
+       !    message is printed.
+       !
+       !    If DET is nonzero, then its value is roughly an estimate
+       !    of how nonsingular the matrix A is.
+       !
+       !  Modified:
+       !
+       !    16 April 1999
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) A(3,3), the matrix to be inverted.
+       !
+       !    Output, real ( kind = 8 ) B(3,3), the inverse of the matrix A.
+       !
+       !    Output, real ( kind = 8 ) DET, the determinant of the matrix A.
+       !
+       implicit none
+
+       real ( kind = 8 ) a(3,3)
+       real ( kind = 8 ) b(3,3)
+       real ( kind = 8 ) det
+       !
+       !  Compute the determinant of A
+       !
+       det =   a(1,1) * ( a(2,2) * a(3,3) - a(2,3) * a(3,2) ) &
+           + a(1,2) * ( a(2,3) * a(3,1) - a(2,1) * a(3,3) ) &
+           + a(1,3) * ( a(2,1) * a(3,2) - a(2,2) * a(3,1) )
+       !
+       !  If the determinant is zero, bail out.
+       !
+       if ( det == 0.0D+00 ) then
+
+           b(1:3,1:3) = 0.0D+00
+
+           return
+       end if
+       !
+       !  Compute the entries of the inverse matrix using an explicit
+       !  formula.
+       !
+       b(1,1) = + ( a(2,2) * a(3,3) - a(2,3) * a(3,2) ) / det
+       b(1,2) = - ( a(1,2) * a(3,3) - a(1,3) * a(3,2) ) / det
+       b(1,3) = + ( a(1,2) * a(2,3) - a(1,3) * a(2,2) ) / det
+
+       b(2,1) = - ( a(2,1) * a(3,3) - a(2,3) * a(3,1) ) / det
+       b(2,2) = + ( a(1,1) * a(3,3) - a(1,3) * a(3,1) ) / det
+       b(2,3) = - ( a(1,1) * a(2,3) - a(1,3) * a(2,1) ) / det
+
+       b(3,1) = + ( a(2,1) * a(3,2) - a(2,2) * a(3,1) ) / det
+       b(3,2) = - ( a(1,1) * a(3,2) - a(1,2) * a(3,1) ) / det
+       b(3,3) = + ( a(1,1) * a(2,2) - a(1,2) * a(2,1) ) / det
+
+       return
+   end
+
+
+
+
+   subroutine rotation_mat_vector_3d ( a, v, w )
+
+       !*****************************************************************************80
+       !
+       !! ROTATION_MAT_VECTOR_3D applies a marix rotation to a vector in 3d.
+       !
+       !  Modified:
+       !
+       !    30 July 1999
+       !
+       !  Author:
+       !
+       !    John Burkardt
+       !
+       !  Parameters:
+       !
+       !    Input, real ( kind = 8 ) A(3,3), the matrix defining the rotation.
+       !
+       !    Input, real ( kind = 8 ) V(3), the vector to be rotated.
+       !
+       !    Output, real ( kind = 8 ) W(3), the rotated vector.
+       !
+       implicit none
+
+       integer, parameter :: dim_num = 3
+
+       real ( kind = 8 ) a(dim_num,dim_num)
+       real ( kind = 8 ) v(dim_num)
+       real ( kind = 8 ) w(dim_num)
+
+       w(1:dim_num) = matmul ( a(1:dim_num,1:dim_num), v(1:dim_num) )
+
+       return
+   end

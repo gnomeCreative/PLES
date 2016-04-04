@@ -1,22 +1,26 @@
 !***********************************************************************
 module multigrid_module
 
+    use scala3
+    use period
+    use tipologia
+    !
+    use mpi
+
     use iso_c_binding
 
-    integer,bind(C) :: jpos
-    integer,bind(C) :: islor
-    integer,bind(C) :: nlevmultimax
-    real,bind(C) :: omega
+    integer,bind(C),public :: jpos
+    integer,bind(C),public :: islor
+    integer,bind(C),public :: nlevmultimax
+    real,bind(C),public :: omega
 
-    !***********************************************************************
+    private
+
     ! array for controvariant metric tensor for multigrid level 1,2,3,4
-    !----------------------------------------------------------------------
-    integer,allocatable :: in_dx1(:,:,:),in_dx2(:,:,:),in_dx3(:,:,:),in_dx4(:,:,:)
-    integer,allocatable :: in_sn1(:,:,:),in_sn2(:,:,:),in_sn3(:,:,:),in_sn4(:,:,:)
-    integer,allocatable :: in_sp1(:,:,:),in_sp2(:,:,:),in_sp3(:,:,:),in_sp4(:,:,:)
-    integer,allocatable :: in_st1(:,:,:),in_st2(:,:,:),in_st3(:,:,:),in_st4(:,:,:)
-    integer,allocatable :: in_av1(:,:,:),in_av2(:,:,:),in_av3(:,:,:),in_av4(:,:,:)
-    integer,allocatable :: in_in1(:,:,:),in_in2(:,:,:),in_in3(:,:,:),in_in4(:,:,:)
+    integer,allocatable,public :: in_dx1(:,:,:),in_sn1(:,:,:),in_sp1(:,:,:),in_st1(:,:,:),in_av1(:,:,:),in_in1(:,:,:)
+    integer,allocatable :: in_dx2(:,:,:),in_sn2(:,:,:),in_sp2(:,:,:),in_st2(:,:,:),in_av2(:,:,:),in_in2(:,:,:)
+    integer,allocatable :: in_dx3(:,:,:),in_sn3(:,:,:),in_sp3(:,:,:),in_st3(:,:,:),in_av3(:,:,:),in_in3(:,:,:)
+    integer,allocatable :: in_dx4(:,:,:),in_sn4(:,:,:),in_sp4(:,:,:),in_st4(:,:,:),in_av4(:,:,:),in_in4(:,:,:)
 
     real,allocatable,private :: g11_2(:,:,:),g12_2(:,:,:),g13_2(:,:,:)
     real,allocatable,private :: g21_2(:,:,:),g22_2(:,:,:),g23_2(:,:,:)
@@ -37,15 +41,12 @@ module multigrid_module
     real,allocatable,private :: aa3(:,:,:),bb3(:,:,:),cc3(:,:,:)
     real,allocatable,private :: aa4(:,:,:),bb4(:,:,:),cc4(:,:,:)
 
+    public :: multi,mul_met,wall
+
 contains
 
-    !***********************************************************************
-    subroutine multi(eps,ficycle,nlevel, &
-        jxc,jyc,jzc, &
-        kparasta,kparaend,myid,nproc, &
-        rightpe,leftpe, &
-        tagls,taglr,tagrs,tagrr,islor, &
-        bodyforce,bodypressure,tipo,deepl,deepr,iterat, &
+    subroutine multi(eps,ficycle,nlevel,jxc,jyc,jzc,kparasta,kparaend,myid,nproc, &
+        rightpe,leftpe,tagls,taglr,tagrs,tagrr,islor,bodyforce,bodypressure,tipo,deepl,deepr,iterat, &
         freesurface,ti)
         !***********************************************************************
         ! pressure solution with sor+multigrid
@@ -53,12 +54,6 @@ contains
         use myarrays_metri3
         use myarrays_velo3
         !
-        use scala3
-        use period
-        use tipologia
-        !
-        use mpi
-
         implicit none
 
         !-----------------------------------------------------------------------
@@ -104,7 +99,7 @@ contains
         integer deepl,deepr
         integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
         integer itipo,finetipo
-        integer bodyforce,ibodyforce
+        logical bodyforce
         integer bodypressure,ibodypressure
         real fi_old
         real ti
@@ -238,13 +233,13 @@ contains
                             kparasta,kparaend, &
                             iterat,freesurface,ti)
 
-                        do ibodyforce=1,bodyforce
+                        if (bodyforce) then
                             do ibodypressure=1,bodypressure
                                 call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
                                     kparaend,rightpe,leftpe,tagls,taglr,tagrs, &
                                     tagrr)
                             end do
-                        end do
+                        end if
 
 
                     elseif(islor.eq.1)then
@@ -518,13 +513,13 @@ contains
                     !
                     if(islor.eq.0)then
 
-                        do ibodyforce=1,bodyforce
+                        if (bodyforce) then
                             do ibodypressure=1,bodypressure
                                 call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
                                     kparaend,rightpe,leftpe,tagls,taglr,tagrs, &
                                     tagrr)
                             end do
-                        end do
+                        end if
 
                         call solut_sndrcv_sor(n,n1,n2,n3, &
                             kss,jxc,jyc,jzc,pr1,rhs, &
@@ -540,13 +535,13 @@ contains
                             bodyforce,bodypressure,kparasta,kparaend, &
                             iterat,freesurface,ti)
 
-                        do ibodyforce=1,bodyforce
+                        if (bodyforce) then
                             do ibodypressure=1,bodypressure
                                 call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
                                     kparaend,rightpe,leftpe,tagls,taglr,tagrs, &
                                     tagrr)
                             end do
-                        end do
+                        end if
 
                     elseif(islor.eq.1)then
 
@@ -601,7 +596,7 @@ contains
             ! compute resmax
             !
             !     without IBM
-            do ibodyforce = 1,1-bodyforce
+            if (.not.bodyforce) then
                 resmax_loc=0.
                 do k=kstamg(n),kendmg(n)
                     do j=1,jyc(n)
@@ -613,10 +608,10 @@ contains
                         enddo
                     enddo
                 enddo
-            enddo
+            end if
 
             !     with IBM
-            do ibodyforce = 1,bodyforce
+            if (bodyforce) then
                 resmax_loc=0.
                 do k=kstamg(n),kendmg(n)
                     do j=1,jyc(n)
@@ -631,7 +626,7 @@ contains
                         enddo
                     enddo
                 enddo
-            enddo
+            end if
             !
             call MPI_ALLREDUCE(resmax_loc,resmax,1,MPI_REAL_SD,MPI_MAX, &
                 MPI_COMM_WORLD,ierr)
@@ -656,9 +651,8 @@ contains
 
         !-----------------------------------------------------------------------
         return
-    end
+    end subroutine multi
 
-    !***********************************************************************
     subroutine solut_sndrcv_sor(n,i1,j1,k1, &
         kss,jxc,jyc,jzc,pr,rh, &
         cs1,cs2,cs3,cs4,cs5,cs6, &
@@ -670,11 +664,6 @@ contains
         iterat,freesurface,ti)
         !***********************************************************************
         ! smoothing on every level with SOR
-        use scala3
-        use period
-        use tipologia
-        !
-        use mpi
 
         implicit none
 
@@ -726,7 +715,7 @@ contains
         integer tagls,taglr,tagrs,tagrr
         !
         !      integer tipo(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
-        integer bodyforce,ibodyforce
+        logical bodyforce
         integer bodypressure,ibodypressure
         integer ilivello,itipo_ib,itipo_solida
         integer ibloop,solidaloop
@@ -1013,10 +1002,10 @@ contains
 
 
         return
-    end
 
-    !***********************************************************************
-    subroutine mul_boun_sndrcv(n,i1,j1,k1, &
+    end subroutine solut_sndrcv_sor
+
+	subroutine mul_boun_sndrcv(n,i1,j1,k1, &
         jxc,jyc,jzc, &
         r11,r12,r13,r21,r22,r23,r31,r32,r33,pr, &
         kstamg,kendmg,rightpe,leftpe, &
@@ -1027,12 +1016,6 @@ contains
         !
         use myarrays_velo3
         use myarrays_metri3 !added to calculate the surface pressure
-        !
-        use scala3
-        use period
-        use tipologia
-        !
-        use mpi
 
         implicit none
 
@@ -1939,9 +1922,8 @@ contains
         enddo ! loop kkk
         !
         return
-    end
+    end subroutine mul_boun_sndrcv
 
-    !***********************************************************************
     subroutine solut_sndrcv_slor(n,i1,j1,k1, &
         kss,jxc,jyc,jzc,pr,rh, &
         cs1,cs2,cs3,cs4,cs5,cs6, &
@@ -1953,12 +1935,6 @@ contains
         !***********************************************************************
         ! line SOR
         ! smoothing on every level with SOR, in eta direction implicit solution
-        !
-        use scala3
-        use period
-        use tipologia
-        !
-        use mpi
 
         implicit none
 
@@ -2295,7 +2271,6 @@ contains
         return
     end
 
-    !***********************************************************************
     subroutine mul_met(nlevel,jxc,jyc,jzc)
         !***********************************************************************
         ! coefficent computation for multigrid
@@ -2305,11 +2280,6 @@ contains
         use myarrays_velo3
         use mysending
         !
-        use scala3
-        use period
-        !
-        use mpi
-
         implicit none
 
         integer ierr
@@ -3055,10 +3025,10 @@ contains
         end do
         !-----------------------------------------------------------------------
         return
-    end
 
-    !***********************************************************************
-    subroutine mul_ini(n1,n2,n3,n12,n22,n32,n13,n23,n33,n14,n24,n34, &
+    end subroutine mul_met
+
+    subroutine mul_ini(n1,n2,n3,n12,n22,n32,n13,n23,n33,n14,n24,n34,&
         rhs1,rhs2,rhs3,rhs4,pr2,pr3,pr4,kstamg,kendmg)
         !***********************************************************************
         ! matrix initialization for multigrid
@@ -3151,9 +3121,9 @@ contains
         enddo
         !
         return
-    end
 
-    !***********************************************************************
+    end subroutine mul_ini
+
     subroutine wall(nlevel,jxc,jyc,jzc)
         !***********************************************************************
         ! set index for computation of pressure index, this is done at the sides
@@ -3162,10 +3132,6 @@ contains
         use myarrays_metri3
         use mysending
         !
-        use scala3
-        use period
-        !
-        use mpi
 
         implicit none
         !
@@ -3267,124 +3233,598 @@ contains
         end do
         !
         return
-    end
+    end subroutine wall
 
-    !***********************************************************************
-subroutine potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
-    kparaend,rightpe,leftpe,tagls,taglr,tagrs, &
-    tagrr)
+    subroutine potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
+        kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
 
-    !***********************************************************************
-    ! pressure correction inside Immersed Boundary is setted equal to that
-    ! outside
-    !-----------------------------------------------------------------------
-    use myarrays_velo3
-    !
-    use scala3
-    use tipologia
-    !
-    use mpi
+        !***********************************************************************
+        ! pressure correction inside Immersed Boundary is setted equal to that
+        ! outside
+        !-----------------------------------------------------------------------
+        use myarrays_velo3
+        !
 
-    implicit none
+        implicit none
 
-    !-----------------------------------------------------------------------
-    !     array declaration
-    integer i,j,k
-    integer nproc,myid
-    integer kparasta,kparaend
-    integer req1,req2,req3,req4
-    integer rightpe ,leftpe
-    integer rightpem,leftpem
-    integer ierr,istatus,status(MPI_STATUS_SIZE)
-    integer tagls,taglr,tagrs,tagrr
-    integer conto_ib
+        !-----------------------------------------------------------------------
+        !     array declaration
+        integer i,j,k
+        integer nproc,myid
+        integer kparasta,kparaend
+        integer req1,req2,req3,req4
+        integer rightpe ,leftpe
+        integer rightpem,leftpem
+        integer ierr,istatus,status(MPI_STATUS_SIZE)
+        integer tagls,taglr,tagrs,tagrr
+        integer conto_ib
 
-    integer deepl,deepr
-    integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+        integer deepl,deepr
+        integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
 
-    real fi_old
-    !-----------------------------------------------------------------------
-    !     solid cell  fi(solida)=fi(ib)
+        real fi_old
+        !-----------------------------------------------------------------------
+        !     solid cell  fi(solida)=fi(ib)
 
-    do k=kparasta,kparaend
-        do j=1,jy
-            do i=1,jx
+        do k=kparasta,kparaend
+            do j=1,jy
+                do i=1,jx
 
-                if(tipo(i,j,k).eq.0)then
-                    fi_old = fi(i,j,k)
-                    fi(i,j,k)=0.
-                    conto_ib=0
+                    if(tipo(i,j,k).eq.0)then
+                        fi_old = fi(i,j,k)
+                        fi(i,j,k)=0.
+                        conto_ib=0
 
-                    if(tipo(i+1,j  ,k  ).eq.1)then
-                        fi(i  ,j  ,k  )=fi(i,j,k)+fi(i+1,j  ,k  )
-                        conto_ib=conto_ib+1
+                        if(tipo(i+1,j  ,k  ).eq.1)then
+                            fi(i  ,j  ,k  )=fi(i,j,k)+fi(i+1,j  ,k  )
+                            conto_ib=conto_ib+1
+                        end if
+
+                        if(tipo(i-1,j  ,k  ).eq.1)then
+                            fi(i  ,j  ,k  )=fi(i,j,k)+fi(i-1,j  ,k  )
+                            conto_ib=conto_ib+1
+                        end if
+
+                        if(tipo(i  ,j+1,k  ).eq.1)then
+                            fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j+1,k  )
+                            conto_ib=conto_ib+1
+                        end if
+
+                        if(tipo(i  ,j-1,k  ).eq.1)then
+                            fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j-1,k  )
+                            conto_ib=conto_ib+1
+                        end if
+
+                        if(tipo(i  ,j  ,k+1).eq.1)then
+                            fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j  ,k+1)
+                            conto_ib=conto_ib+1
+                        end if
+
+                        if(tipo(i  ,j  ,k-1).eq.1)then
+                            fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j  ,k-1)
+                            conto_ib=conto_ib+1
+                        end if
+
+                        if(conto_ib.ne.0)then
+                            fi(i,j,k)=fi(i,j,k)/conto_ib
+                        else
+                            fi(i,j,k)=fi_old
+                        end if
+
                     end if
 
-                    if(tipo(i-1,j  ,k  ).eq.1)then
-                        fi(i  ,j  ,k  )=fi(i,j,k)+fi(i-1,j  ,k  )
-                        conto_ib=conto_ib+1
-                    end if
+                end do
+            end do
+        end do
 
-                    if(tipo(i  ,j+1,k  ).eq.1)then
-                        fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j+1,k  )
-                        conto_ib=conto_ib+1
-                    end if
+        !     send left
+        if(myid.ne.0)then
+            call MPI_SSEND(fi(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD, &
+                leftpe,tagls,MPI_COMM_WORLD,ierr)
+        !      call MPI_WAIT (req1,istatus,ierr)
+        end if
+        if(myid.ne.nproc-1)then
+            call MPI_RECV(fi(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD, &
+                rightpe,tagrr,MPI_COMM_WORLD,status,ierr)
+        !      call MPI_WAIT (req2,istatus,ierr)
+        end if
 
-                    if(tipo(i  ,j-1,k  ).eq.1)then
-                        fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j-1,k  )
-                        conto_ib=conto_ib+1
-                    end if
+        !     send right
+        if(myid.ne.nproc-1)then
+            call MPI_SSEND(fi(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD, &
+                rightpe,tagrs,MPI_COMM_WORLD,ierr)
+        !      call MPI_WAIT (req3,istatus,ierr)
+        end if
+        if(myid.ne.0)then
+            call MPI_RECV(fi(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD, &
+                leftpe,taglr,MPI_COMM_WORLD,status,ierr)
+        !      call MPI_WAIT (req4,istatus,ierr)
+        end if
 
-                    if(tipo(i  ,j  ,k+1).eq.1)then
-                        fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j  ,k+1)
-                        conto_ib=conto_ib+1
-                    end if
+        return
 
-                    if(tipo(i  ,j  ,k-1).eq.1)then
-                        fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j  ,k-1)
-                        conto_ib=conto_ib+1
-                    end if
+    end subroutine potenziale_ibm
 
-                    if(conto_ib.ne.0)then
-                        fi(i,j,k)=fi(i,j,k)/conto_ib
-                    else
-                        fi(i,j,k)=fi_old
-                    end if
+    subroutine gprima(xcsi,ycsi,zcsi,xeta,yeta,zeta,xzet,yzet,zzet,t11,t22,t33)
+        !***********************************************************************
+        !
+        ! compute the first line elements of controvariant metric tensor on
+        ! higher grid level for multigrid
+        !
+        implicit none
+        !
+        !-----------------------------------------------------------------------
+        !     variables declaration
+        real giac,t11,t22,t33
+        real xcsi,ycsi,zcsi
+        real xeta,yeta,zeta
+        real xzet,yzet,zzet
+        real csx,csy,csz
+        real etx,ety,etz
+        real ztx,zty,ztz
+        !-----------------------------------------------------------------------
+        !
+        giac=     xcsi*(yeta*zzet-yzet*zeta)- &
+            xeta*(ycsi*zzet-yzet*zcsi)+ &
+            xzet*(ycsi*zeta-yeta*zcsi)
+        !
+        csx = yeta*zzet - yzet*zeta
+        csy = xzet*zeta - xeta*zzet
+        csz = xeta*yzet - xzet*yeta
+        !
+        etx = yzet*zcsi - ycsi*zzet
+        ety = xcsi*zzet - xzet*zcsi
+        etz = xzet*ycsi - xcsi*yzet
+        !
+        ztx=ycsi*zeta-yeta*zcsi
+        zty=xeta*zcsi-xcsi*zeta
+        ztz=xcsi*yeta-xeta*ycsi
+        !
+        t11=(csx**2+csy**2+csz**2)/giac
+        !
+        t22=(csx*etx+csy*ety+csz*etz)/giac
+        !
+        t33=(csx*ztx+csy*zty+csz*ztz)/giac
+        !
+        return
+    end subroutine gprima
 
-                end if
+    subroutine gseconda(xcsi,ycsi,zcsi,xeta,yeta,zeta,xzet,yzet,zzet,t11,t22,t33)
+        !***********************************************************************
+        !
+        ! compute the second line elements of controvariant metric tensor on
+        ! higher grid level for multigrid
+        !
+        implicit none
+        !
+        !-----------------------------------------------------------------------
+        !     variables declaration
+        real giac,t11,t22,t33
+        real xcsi,ycsi,zcsi
+        real xeta,yeta,zeta
+        real xzet,yzet,zzet
+        real csx,csy,csz
+        real etx,ety,etz
+        real ztx,zty,ztz
+        !-----------------------------------------------------------------------
+        !
+        etx = yzet*zcsi - ycsi*zzet
+        ety = xcsi*zzet - xzet*zcsi
+        etz = xzet*ycsi - xcsi*yzet
+        !
+        csx = yeta*zzet - yzet*zeta
+        csy = xzet*zeta - xeta*zzet
+        csz = xeta*yzet - xzet*yeta
+        !
+        ztx=ycsi*zeta-yeta*zcsi
+        zty=xeta*zcsi-xcsi*zeta
+        ztz=xcsi*yeta-xeta*ycsi
+        !
+        giac=xcsi*(yeta*zzet-yzet*zeta)- &
+            xeta*(ycsi*zzet-yzet*zcsi)+ &
+            xzet*(ycsi*zeta-yeta*zcsi)
+        !
+        t11=(etx*csx+ety*csy+etz*csz)/giac
+        !
+        t22=(etx**2+ety**2+etz**2)/giac
+        !
+        t33=(etx*ztx+ety*zty+etz*ztz)/giac
+        !
+        return
+    end subroutine gseconda
+
+    subroutine gterza(xcsi,ycsi,zcsi,xeta,yeta,zeta,xzet,yzet,zzet,t11,t22,t33)
+        !***********************************************************************
+        !
+        ! compute the elements for the third line of the controvariant
+        ! metric tensor for upper grid for multigrid cycle
+        !
+        implicit none
+        !
+        !-----------------------------------------------------------------------
+        !     variables declaration
+        real giac,t11,t22,t33
+        real xcsi,ycsi,zcsi
+        real xeta,yeta,zeta
+        real xzet,yzet,zzet
+        real csx,csy,csz
+        real etx,ety,etz
+        real ztx,zty,ztz
+        !-----------------------------------------------------------------------
+        !
+        csx = yeta*zzet - yzet*zeta
+        csy = xzet*zeta - xeta*zzet
+        csz = xeta*yzet - xzet*yeta
+        !
+        etx = yzet*zcsi - ycsi*zzet
+        ety = xcsi*zzet - xzet*zcsi
+        etz = xzet*ycsi - xcsi*yzet
+        !
+        ztx=  ycsi*zeta - yeta*zcsi
+        zty=  xeta*zcsi - xcsi*zeta
+        ztz=  xcsi*yeta - xeta*ycsi
+        !
+        giac=     xcsi*(yeta*zzet-yzet*zeta)- &
+            xeta*(ycsi*zzet-yzet*zcsi)+ &
+            xzet*(ycsi*zeta-yeta*zcsi)
+        !
+        t11=(ztx*csx+zty*csy+ztz*csz)/giac
+        !
+        t22=(ztx*etx+zty*ety+ztz*etz)/giac
+        !
+        t33=(ztx**2+zty**2+ztz**2)/giac
+        !
+        return
+    end subroutine gterza
+
+    subroutine restrict_sndrcv(n,i1,j1,k1,i2,j2,k2,jxc,jyc,jzc,rh,rh1,kstamg,kendmg)
+        !***********************************************************************
+        ! compute residual on lower level grid
+        ! restriction operation with average value
+        !
+        implicit none
+        !
+        !-----------------------------------------------------------------------
+        !     array declaration
+        integer ierr,myid,nproc,status
+        integer kstamg(4),kendmg(4),m
+        !
+        integer i,j,k,id,jd,kd,n,i1,j1,k1,i2,j2,k2
+        integer jxc(0:4),jyc(0:4),jzc(0:4)
+        real  rh(i1,j1,kstamg(n):kendmg(n)) !k1)
+        real rh1(i2,j2,kstamg(n+1):kendmg(n+1)) !k2)
+
+        real, allocatable :: rh1col(:),rh1tot(:)
+
+        real inv_8
+        !-----------------------------------------------------------------------
+        CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
+        CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
+        !-----------------------------------------------------------------------
+        inv_8 = 1./8.
+
+        do k=kstamg(n+1),kendmg(n+1)
+            do j=1,jyc(n+1)
+                do i=1,jxc(n+1)
+                    !
+                    id=2*i
+                    jd=2*j
+                    kd=2*k
+                    !
+                    rh1(i,j,k)=rh(id  ,jd  ,kd  ) &
+                        +rh(id-1,jd  ,kd  ) &
+                        +rh(id  ,jd-1,kd  ) &
+                        +rh(id-1,jd-1,kd  ) &
+                        +rh(id  ,jd  ,kd-1) &
+                        +rh(id-1,jd  ,kd-1) &
+                        +rh(id  ,jd-1,kd-1) &
+                        +rh(id-1,jd-1,kd-1)
+                    !
+                    rh1(i,j,k)=-rh1(i,j,k)*inv_8
+                !
+                enddo
+            enddo
+        enddo
+        !
+        return
+
+    end subroutine restrict_sndrcv
+
+    subroutine resid_sndrcv(n,i1,j1,k1,jxc,jyc,jzc,pr,rh1,rh, &
+        cs1,cs2,cs3,cs4,cs5,cs6,       &
+        r11,r12,r13,r21,r22,r23,r31,r32,r33, &
+        i_dx,i_sn,i_sp,i_st,i_av,i_in, &
+        kstamg,kendmg, &
+        bodyforce,bodypressure,kparasta,kparaend)
+        !***********************************************************************
+        ! compute residuals on current grid
+        !
+        implicit none
+
+        !-----------------------------------------------------------------------
+        !     array declaration
+        integer kstamg(4),kendmg(4)
+        integer kparasta,kparaend
+        integer i,j,k,n,i1,j1,k1,ipot
+        integer i_dx(i1,j1,kstamg(n):kendmg(n)) !k1)
+        integer i_sn(i1,j1,kstamg(n):kendmg(n)) !k1)
+        integer i_sp(i1,j1,kstamg(n):kendmg(n)) !k1)
+        integer i_st(i1,j1,kstamg(n):kendmg(n)) !k1)
+        integer i_av(i1,j1,kstamg(n):kendmg(n)) !k1)
+        integer i_in(i1,j1,kstamg(n):kendmg(n)) !k1)
+        integer jxc(0:4),jyc(0:4),jzc(0:4)
+        !
+        real res_av,res_ind,res_sot,res_sop,res_sn,res_dx
+        real pot,inv_pot,inv_dt,coef
+        real r11(0:i1,  j1,  kstamg(n):kendmg(n))
+        real r12(0:i1,  j1,  kstamg(n):kendmg(n))
+        real r13(0:i1,  j1,  kstamg(n):kendmg(n))
+        real r21(i1  ,0:j1,  kstamg(n):kendmg(n))
+        real r22(i1  ,0:j1,  kstamg(n):kendmg(n))
+        real r23(i1  ,0:j1,  kstamg(n):kendmg(n))
+        real r31(i1  ,  j1,kstamg(n)-1:kendmg(n))
+        real r32(i1  ,  j1,kstamg(n)-1:kendmg(n))
+        real r33(i1  ,  j1,kstamg(n)-1:kendmg(n))
+        real pr(0:i1+1,0:j1+1,kstamg(n)-1:kendmg(n)+1) !0:k1+1)
+        real rh(i1,j1,kstamg(n):kendmg(n))  !k1)
+        real rh1(i1,j1,kstamg(n):kendmg(n)) !k1)
+
+        real cs1(n2,n3),cs2(n2,n3)
+        real cs3(n1,n3),cs4(n1,n3)
+        real cs5(n1,n2),cs6(n1,n2)
+        real an
+
+        !
+        integer ierr,myid,nproc,status
+        integer ncolperproc,m
+        !
+        !integer tipo(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+        logical bodyforce
+        integer bodypressure,ibodypressure
+        integer ilivello,itipo_ib,itipo_solida
+        integer ibloop,solidaloop
+
+        !-----------------------------------------------------------------------
+        CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
+        CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
+        !-----------------------------------------------------------------------
+
+        ipot=2**(n-1)
+        pot=float(ipot)
+
+        inv_pot = 1./pot
+        inv_dt  = 1./dt
+
+        coef = 0.25
+
+        if(n.eq.1)then
+            an=1.
+        else
+            an=0.
+        end if
+        !-----------------------------------------------------------------------
+        !
+        do k=kstamg(n),kendmg(n)
+            do j=1,jyc(n)
+                do i=1,jxc(n)
+                    !
+                    !      residual right
+                    res_dx=( &
+                        r11(i,j,k)*(pr(i+1,j,k)-pr(i,j,k))   &
+                        +coef* &
+                        (r12(i,j,k)* &
+                        (pr(i+1,j+1,k)+pr(i,j+1,k)-pr(i+1,j-1,k)-pr(i,j-1,k)) &
+                        +r13(i,j,k)* &
+                        (pr(i+1,j,k+1)+pr(i,j,k+1)-pr(i+1,j,k-1)-pr(i,j,k-1)) &
+                        ))*inv_pot
+                    !
+                    !      left residual
+                    res_sn=( &
+                        r11(i-1,j,k)*(pr(i,j,k)-pr(i-1,j,k))     &
+                        +coef* &
+                        (r12(i-1,j,k)* &
+                        (pr(i,j+1,k)+pr(i-1,j+1,k)-pr(i,j-1,k)-pr(i-1,j-1,k)) &
+                        +r13(i-1,j,k)* &
+                        (pr(i,j,k+1)+pr(i-1,j,k+1)-pr(i,j,k-1)-pr(i-1,j,k-1)) &
+                        ))*inv_pot
+                    !
+                    !      upper residual
+                    res_sop=( &
+                        r22(i,j,k)*(pr(i,j+1,k)-pr(i,j,k))    &
+                        +coef* &
+                        (r21(i,j,k)* &
+                        (pr(i+1,j+1,k)+pr(i+1,j,k)-pr(i-1,j+1,k)-pr(i-1,j,k)) &
+                        +r23(i,j,k)* &
+                        (pr(i,j+1,k+1)+pr(i,j,k+1)-pr(i,j+1,k-1)-pr(i,j,k-1)) &
+                        ))*inv_pot
+                    !
+                    !     bottom residual
+                    res_sot=( &
+                        r22(i,j-1,k)*(pr(i,j,k)-pr(i,j-1,k)) &
+                        +coef* &
+                        (r21(i,j-1,k)* &
+                        (pr(i+1,j,k)+pr(i+1,j-1,k)-pr(i-1,j,k)-pr(i-1,j-1,k)) &
+                        +r23(i,j-1,k)* &
+                        (pr(i,j,k+1)+pr(i,j-1,k+1)-pr(i,j,k-1)-pr(i,j-1,k-1)) &
+                        ))*inv_pot
+                    !
+                    !     front residual
+                    res_av=( &
+                        r33(i,j,k)*(pr(i,j,k+1)-pr(i,j,k))   &
+                        +coef* &
+                        (r31(i,j,k)* &
+                        (pr(i+1,j,k+1)+pr(i+1,j,k)-pr(i-1,j,k+1)-pr(i-1,j,k)) &
+                        +r32(i,j,k)* &
+                        (pr(i,j+1,k+1)+pr(i,j+1,k)-pr(i,j-1,k+1)-pr(i,j-1,k)) &
+                        ))*inv_pot
+                    !
+                    !     back residual
+                    res_ind=( &
+                        r33(i,j,k-1)*(pr(i,j,k)-pr(i,j,k-1)) &
+                        +coef* &
+                        (r31(i,j,k-1)* &
+                        (pr(i+1,j,k)+pr(i+1,j,k-1)-pr(i-1,j,k)-pr(i-1,j,k-1)) &
+                        +r32(i,j,k-1)* &
+                        (pr(i,j+1,k)+pr(i,j+1,k-1)-pr(i,j-1,k)-pr(i,j-1,k-1)) &
+                        ))*inv_pot
+                    !
+                    rh1(i,j,k)= &
+                        (res_dx  - res_sn  +  &
+                        res_sop - res_sot + &
+                        res_av  - res_ind )*inv_pot - rh(i,j,k)
+                !
+                enddo
+            enddo
+        enddo
+        !-----------------------------------------------------------------------
+
+        return
+
+    end subroutine resid_sndrcv
+
+    subroutine sett(myid,nproc,n,ksta,kend,kfsta,ix,iy,iz,nx,ny,nz, &
+        i_dx,i_sn,i_sp,i_st,i_av,i_in, &
+        r11,r12,r13,r21,r22,r23,r31,r32,r33,aa,bb,cc)
+        !***********************************************************************
+        !     set index
+        !
+        implicit none
+
+        !-----------------------------------------------------------------------
+        !     variables declaration
+        integer ierr
+        integer ksta,kend,kfsta
+        integer i,j,k,ij
+        integer ix,iy,iz
+        integer nx,ny,nz
+
+        integer i_dx(nx,ny,ksta:kend)
+        integer i_sn(nx,ny,ksta:kend)
+        integer i_sp(nx,ny,ksta:kend)
+        integer i_st(nx,ny,ksta:kend)
+        integer i_av(nx,ny,ksta:kend)
+        integer i_in(nx,ny,ksta:kend)
+
+        real  aa(nx,0:ny+1,ksta:kend)
+        real  bb(nx,0:ny+1,ksta:kend)
+        real  cc(nx,0:ny+1,ksta:kend)
+
+        real r11(0:nx,ny,ksta:kend)
+        real r12(0:nx,ny,ksta:kend)
+        real r13(0:nx,ny,ksta:kend)
+
+        real r21(nx,0:ny,ksta:kend)
+        real r22(nx,0:ny,ksta:kend)
+        real r23(nx,0:ny,ksta:kend)
+
+        real r31(nx,ny,kfsta:kend)
+        real r32(nx,ny,kfsta:kend)
+        real r33(nx,ny,kfsta:kend)
+
+        integer ipot
+        real pot,ppot1,ppot2
+        integer n,myid,nproc
+
+        !-----------------------------------------------------------------------
+        !
+        ! in all the field
+        !
+        do k=ksta,kend
+            do j=1,ny
+                do i=1,nx
+                    !
+                    i_dx(i,j,k) =1
+                    i_sn(i,j,k) =1
+                    i_sp(i,j,k) =1
+                    i_st(i,j,k) =1
+                    i_av(i,j,k) =1
+                    i_in(i,j,k) =1
+                !
+                end do
+            end do
+        end do
+        !
+        ! index sides sn and dx (1 and 2), general periodicity
+        !
+        do j=1,ny
+            do k=ksta,kend
+                !
+                i_sn(1 ,j,k) =1-ip
+                i_dx(ix,j,k) =1-ip
+                    !
+            end do
+        end do
+        !
+        ! index sides bottom and upper (3 and 4), general periodicity
+        !
+        do i=1,nx
+            do k=ksta,kend
+                !
+                i_st(i,1 ,k) =1-jp
+                i_sp(i,iy,k) =1-jp
+                        !
+            end do
+        end do
+        !
+        ! index sides back and front (6 and 5), general periodicity
+
+        !hicco MA SIAMO SICUI CHE SIANO COSI' INDIETRO E AVANTI?????
+        !hicco DOVREBBE ESSERE IL CONTRARIO !!!!!!!
+
+        ! indici parete  indietro e avanti: (periodicita generalizzata)
+        !
+        if(myid.eq.0)then
+            do j=1,ny
+                do i=1,nx
+                    i_in(i,j,ksta) =1-kp
+                end do
+            end do
+        elseif(myid.eq.nproc-1)then
+            write(*,*)'IZ,NZ',iz,nz,ksta,kend
+            do j=1,ny
+                do i=1,nx
+                    i_av(i,j,kend) =1-kp
+                end do
+            end do
+        end if
+
+        !-----------------------------------------------------------------------
+        ! for multigrid in case of line sor in j direction (implict solution)
+        ! build fixed coefficent for the tridiagonal matrix
+        !
+        ipot=2**(n-1)
+        pot=float(ipot)
+        ppot1=1/pot
+        ppot2=1/pot/pot
+
+        do k=ksta,kend !1,nz
+            do i=1,nx
+
+                do j=1,ny
+                    aa(i,j,k)=ppot2*r22(i,j-1,k)
+                    bb(i,j,k)=-ppot2*(r22(i  ,j,k  )+r22(i,j-1,k) &
+                        +r11(i  ,j,k  )*i_dx(i,j,k) &
+                        +r11(i-1,j,k  )*i_sn(i,j,k) &
+                        +r33(i  ,j,k  )*i_av(i,j,k) &
+                        +r33(i  ,j,k-1)*i_in(i,j,k))
+                    cc(i,j,k)=ppot2*r22(i,j,k)
+                end do
+
+                !     side bottom (3) aa=0
+                aa(i,0,k)= 0.
+                bb(i,0,k)= r22(i,0,k)*ppot2
+                cc(i,0,k)=-r22(i,0,k)*ppot2
+
+                !     side upper (4) cc=0
+                aa(i,ny+1,k)=-r22(i,ny,k)*ppot2
+                bb(i,ny+1,k)= r22(i,ny,k)*ppot2
+                cc(i,ny+1,k)= 0.
 
             end do
         end do
-    end do
 
-    !     send left
-    if(myid.ne.0)then
-        call MPI_SSEND(fi(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD, &
-            leftpe,tagls,MPI_COMM_WORLD,ierr)
-    !      call MPI_WAIT (req1,istatus,ierr)
-    end if
-    if(myid.ne.nproc-1)then
-        call MPI_RECV(fi(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD, &
-            rightpe,tagrr,MPI_COMM_WORLD,status,ierr)
-    !      call MPI_WAIT (req2,istatus,ierr)
-    end if
+        return
 
-    !     send right
-    if(myid.ne.nproc-1)then
-        call MPI_SSEND(fi(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD, &
-            rightpe,tagrs,MPI_COMM_WORLD,ierr)
-    !      call MPI_WAIT (req3,istatus,ierr)
-    end if
-    if(myid.ne.0)then
-        call MPI_RECV(fi(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD, &
-            leftpe,taglr,MPI_COMM_WORLD,status,ierr)
-    !      call MPI_WAIT (req4,istatus,ierr)
-    end if
+    end subroutine sett
 
-    return
-end
-
-
-!***********************************************************************
 end module multigrid_module
-!***********************************************************************

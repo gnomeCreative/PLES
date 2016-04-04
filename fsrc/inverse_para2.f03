@@ -3,8 +3,7 @@ subroutine inverse_para2(myid,nproc,kparasta,kparaend)
    !***********************************************************************
    ! find the component starting from controvariant
    !
-   use turbo2_data
-   use turbo3bis
+   use turbo_module
    !
    use scala3
    !

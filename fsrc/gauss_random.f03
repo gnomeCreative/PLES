@@ -7,7 +7,7 @@ subroutine gauss_random(ktime,n1,n2,n3,myid,nproc,kparasta,kparaend)
     use mpi
 
     implicit none
-      
+
 
     real, allocatable :: eps(:,:)
     real, allocatable :: stepg(:)
@@ -33,7 +33,7 @@ subroutine gauss_random(ktime,n1,n2,n3,myid,nproc,kparasta,kparaend)
     dt    = .5          !time step size=.5
     cortim= 5.          !corr. time in the same units as DT=5
     iverifico = 1
- 
+
     allocate(eps(nreal,-1:nstep*2))
     allocate(A(1:nreal*(nstep+1)*2))
     allocate(stepg(1:100))
@@ -50,7 +50,7 @@ subroutine gauss_random(ktime,n1,n2,n3,myid,nproc,kparasta,kparaend)
     ! store several series of Gaussian noise values in array EPS.
     !.......................................................................
     !      call cpu_time(timeA)
-      
+
     count   = 1
     sum     = 0.
     do i=1,nreal             !realizations
@@ -62,7 +62,7 @@ subroutine gauss_random(ktime,n1,n2,n3,myid,nproc,kparasta,kparaend)
     sum = sum/float(nreal*(nstep*2+1))
     !      write(*,*)myid,'sum',sum
     !      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-            
+
     sumnew = 0.
     do i=1,nreal             !realizations
         do j=0,nstep*2          !time delays
@@ -109,7 +109,7 @@ subroutine gauss_random(ktime,n1,n2,n3,myid,nproc,kparasta,kparaend)
     !
     !      call cpu_time(time3)
     !      write(*,*)'store',time3-time2
-	
+
     !
     !--------------------------------------------------------------
     !**************************************************************
@@ -150,7 +150,7 @@ subroutine gauss_random(ktime,n1,n2,n3,myid,nproc,kparasta,kparaend)
         deviaz = sqrt(deviaz)
         !     	 write(*,*)myid,'deviaz',deviaz
         !     	 call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-     	 
+
         if(myid==0)then
             write(*,*)'Media vento= ',sum,'Deviazione= ',deviaz
         end if
@@ -264,7 +264,7 @@ real function cgauss()
     logical white
     real  fac,gset,rsq,v1,v2,l1me2,h,cape,rinv,prev
     common /color/l1me2,cape,white
-      
+
     save iset,gset,prev
     data iset/0/
     data prev/0.0d0/
@@ -273,7 +273,7 @@ real function cgauss()
 
     rinv =  0.000014874754566549652 ! 2./134456.
     if (iset==0) then
-      
+
         !      n  = abs(iseed)
         n  = mod(8121*n+28411,134456)
         !      v1 = 2.*real(n)/134456.
@@ -287,7 +287,7 @@ real function cgauss()
         !
         !        rsq=v1**2.+v2**2.
         rsq=v1*v1+v2*v2
-     
+
         do while (rsq>=1. .or. rsq==0.) ! Alessandro there was a horrible goto here
 
             call random_number(v1)
@@ -309,13 +309,13 @@ real function cgauss()
         h=gset
         iset=0
     endif
-      
+
     if(white)then  !please note that the time step vs its sqrt
         cgauss=h      !in integration is previously set in PARAM
     else
         cgauss=prev*cape+h
         prev=cgauss
     end if
-      
+
     return
 end

@@ -9,7 +9,6 @@ module myarrays_density
     real,allocatable :: akapt(:,:,:,:),akaptV(:,:,:,:)
     real,allocatable :: akapt_piano(:,:,:,:),akaptV_piano(:,:,:,:)
     real,pointer :: pran(:),prsc(:)
-    type(c_ptr),bind(C) :: c_pran,c_prsc
     integer,bind(c) :: re_analogy
 !
 !***********************************************************************

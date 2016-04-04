@@ -191,7 +191,7 @@ subroutine metrica
                   +csz(i,j,k)*a_ztz)/a_giac
 
             end if
-      
+
          end do
       end do
    end do
@@ -488,7 +488,7 @@ subroutine metrica
             if(giac(i,j,k)<1.e-10) then
                write(*,*) 'METRICA: grid not good cell very small'
             end if
-      
+
          end do
       end do
    end do

@@ -5,8 +5,7 @@ subroutine mixrho_para(inmod,rho)
    !
    use filter_module
    use mysending
-   use turbo3bis
-   use turbo2_data
+   use turbo_module
    use myarrays_velo3
    use myarrays_metri3
    !

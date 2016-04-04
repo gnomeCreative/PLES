@@ -92,7 +92,7 @@ public:
     // predicted angular velocities
     tVect wpGlobal,wpLocal;
     // force and moment
-    tVect FParticle,FWall,FGrav;
+    tVect FParticle,FWall,FGrav,FHydroShear,FHydroPressure;
     tVect MParticle,MWall;
 
     // default constructor
@@ -113,6 +113,8 @@ public:
         radius=1.0;
         I=tVect(1.0,1.0,1.0);
         FWall=tVect(0.0,0.0,0.0);
+        FHydroShear=tVect(0.0,0.0,0.0);
+        FHydroPressure=tVect(0.0,0.0,0.0);
         FParticle=tVect(0.0,0.0,0.0);
         MParticle=tVect(0.0,0.0,0.0);
         MWall=tVect(0.0,0.0,0.0);
@@ -201,14 +203,16 @@ public:
     tVect  x0;
     // velocity of the object
     tVect x1;
-    // force on the object
-    tVect force;
+    // force on the object, from collisions
+    tVect FParticle,FHydroShear,FHydroPressure;
     object() {
         index=0;
         radius=0.0;
         x0=tVect(0.0,0.0,0.0);
         x1=tVect(0.0,0.0,0.0);
-        force=tVect(0.0,0.0,0.0);
+        FParticle=tVect(0.0,0.0,0.0);
+        FHydroShear=tVect(0.0,0.0,0.0);
+        FHydroPressure=tVect(0.0,0.0,0.0);
     }
 };
 

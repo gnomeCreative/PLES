@@ -8,7 +8,7 @@ subroutine iniz(f1ve,f2ve,f3ve,bcsi,beta,bzet)
     !
     use myarrays_velo3
     use myarrays_density
-    use myarrays_moisture
+    !use myarrays_moisture
     use mysending
     use scala3
 
@@ -47,12 +47,17 @@ subroutine iniz(f1ve,f2ve,f3ve,bcsi,beta,bzet)
         allocate(akaptV_piano(nscal,0:n1+1,0:n2+1,1:1))
         akapt_piano  = 0.
         akaptV_piano = 0.
+    else
+        allocate( akapt_piano(nscal,0:n1+1,0:n2+1,1:1))
+        allocate(akaptV_piano(nscal,0:n1+1,0:n2+1,1:1))
+        akapt_piano  = 0.
+        akaptV_piano = 0.
     end if
     !-----------------------------------------------------------------------
-    if(imoist==1)then
-        allocate(tpotm(1:n2))
-        allocate(qm(1:n2))
-    end if
+!    if(imoist==1)then
+!        allocate(tpotm(1:n2))
+!        allocate(qm(1:n2))
+!    end if
     !-----------------------------------------------------------------------
     !
     kpsta_alloc = kparasta
@@ -92,13 +97,12 @@ subroutine iniz(f1ve,f2ve,f3ve,bcsi,beta,bzet)
     !-----------------------------------------------------------------------c
     allocate(rhs(1:n1,1:n2,kparasta:kparaend))
 
-    allocate( u(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
-    allocate( v(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
-    allocate( w(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+    allocate(u(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+    allocate(v(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+    allocate(w(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
     allocate(fi(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
     allocate(next_prs(0:n1+1,kparasta-deepl:kparaend+deepr))
-    allocate(rhov(1:nscal,0:n1+1,0:n2+1, &
-        kparasta-deepl:kparaend+deepr))
+    allocate(rhov(1:nscal,0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
        
     allocate( uc(0:n1,1:n2,kparasta  :kparaend))
     allocate( vc(1:n1,0:n2,kparasta  :kparaend))

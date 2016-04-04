@@ -7,24 +7,49 @@ module output_module
 
     use mysending, only: kparaend,kparasta,myid,nproc,deepl,deepr
     !
-    use scala3, only: jx,jy,jz,nscal,re,n1,n2,n3,dt
-            !
-    use print
+    use scala3, only: jx,jy,jz,nscal,re,n1,n2,n3,dt,re
+    use tipologia
+
+    use mpi
 
     implicit none
 
+    private
+
+    ! public elements: -------------------------------------------------------
+    integer(kind=c_int),bind(C),public :: i_print,i_print_part,ktime
+    real,public :: ti
+
     ! flags
-    integer,bind(C) :: print_iter_or_time,i_printfile,iformat_newres
-    logical,bind(C) :: i_paraview,i_newres,i_medietempo
-    logical,bind(C) :: i_cumulative,iformat_grid
-    character(len=500) :: result_folder
-    !character,bind(C),dimension(*) :: result_folder_name,simulation_name
+    integer(kind=c_int),bind(C),public :: print_iter_or_time,i_printfile,iformat_newres
+    logical(kind=c_bool),bind(C),public :: i_paraview,i_newres,i_medietempo
+    logical(kind=c_bool),bind(C),public :: i_cumulative,iformat_grid
+    real(kind=c_double),bind(C),public :: i_time
 
+    character(len=500),public :: result_folder
+    character(len=500),public :: grid_file
+    character(len=500),public :: restart_file
 
+    integer,parameter,public :: info_run_file=11
+
+    ! formats
+    character(len=12),public :: string_newres_format
+    character(len=12),public :: string_grid_format
+
+    ! piani & sonde
+    integer(kind=c_int),bind(C),public :: npiani,nsonde
+    type(c_ptr),bind(C),public :: c_sondeindexi,c_sondeindexj,c_sondeindexk,c_piani
+
+    ! scalar dimensionless numbers
+    type(c_ptr),bind(C),public :: c_pran,c_prsc
+
+    public :: create_output_folder,initialize_output,initialize_input
+    public :: update_medie,output_step,output_finalize,get_cpp_strings
+
+    ! private elements: -------------------------------------------------------
     logical :: iscrivo
 
     ! information output files
-    integer,parameter :: info_run_file=11
     integer,parameter :: new_res_file=14
     integer,parameter :: medietempo_file=14
     integer,parameter :: paraview_file=17
@@ -40,77 +65,56 @@ module output_module
     integer,parameter :: sonde_file_base=2000
 
     ! formats
-    character(len=12) :: string_newres_format
-    character(len=12) :: string_grid_format
     character(len=20) :: fmt_newres
 
     ! file names
     character(len=500) :: filename_newres,filename_medietempo,filename_paraview
     character(len=500) :: filename_movie,filename_paraview_piece
-    !
     character(len=500) :: filename_inforun,filename_turbo,filename_subdis
     character(len=500) :: filename_subscl,filename_subrho,filename_drag
     character(len=500) :: filename_bulkvel,filename_maxvel,filename_encheck
     character(len=500) :: flename_sondefilebase
-
     character*120,allocatable   :: paraview_piecename(:)
 
     ! folders to store results (see output_init)
-    !character(len=23) :: result_folder ! length = length(result_folder_name)+length('results/')
-    character(len=34) :: new_res_folder
-    character(len=36) :: paraview_folder
-    character(len=38) :: medietempo_folder
+    character(len=500) :: new_res_folder
+    character(len=500) :: paraview_folder
+    character(len=500) :: medietempo_folder
 
     character(len=4) :: char_myid
 
-    real,bind(C) :: i_time
     real ti_start
+    integer count_print_time
+
+    ! piani & sonde
+    integer,pointer :: sonde(:,:),piani(:)
+    integer,pointer :: sondeindexi(:),sondeindexj(:),sondeindexk(:)
+
       
     ! variables for printing
-    real, allocatable :: umed(:,:,:,:) !(1:n1,1:n2,kparasta:kparaend,4)
-    real, allocatable :: uutau(:,:,:,:) !(1:n1,1:n2,kparasta:kparaend,7)
+    real, allocatable :: umed(:,:,:,:),uutau(:,:,:,:) !(1:n1,1:n2,kparasta:kparaend,7)
     real :: deltatempo
 
     real,allocatable :: print_u(:,:,:),print_v(:,:,:),print_w(:,:,:)
-      
     real,allocatable :: print_uc(:,:,:),print_vc(:,:,:),print_wc(:,:,:)
-      
-    real,allocatable :: print_fi(:,:,:)
-    real,allocatable :: print_rhov(:,:,:,:)
-    real,allocatable :: print_annit(:,:,:)
-    real,allocatable :: print_annitv(:,:,:)
-    real,allocatable :: print_akapt(:,:,:)
-    real,allocatable :: print_akaptv(:,:,:)
-       
-    real,allocatable :: rhocol(:),rhotot(:)
-    real,allocatable :: ficol(:),fitot(:)
-    real,allocatable :: ucol(:),utot(:)
-    real,allocatable :: vcol(:),vtot(:)
-    real,allocatable :: wcol(:),wtot(:)
-    real,allocatable :: uccol(:),uctot(:)
-    real,allocatable :: vccol(:),vctot(:)
-    real,allocatable :: wccol(:),wctot(:)
-    real,allocatable :: annitcol(:),annittot(:)
-    real,allocatable :: akaptcol(:),akapttot(:)
-    real,allocatable :: upncol(:),upntot(:)
-    real,allocatable :: vpncol(:),vpntot(:)
-    real,allocatable :: wpncol(:),wpntot(:)
-    real,allocatable :: updcol(:),updtot(:)
-    real,allocatable :: vpdcol(:),vpdtot(:)
-    real,allocatable :: wpdcol(:),wpdtot(:)
-    real,allocatable :: uptcol(:),upttot(:)
-    real,allocatable :: vptcol(:),vpttot(:)
-    real,allocatable :: wptcol(:),wpttot(:)
-    real,allocatable :: upqcol(:),upqtot(:)
-    real,allocatable :: vpqcol(:),vpqtot(:)
-    real,allocatable :: wpqcol(:),wpqtot(:)
+    real,allocatable :: print_fi(:,:,:),print_rhov(:,:,:,:)
+    real,allocatable :: print_annit(:,:,:),print_annitv(:,:,:)
+    real,allocatable :: print_akapt(:,:,:),print_akaptv(:,:,:)
+
+    real,allocatable :: rhocol(:),rhotot(:),ficol(:),fitot(:)
+    real,allocatable :: ucol(:),utot(:),vcol(:),vtot(:),wcol(:),wtot(:)
+    real,allocatable :: uccol(:),uctot(:),vccol(:),vctot(:),wccol(:),wctot(:)
+    real,allocatable :: annitcol(:),annittot(:),akaptcol(:),akapttot(:)
+    real,allocatable :: upncol(:),upntot(:),vpncol(:),vpntot(:),wpncol(:),wpntot(:)
+    real,allocatable :: updcol(:),updtot(:),vpdcol(:),vpdtot(:),wpdcol(:),wpdtot(:)
+    real,allocatable :: uptcol(:),upttot(:),vptcol(:),vpttot(:),wptcol(:),wpttot(:)
+    real,allocatable :: upqcol(:),upqtot(:),vpqcol(:),vpqtot(:),wpqcol(:),wpqtot(:)
 
 contains
 
-    !**********************************************************************
     subroutine create_output_folder()
 
-        use mysettings, only: lagr,nsonde
+        use mysettings, only: lagr
 
         use mpi
 
@@ -119,10 +123,6 @@ contains
         character(len=12),parameter :: paraview_folder_name = 'paraviewData'
         character(len=10),parameter :: new_res_folder_name = 'newResData'
         character(len=14),parameter :: medietempo_folder_name = 'medietempoData'
-        !character(len=7),parameter  :: global_result_folder_name = 'results'
-        !character(len=8)            :: date
-        !character(len=6)            :: time
-        !character(len=15)           :: result_folder_name ! length = date+time+1
 
         ! for sonde
         character*3  identificosonda
@@ -130,7 +130,6 @@ contains
 
         integer isonde
         integer ierr
-        integer ichar
 
         !-----------------------------------------------------------------------
         ! check date and time for the result folder creation
@@ -144,26 +143,15 @@ contains
                 write(*,*) 'Warning: in output files no subrid section has been implemented'
             end if
 
-            ! global result folder
-            !write(*,*) 'Check if global result folder exist'
-            !call system('mkdir '//trim(global_result_folder_name))
-
         end if
 
-        ! result folder
-        !result_folder_name=date//'_'//time
-        !result_folder=global_result_folder_name//'/'//result_folder_name
-        !if (myid == 0) then
-        !    write(*,*) 'Create result folder (format=date_time)'
-        !    call system('mkdir '//trim(result_folder))
-        !end if
 
         ! paraview folder
         if (i_paraview) then
             paraview_folder=trim(result_folder)//'/'//paraview_folder_name
             if (myid == 0) then
-                call system('mkdir '//paraview_folder)
-                write(*,*) 'Created folder ',paraview_folder
+                call system('mkdir '//trim(paraview_folder))
+                write(*,*) 'Created folder ',trim(paraview_folder)
             end if
 
         end if
@@ -172,8 +160,8 @@ contains
         if (i_newres) then
             new_res_folder=trim(result_folder)//'/'//new_res_folder_name
             if (myid == 0) then
-                call system('mkdir '//new_res_folder)
-                write(*,*) 'Created folder ',new_res_folder
+                call system('mkdir '//trim(new_res_folder))
+                write(*,*) 'Created folder ',trim(new_res_folder)
             end if
         end if
 
@@ -181,8 +169,8 @@ contains
         if (i_medietempo) then
             medietempo_folder=trim(result_folder)//'/'//medietempo_folder_name
             if (myid == 0) then
-                call system('mkdir '//medietempo_folder)
-                write(*,*) 'Created folder ',medietempo_folder
+                call system('mkdir '//trim(medietempo_folder))
+                write(*,*) 'Created folder ',trim(medietempo_folder)
             end if
 
         end if
@@ -229,17 +217,13 @@ contains
 
     end subroutine create_output_folder
 
-    !***********************************************************************
-    subroutine output_init()
-
-        use mysettings, only: lagr,nsonde
+    subroutine initialize_output()
 
         use mpi
 
         implicit none
 
-        integer ierr
-        integer ichar
+        integer ::ichar
 
         !-----------------------------------------------------------------------
         ! check date and time for the result folder creation
@@ -256,7 +240,7 @@ contains
         if (i_medietempo) then
 
             ! allocation
-            allocate( umed(1:n1,1:n2,kparasta:kparaend,4+nscal))
+            allocate(umed(1:n1,1:n2,kparasta:kparaend,4+nscal))
             allocate(uutau(1:n1,1:n2,kparasta:kparaend,6+nscal+nscal))
             ! initialization
             deltatempo=0.
@@ -281,33 +265,77 @@ contains
             if (myid == 0) write(*,*) 'New_res file format: ',fmt_newres
         end if
 
-    end subroutine output_init
+        count_print_time = 0
+        ti_start = ti
 
-    !***********************************************************************
-    subroutine output_step(count_print_time,dbbx,tipo)
+    end subroutine initialize_output
 
-        !-----------------------------------------------------------------------
-        !++++++++++  WRITE OUTPUT  +++++++++++++++++++++++++++++++++++++++++++++
+    subroutine initialize_input()
 
-        use parti, only: alx, alz, ti
-        use mysettings, only: bbx, niter
-        use convex, only: bulk
-        use myarrays_ibm, only: bodyupdate,bodyforce
+        use mysettings, only: rich
+        use myarrays_density, only: pran,prsc
+
+        implicit none
+
+        integer :: i
+
+
+        ! variable allocation for piani and sonde and convert (see above)
+        allocate(piani(npiani))
+        call C_F_POINTER(c_piani,piani,[npiani])
+        allocate(sonde(3,nsonde))
+        allocate(sondeindexi(nsonde),sondeindexj(nsonde),sondeindexk(nsonde))
+        call C_F_POINTER(c_sondeindexi,sondeindexi,[nsonde])
+        call C_F_POINTER(c_sondeindexj,sondeindexj,[nsonde])
+        call C_F_POINTER(c_sondeindexk,sondeindexk,[nsonde])
+
+                !-----------------------------------------------------------------------
+        ! variable allocation for the scalar equations
+        allocate(pran(nscal))
+        allocate(prsc(nscal))
+
+        ! convert values from c++ format to fortran format
+        call C_F_POINTER(c_pran,pran,[nscal])
+        call C_F_POINTER(c_prsc,prsc,[nscal])
+
+        if (myid==0) then
+            write (*,*) "Reynolds = ",re
+            write (*,*) "Richardson = ",rich
+            do i=1,nscal
+                write(*,*) "Scalar ",i," Prandtl = ",pran(i),' Prscr = ',prsc(i)
+            end do
+
+            write (*,*) "Total piani = ",npiani
+            do i=1,npiani
+                write(*,*) "Piano number ",i," x=",piani(i)
+            end do
+
+            write (*,*) "Total sonde = ",nsonde
+            do i=1,nsonde
+                write(*,*) "Sonda number ",i,"point:(",sondeindexi(i),",",sondeindexj(i),",",sondeindexk(i),")"
+            end do
+        end if
+
+    end subroutine initialize_input
+
+    subroutine output_step(tipo)
+
+        ! write output
+
+        use mysettings, only: bbx
+        use myarrays_ibm, only: particles,bodyforce
         !
         use mpi
 
         implicit none
 
         ! arguments
-        integer,intent(inout) :: count_print_time
-        real,intent(in) :: dbbx
         integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
 
         ! local variables
-        integer :: next_print
         integer :: ierr
-        real :: time_evaluation
         logical :: writeprocedure
+
         !-----------------------------------------------------------------------
         ! print restart file in the form new_res
 
@@ -316,35 +344,35 @@ contains
         writeprocedure = .false.
 
         ! check condition on reached number of iterations
-        if (print_iter_or_time ==0 .and. ktime==i_print*(ktime/i_print)) then
+        if (print_iter_or_time==0 .and. ktime==i_print*(ktime/i_print)) then
+
             writeprocedure = .true.
 
         ! check condition on reached time
-        else if (print_iter_or_time == 1 .and. &
+        else if (print_iter_or_time==1 .and. &
             ( ((ti-ti_start)-count_print_time*i_time)>= i_time .or. &
-            abs(((ti-ti_start)-count_print_time*i_time)-i_time )<10e-7 ) ) then
+            abs(((ti-ti_start)-count_print_time*i_time)-i_time)<10e-7) ) then
 
             writeprocedure = .true.
-
             count_print_time = count_print_time + 1
+
         end if
 
 
         ! if it's time to write output, start prodecure
         if (writeprocedure) then
 
-            !-----------------------------------------------------------------------
             if (myid == 0) write(*,*) 'OUTPUT STEP BEGINS ---------------------------------'
 
-                ! set the folder for the output and the filename
-            call write_preparation(ti)
+            ! set the folder for the output and the filename
+            call write_preparation()
 
             ! write output new_res_form without mpi procedure
             if ((i_newres .and. i_printfile == 0) .or. (i_newres .and. i_printfile == 2)) then
                 ! collect data to print
                 call prepare_printdata
                 ! and produce new_res
-                call write_newres(ti,bbx,dbbx,tipo)
+                call write_newres(bbx)
             end if
 
             ! print paraview
@@ -357,45 +385,39 @@ contains
                 call write_medietempo()
             end if
 
-
             call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
-                !
-            !-----------------------------------------------------------------------
-            !
             if (myid == 0) write(*,*) 'OUTPUT STEP ENDS -----------------------------------'
 
-            !     check if I can write another new_res before ending the number of iterations
-            if (print_iter_or_time == 1) then
-
-                ! time_evaluation = (niter-ktime)*dt
-                ! time_evaluation =  niter*dt - ti_start
-
-                time_evaluation = (ti-ti_start) + (niter-ktime)*dt
-                next_print = time_evaluation/real(i_time)
-                if (myid == 0) write(*,*) 'time evaluation ',time_evaluation,next_print,count_print_time
-
-                if (next_print <= count_print_time .and. ktime/=niter) then
-
-                    !         if (time_evaluation < i_time) then
-
-                    if (myid ==0) then
-                        write(*,*)'remaining iteration not sufficent'
-                        write(*,*)'to write another new_res'
-                        write(*,*)'run is stopped'
-                    end if
-
-                    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-
-                    stop
-                end if
-            end if
+            ! check if I can write another new_res before ending the number of iterations
+        !            if (print_iter_or_time == 1) then
+        !
+        !                ! time_evaluation = (niter-ktime)*dt
+        !                ! time_evaluation =  niter*dt - ti_start
+        !
+        !                time_evaluation = (ti-ti_start) + (niter-ktime)*dt
+        !                next_print = time_evaluation/real(i_time)
+        !                if (myid == 0) write(*,*) 'time evaluation ',time_evaluation,next_print,count_print_time
+        !
+        !                if (next_print <= count_print_time .and. ktime/=niter) then
+        !
+        !                    if (myid ==0) then
+        !                        write(*,*)'remaining iteration not sufficent'
+        !                        write(*,*)'to write another new_res'
+        !                        write(*,*)'run is stopped'
+        !                    end if
+        !
+        !                    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+        !
+        !                    stop
+        !                end if
+        !            end if
 
 
         end if !write procedure
 
         ! print data from sonde
-        call write_tracers(ti)
+        call write_tracers()
 
         ! print kinetic energy
         call print_energy(tipo)
@@ -404,14 +426,17 @@ contains
         call print_velocity(tipo)
 
         ! print bulk velocity
-        if (bodyforce==1 .and. bodyupdate) then
+        if (bodyforce .and. particles) then
             call print_drag()
         end if
 
+        ! print priano for inflow
+        call print_inflow_planes(ktime)
+
+
     end subroutine
 
-    !***********************************************************************
-    subroutine write_preparation(ti)
+    subroutine write_preparation()
         ! this subroutine prepares the file names and the folder
 
         use mpi
@@ -423,8 +448,6 @@ contains
         character(len=9),parameter :: filemedie_header='meantime'
         character(len=4),parameter  :: paraview_header ='para'
 
-        ! arguments
-        real,intent(in) :: ti
 
         !-----------------------------------------------------------------------
         !  local variables declaration
@@ -529,50 +552,8 @@ contains
             iscrivo=.true.
         end if
 
-        !-----------------------------------------------------------------------
-        ! set output file names for paraview
-        ! also for paraview all procs write, and in addition there is one header file
-        ! that is handled only by processor 0
-
-    !        if (i_paraview) then
-    !            ! filename for iter
-    !            if (print_iter_or_time == 0) then
-    !                if (myid==0) then
-    !                    filename_paraview=paraview_folder//'/'// &
-    !                        paraview_header//char_ikiter//'.pvti'
-    !                end if
-    !                do iproc=0,nproc-1
-    !                    write (char_piece,'(i4.1)') iproc
-    !                    do ichar = 1,len(char_piece)
-    !                        if (char_piece(ichar:ichar)==' ') char_piece(ichar:ichar)='0'
-    !                    end do
-    !                    paraview_piecename(iproc)=paraview_header//char_ikiter//'_'//char_piece//'.vti'
-    !                end do
-    !                filename_paraview_piece=paraview_folder//'/'// &
-    !                    paraview_piecename(myid)
-    !            ! filename for time
-    !            else if (print_iter_or_time == 1) then
-    !                if (myid==0) then
-    !                    filename_paraview=paraview_folder//'/'// &
-    !                        paraview_header//char_iktime//'.pvti'
-    !                end if
-    !                do iproc=0,nproc-1
-    !                    write (char_piece,'(i4.1)') char_piece
-    !                    do ichar = 1,len(char_piece)
-    !                        if (char_piece(ichar:ichar)==' ') char_piece(ichar:ichar)='0'
-    !                    end do
-    !                    paraview_piecename(iproc)=paraview_header//char_iktime//'_'//char_piece//'.vti'
-    !                end do
-    !                filename_paraview_piece=paraview_folder//'/'// &
-    !                    paraview_piecename(myid)
-    !            end if
-    !
-    !        end if
-        !-----------------------------------------------------------------------
-
     end subroutine write_preparation
 
-    !***********************************************************************
     subroutine prepare_printdata()
         !***********************************************************************
         !     in these sub the variable that must be print are given to temp
@@ -582,11 +563,9 @@ contains
         !     if iprint_file = 1 print_u is allocated locally and it is used
         !     instead of directly u just for simplicity in the writing subroutine
         !
-        use myarrays_velo3
-        use myarrays_metri3
-        use myarrays_density
-        !
-        use tipologia
+        use myarrays_velo3, only: fi, rhov, u, uc, v, vc, w, wc
+        use myarrays_metri3, only: annit, annitV
+        use myarrays_density, only: akapt
         !
         use mpi
 
@@ -594,18 +573,17 @@ contains
 
         !-----------------------------------------------------------------------
         !     array declaration
-        integer i,j,k
-        integer m
-        integer ierr
-        integer isc
+        integer :: i,j,k,m,ierr,isc
 
         !integer requ1,requ2,reqv1,reqv2,reqw1,reqw2
         !integer reqannit1,reqannit2,reqakapt1,reqakapt2
         !integer reqr1,reqr2,reqf1,reqf2
-        integer istatus(MPI_STATUS_SIZE)
+        integer :: istatus(MPI_STATUS_SIZE)
 
         real, allocatable :: rho(:,:,:)
         !-----------------------------------------------------------------------
+
+
         if (i_printfile == 0) then
 
             allocate(print_u(0:jx+1,0:jy+1,0:jz+1))
@@ -652,10 +630,8 @@ contains
                 end do
             end do
 
-            call MPI_ALLGATHER( &
-                annitcol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                annittot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_ALLGATHER(annitcol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
+                annittot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=0,jy+1
@@ -669,15 +645,9 @@ contains
             deallocate(annitcol,annittot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_annit(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,0,1061, &
-                    MPI_COMM_WORLD,ierr)
-            !      call MPI_WAIT(reqannit1,istatus,ierr)
+                call MPI_SSEND(print_annit(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1061,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
-                call MPI_RECV(print_annit(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD, &
-                    nproc-1,1061, &
-                    MPI_COMM_WORLD,istatus,ierr)
-            !      call MPI_WAIT(reqannit2,istatus,ierr)
+                call MPI_RECV(print_annit(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1061,MPI_COMM_WORLD,istatus,ierr)
             end if
 
 
@@ -703,10 +673,8 @@ contains
                 end do
             end do
 
-            call MPI_ALLGATHER( &
-                annitcol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                annittot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_ALLGATHER(annitcol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
+                annittot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=0,jy+1
@@ -720,15 +688,9 @@ contains
             deallocate(annitcol,annittot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_annitV(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,0,1061, &
-                    MPI_COMM_WORLD,ierr)
-            !      call MPI_WAIT(reqannit1,istatus,ierr)
+                call MPI_SSEND(print_annitV(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1061,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
-                call MPI_RECV(print_annitV(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD, &
-                    nproc-1,1061, &
-                    MPI_COMM_WORLD,istatus,ierr)
-            !      call MPI_WAIT(reqannit2,istatus,ierr)
+                call MPI_RECV(print_annitV(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1061,MPI_COMM_WORLD,istatus,ierr)
             end if
 
             !.................................................................
@@ -756,8 +718,7 @@ contains
 
             call MPI_ALLGATHER( &
                 akaptcol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                akapttot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+                akapttot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=0,jy+1
@@ -771,15 +732,9 @@ contains
             deallocate(akaptcol,akapttot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_akapt(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,0,1071, &
-                    MPI_COMM_WORLD,ierr)
-            !      call MPI_WAIT(reqakapt1,istatus,ierr)
+                call MPI_SSEND(print_akapt(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1071,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
-                call MPI_RECV(print_akapt(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD, &
-                    nproc-1,1071, &
-                    MPI_COMM_WORLD,istatus,ierr)
-            !      call MPI_WAIT(reqakapt2,istatus,ierr)
+                call MPI_RECV(print_akapt(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1071,MPI_COMM_WORLD,istatus,ierr)
             end if
 
             !.......................................................................
@@ -821,15 +776,9 @@ contains
             deallocate(ucol,utot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_u(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,0,1011, &
-                    MPI_COMM_WORLD,ierr)
-            !      call MPI_WAIT(requ1,istatus,ierr)
+                call MPI_SSEND(print_u(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1011,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
-                call MPI_RECV(print_u(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,nproc-1,1011, &
-                    MPI_COMM_WORLD,istatus,ierr)
-            !      call MPI_WAIT(requ2,istatus,ierr)
+                call MPI_RECV(print_u(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1011,MPI_COMM_WORLD,istatus,ierr)
             end if
 
             !.......................................................................
@@ -855,8 +804,7 @@ contains
             end do
 
             call MPI_ALLGATHER(vcol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                vtot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+                vtot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=0,jy+1
@@ -870,15 +818,9 @@ contains
             deallocate(vcol,vtot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_v(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,0,1021, &
-                    MPI_COMM_WORLD,ierr)
-            !      call MPI_WAIT(reqv1,istatus,ierr)
+                call MPI_SSEND(print_v(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1021,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
-                call MPI_RECV(print_v(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,nproc-1,1021, &
-                    MPI_COMM_WORLD,istatus,ierr)
-            !      call MPI_WAIT(reqv2,istatus,ierr)
+                call MPI_RECV(print_v(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1021,MPI_COMM_WORLD,istatus,ierr)
             end if
             !.......................................................................
 
@@ -903,9 +845,8 @@ contains
                 end do
             end do
 
-            call MPI_ALLGATHER(wcol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                wtot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_ALLGATHER(wcol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD,&
+                wtot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=0,jy+1
@@ -919,15 +860,9 @@ contains
             deallocate(wcol,wtot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_w(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,0,1031, &
-                    MPI_COMM_WORLD,ierr)
-            !      call MPI_WAIT(reqw1,istatus,ierr)
+                call MPI_SSEND(print_w(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1031,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
-                call MPI_RECV(print_w(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,nproc-1,1031, &
-                    MPI_COMM_WORLD,istatus,ierr)
-            !      call MPI_WAIT(reqw2,istatus,ierr)
+                call MPI_RECV(print_w(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1031,MPI_COMM_WORLD,istatus,ierr)
             end if
 
             !.......................................................................
@@ -963,10 +898,8 @@ contains
                     end do
                 end do
 
-                call MPI_ALLGATHER(rhocol(1),(jx+2)*(jy+2)*(jz/nproc), &
-                    MPI_REAL_SD, &
-                    rhotot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                    MPI_COMM_WORLD,ierr)
+                call MPI_ALLGATHER(rhocol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
+                    rhotot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
                 do k=1,jz
                     do j=0,jy+1
@@ -980,14 +913,9 @@ contains
                 deallocate(rhocol,rhotot)
 
                 if (myid==nproc-1) then
-                    call MPI_SSEND(rho(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1041, &
-                        MPI_COMM_WORLD,ierr)
-                !      call MPI_WAIT(reqr1,istatus,ierr)
+                    call MPI_SSEND(rho(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1041,MPI_COMM_WORLD,ierr)
                 else if (myid==0) then
-                    call MPI_RECV(rho(0,0,jz+1),(jx+2)*(jy+2), &
-                        MPI_REAL_SD,nproc-1,1041, &
-                        MPI_COMM_WORLD,istatus,ierr)
-                !      call MPI_WAIT(reqr2,istatus,ierr)
+                    call MPI_RECV(rho(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1041,MPI_COMM_WORLD,istatus,ierr)
                 end if
 
                 do k=0,jz+1
@@ -1024,8 +952,7 @@ contains
             end do
 
             call MPI_ALLGATHER(ficol(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                fitot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+                fitot(1),(jx+2)*(jy+2)*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=0,jy+1
@@ -1039,15 +966,9 @@ contains
             deallocate(ficol,fitot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_fi(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,0,1051, &
-                    MPI_COMM_WORLD,ierr)
-            !      call MPI_WAIT(reqf1,istatus,ierr)
+                call MPI_SSEND(print_fi(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1051,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
-                call MPI_RECV(print_fi(0,0,jz+1),(jx+2)*(jy+2), &
-                    MPI_REAL_SD,nproc-1,1051, &
-                    MPI_COMM_WORLD,istatus,ierr)
-            !      call MPI_WAIT(reqf2,istatus,ierr)
+                call MPI_RECV(print_fi(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1051,MPI_COMM_WORLD,istatus,ierr)
             end if
 
             !.......................................................................
@@ -1074,8 +995,7 @@ contains
             end do
 
             call MPI_ALLGATHER(uccol(1),(jx+1)*jy*(jz/nproc),MPI_REAL_SD, &
-                uctot(1),(jx+1)*jy*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+                uctot(1),(jx+1)*jy*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=1,jy
@@ -1110,8 +1030,7 @@ contains
             end do
 
             call MPI_ALLGATHER(vccol(1),jx*(jy+1)*(jz/nproc),MPI_REAL_SD, &
-                vctot(1),jx*(jy+1)*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+                vctot(1),jx*(jy+1)*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=0,jy
@@ -1146,8 +1065,7 @@ contains
             end do
 
             call MPI_ALLGATHER(wccol(1),jx*jy*(jz/nproc),MPI_REAL_SD, &
-                wctot(1),jx*jy*(jz/nproc),MPI_REAL_SD, &
-                MPI_COMM_WORLD,ierr)
+                wctot(1),jx*jy*(jz/nproc),MPI_REAL_SD,MPI_COMM_WORLD,ierr)
 
             do k=1,jz
                 do j=1,jy
@@ -1234,8 +1152,7 @@ contains
 
     end subroutine prepare_printdata
 
-    !***********************************************************************
-    subroutine write_newres(ti,bbx,dbbx,tipo)
+    subroutine write_newres(bbx)
 
         !***********************************************************************
         !     this sub write the new_res_form which contains the flow field for
@@ -1250,13 +1167,13 @@ contains
         implicit none
 
         ! arguments
-        real,intent(in) :: ti,bbx,dbbx
-        integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+        real,intent(in) :: bbx
+
         !-----------------------------------------------------------------------
         ! local variables declaration
         integer kstawrite,kendwrite
-        integer i,j,k,n,isc
-        !integer ierr
+        integer i,j,k,isc
+        real,parameter :: dumpvalue=0.0
 
         !-----------------------------------------------------------------------
         !     start to write new_res file (only proc that have iscrivo true write)
@@ -1270,14 +1187,16 @@ contains
                 open(new_res_file,file=filename_newres,status='unknown')
                 write (new_res_file,*) nscal
                 write (new_res_file,*) ti
-                write (new_res_file,*) bbx,dbbx
+                write (new_res_file,*) bbx,dumpvalue
+
+                kstawrite = 0
+                kendwrite = 0
 
                 !  write the cartesian component
                 if (i_printfile == 0) then
                     kstawrite = 0
                     kendwrite = jz+1
-                end if
-                if (i_printfile == 2) then
+                else if (i_printfile == 2) then
                     kstawrite = kparasta
                     kendwrite = kparaend
                     if (myid == 0) kstawrite = kparasta -1
@@ -1355,8 +1274,11 @@ contains
             else if (iformat_newres == 1) then
                 open(new_res_file,file=trim(filename_newres),status='unknown')
                 write(new_res_file,*) nscal
-                write(new_res_file,*)ti
-                write(new_res_file,*)bbx,dbbx
+                write(new_res_file,*) ti
+                write(new_res_file,*) bbx,dumpvalue
+
+                kstawrite = 0
+                kendwrite = 0
 
                 ! write the cartesiano component
                 if (i_printfile == 0) then
@@ -1443,9 +1365,12 @@ contains
 
                 write(new_res_file)nscal
                 write(new_res_file)ti
-                write(new_res_file)bbx,dbbx
+                write(new_res_file)bbx,dumpvalue
 
-                !        write the cartesiano component
+                kstawrite = 0
+                kendwrite = 0
+
+                ! write the cartesiano component
                 if (i_printfile == 0) then
                     kstawrite = 0
                     kendwrite = jz+1
@@ -1457,7 +1382,7 @@ contains
                     if (myid == nproc-1)kendwrite = kparaend +1
                 end if
 
-                do k=kstawrite,kendwrite         !0,jz+1
+                do k=kstawrite,kendwrite  !0,jz+1
                     do j=0,jy+1
                         do i=0,jx+1
                             write(new_res_file)print_u(i,j,k), &
@@ -1543,7 +1468,6 @@ contains
 
     end subroutine write_newres
 
-    !***********************************************************************
     subroutine write_medietempo()
 
         use mpi
@@ -1554,7 +1478,6 @@ contains
         character*2 char_fmt
         character*12 fmt_mean
 
-        integer :: ierr
         integer :: i,j,k,n
 
         !-----------------------------------------------------------------------
@@ -1583,16 +1506,12 @@ contains
                     write(medietempo_file,fmt_mean)(umed(i,j,k,n),n=1,4+nscal), &       !u,v,w,fi,r_n
                         (uutau(i,j,k,n),n=1,6+nscal+nscal)  !uu_ii, uu_ij, rr_n, rv_n
 
-
-
                 end do
             end do
         end do
         close(medietempo_file)
 
         !      end if
-
-
 
         !1001    format(12e18.10)
 
@@ -1605,14 +1524,9 @@ contains
 
     end subroutine write_medietempo
 
-    !***********************************************************************
-    subroutine write_tracers(ti)
-
-        use mysettings, only: sonde,nsonde
+    subroutine write_tracers()
 
         implicit none
-
-        real, intent(in) :: ti
         !
         integer :: isc,isonde
 
@@ -1636,19 +1550,19 @@ contains
 
     end subroutine write_tracers
 
-    !***********************************************************************
+
     subroutine write_paraview(tipo)
 
         use myarrays_metri3, only: x,y,z
         use myarrays_velo3, only: u,v,w,fi,rhov
-        use myarrays_ibm, only: bodyforce
-        !use myarrays_levelset2, only: phi0, phi_temp, fext
+        use myarrays_ibm, only: bodyforce,normalVectorX,normalVectorY,normalVectorZ
+        use particle_module, only: fluidPressureForce,fluidShearForce,forceCaso
+        use mysettings, only: attiva_scal
 
         use mpi
 
         implicit none
 
-        !
         integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
         !-----------------------------------------------------------------------
         ! local variables declaration
@@ -1658,11 +1572,11 @@ contains
         integer x_piece_begin,x_piece_end
         integer y_piece_begin,y_piece_end
         integer ierr
+
+
+        !-----------------------------------------------------------------------
         ! we need kparasta and kparaend saved at the root processor
         ! for this, a gather is needed
-
-        !piece_begin(myid)=kparasta
-        !piece_end(myid)=kparaend
         call MPI_GATHER(kparasta-1,1,MPI_INTEGER,z_piece_begin,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
         call MPI_GATHER(kparaend+1,1,MPI_INTEGER,z_piece_end,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
 
@@ -1684,25 +1598,23 @@ contains
                 '" GhostLevel="1" Origin="0.0 0.0 0.0" Spacing="1.0 1.0 1.0">' ! spacing is missing
             write(paraview_file,'(A)')'    <PPointData>'
             write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="warp" NumberOfComponents="3"/>'
-            !            write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="y"/>'
-            !            write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="z"/>'
             write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="vel" NumberOfComponents="3"/>'
             write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="pres"/>'
-            !            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="phi_temp"/>'
-            !            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fext"/>'
-            !            write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="phi0"/>'
-            !if (bodyforce == 1) then
-            write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="tipo"/>'
-            !end if
-            !            if (nscal>0) then
-            !                do isc = 1,nscal
-            !                    write(paraview_file,'(A,I0.1,A)')'      <PDataArray type="Float64" Name="scal',isc,'"/>'
-            !                end do
-            !            end if
+            if (bodyforce) then
+                write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="tipo"/>'
+                write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="normal" NumberOfComponents="3"/>'
+                write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="caso"/>'
+                write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fluidPressureForce" NumberOfComponents="3"/>'
+                write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fluidShearForce" NumberOfComponents="3"/>'
+            end if
+            if (attiva_scal==1) then
+                do isc = 1,nscal
+                    write(paraview_file,'(A,I0.1,A)')'      <PDataArray type="Float64" Name="scal',isc,'"/>'
+                end do
+            end if
             write(paraview_file,'(A)')'    </PPointData>'
             write(paraview_file,'(A)')'    <PCellData>'
             write(paraview_file,'(A)')'    </PCellData>'
-            !write(paraview_file,'(A,I0.1,A,I0.1,A)')'    <Piece Extent="0 ',jx+1,' 0 ',jy+1,' ',piece_begin,' ',piece_end,'" Source="para_iter000010_0.vti"/>'
             do iproc=0,nproc-1
                 write(paraview_file,'(A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,I0.1,A,A,A)') '    <Piece Extent="',&
                     x_piece_begin,' ',x_piece_end,' ',y_piece_begin,' ',y_piece_end,' ',&
@@ -1734,8 +1646,8 @@ contains
         do k=kparasta-1,kparaend+1
             do j=0,jy+1
                 do i=0,jx+1
-                    write(piecefile,'(ES14.7,A,ES14.7,A,ES14.7,A)',advance='no') &
-                        x(i,j,k)-1.0*i,' ',y(i,j,k)-1.0*j,' ',z(i,j,k)-1.0*k,' '
+                    write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+                        x(i,j,k)-1.0*real(i),' ',y(i,j,k)-1.0*real(j),' ',z(i,j,k)-1.0*real(k),' '
                 end do
             end do
         end do
@@ -1745,7 +1657,7 @@ contains
         do k=kparasta-1,kparaend+1
             do j=0,jy+1
                 do i=0,jx+1
-                    write(piecefile,'(ES14.7,A,ES14.7,A,ES14.7,A)',advance='no') &
+                    write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
                         u(i,j,k),' ',v(i,j,k),' ',w(i,j,k),' '
                 end do
             end do
@@ -1756,78 +1668,81 @@ contains
         do k=kparasta-1,kparaend+1
             do j=0,jy+1
                 do i=0,jx+1
-                    write(piecefile,'(ES14.7,A)',advance='no') fi(i,j,k),' '
+                    write(piecefile,'(ES14.6E3,A)',advance='no') fi(i,j,k),' '
                 end do
             end do
         end do
         write(piecefile,*)
         write(piecefile,'(A)')'      </DataArray>'
-        !            write(piecefile,'(A)')'      <DataArray type="Float64" Name="phi_temp">'
-        !            do k=kparasta-1,kparaend+1
-        !                do j=0,jy+1
-        !                    do i=0,jx+1
-        !                        write(piecefile,'(ES14.7,A)',advance='no') phi_temp(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(piecefile,*)
-        !            write(piecefile,'(A)')'      </DataArray>'
-        !            write(piecefile,'(A)')'      <DataArray type="Float64" Name="Fext">'
-        !            do k=kparasta-1,kparaend+1
-        !                do j=0,jy+1
-        !                    do i=0,jx+1
-        !                        write(piecefile,'(ES14.7,A)',advance='no') fext(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(piecefile,*)
-        !            write(piecefile,'(A)')'      </DataArray>'
-        !            write(piecefile,'(A)')'      <DataArray type="Float64" Name="phi0">'
-        !            do k=kparasta-1,kparaend+1
-        !                do j=0,jy+1
-        !                    do i=0,jx+1
-        !                        write(piecefile,'(ES14.7,A)',advance='no') phi0(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(piecefile,*)
-        !            write(piecefile,'(A)')'      </DataArray>'
-        !if (bodyforce == 1) then
-        write(piecefile,'(A)')'      <DataArray type="Int32" Name="tipo">'
-        do k=kparasta-1,kparaend+1
-            do j=0,jy+1
-                do i=0,jx+1
-                    write(piecefile,'(I0.1,A)',advance='no') tipo(i,j,k),' '
+        if (bodyforce) then
+            write(piecefile,'(A)')'      <DataArray type="Int32" Name="tipo">'
+            do k=kparasta-1,kparaend+1
+                do j=0,jy+1
+                    do i=0,jx+1
+                        write(piecefile,'(I0.1,A)',advance='no') tipo(i,j,k),' '
+                    end do
                 end do
             end do
-        end do
-        write(piecefile,'(A)')'      </DataArray>'
-        !            write(fileunit,'(A)')'      <DataArray type="Float64" Name="surfNorm" NumberOfComponents="3">'
-        !            do k = 1,nz
-        !                do j = 1,ny
-        !                    do i = 1,nx
-        !                        write(fileunit,'(ES14.7,A,ES14.7,A,ES14.7,A)',advance='no') &
-        !                            normalVectorX(i,j,k),' ',normalVectorY(i,j,k),' ',normalVectorZ(i,j,k),' '
-        !                    end do
-        !                end do
-        !            end do
-        !            write(fileunit,*)
-        !            write(fileunit,'(A)')'      </DataArray>'
-            !end if
-        !            if (nscal>0) then
-        !                do isc = 1,nscal
-        !                write(piecefile,'(A,I0.1,A)')'      <DataArray type="Float64" Name="scal',isc,'">'
-        !                do k=kparasta-1,kparaend+1
-        !                    do j=0,jy+1
-        !                        do i=0,jx+1
-        !                            write(piecefile,'(ES14.7,A)',advance='no') rhov(isc,i,j,k),' '
-        !                        end do
-        !                    end do
-        !                end do
-        !                write(piecefile,*)
-        !            end do
-        !        end if
-        !        write(piecefile,'(A)')'      </DataArray>'
+            write(piecefile,*)
+            write(piecefile,'(A)')'      </DataArray>'
+            write(piecefile,'(A)')'      <DataArray type="Float64" Name="normal" NumberOfComponents="3">'
+            do k=kparasta-1,kparaend+1
+                do j=0,jy+1
+                    do i=0,jx+1
+                        write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+                            normalVectorX(i,j,k),' ',normalVectorY(i,j,k),' ',normalVectorZ(i,j,k),' '
+                    end do
+                end do
+            end do
+            write(piecefile,*)
+            write(piecefile,'(A)')'      </DataArray>'
+            write(piecefile,'(A)')'      <DataArray type="Int32" Name="caso">'
+            do k=kparasta-1,kparaend+1
+                do j=0,jy+1
+                    do i=0,jx+1
+                        write(piecefile,'(I0.1,A)',advance='no') forceCaso(i,j,k),' '
+                    end do
+                end do
+            end do
+            write(piecefile,*)
+            write(piecefile,'(A)')'      </DataArray>'
+            write(piecefile,'(A)')'      <DataArray type="Float64" Name="fluidPressureForce" NumberOfComponents="3">'
+            do k=kparasta-1,kparaend+1
+                do j=0,jy+1
+                    do i=0,jx+1
+                        write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+                            fluidPressureForce(i,j,k,1),' ',fluidPressureForce(i,j,k,2),' ',fluidPressureForce(i,j,k,3),' '
+                    end do
+                end do
+            end do
+            write(piecefile,*)
+            write(piecefile,'(A)')'      </DataArray>'
+            write(piecefile,'(A)')'      <DataArray type="Float64" Name="fluidShearForce" NumberOfComponents="3">'
+            do k=kparasta-1,kparaend+1
+                do j=0,jy+1
+                    do i=0,jx+1
+                        write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+                            fluidShearForce(i,j,k,1),' ',fluidShearForce(i,j,k,2),' ',fluidShearForce(i,j,k,3),' '
+                    end do
+                end do
+            end do
+            write(piecefile,*)
+            write(piecefile,'(A)')'      </DataArray>'
+        end if
+        if (attiva_scal==1) then
+            do isc = 1,nscal
+                write(piecefile,'(A,I0.1,A)')'      <DataArray type="Float64" Name="scal',isc,'">'
+                do k=kparasta-1,kparaend+1
+                    do j=0,jy+1
+                        do i=0,jx+1
+                            write(piecefile,'(ES14.6E3,A)',advance='no') rhov(isc,i,j,k),' '
+                        end do
+                    end do
+                end do
+                write(piecefile,*)
+                write(piecefile,'(A)')'      </DataArray>'
+            end do
+        end if
         write(piecefile,'(A)')'    </PointData>'
         write(piecefile,'(A)')'    <CellData>'
         write(piecefile,'(A)')'    </CellData>'
@@ -1839,10 +1754,9 @@ contains
 
     end subroutine write_paraview
 
-    !***********************************************************************
     subroutine output_finalize()
 
-        use mysettings, only: lagr,nsonde
+        use mysettings, only: lagr
 
         implicit none
 
@@ -1870,15 +1784,10 @@ contains
 
     end subroutine output_finalize
 
-    !***********************************************************************
     subroutine print_energy(tipo)
 
         use myarrays_metri3, only: fluid_vol,giac
         use myarrays_velo3, only: u,v,w
-        use parti, only: ti
-
-        use tipologia
-        use mpi
 
         implicit none
 
@@ -1917,15 +1826,10 @@ contains
         end if
     end subroutine print_energy
 
-    !***********************************************************************
     subroutine print_velocity(tipo)
 
         use myarrays_metri3, only: fluid_vol,giac
-        use myarrays_velo3, only: u,v,w
-        use parti, only: ti
-
-        use tipologia
-        use mpi
+        use myarrays_velo3, only: u,v,w,fi
 
         implicit none
 
@@ -1933,6 +1837,7 @@ contains
 
         real :: u_bulk,u_bulk_tot,v_bulk,v_bulk_tot,w_bulk,w_bulk_tot
         real :: u_max,u_max_tot,v_max,v_max_tot,w_max,w_max_tot
+        real :: fi_bulk,fi_bulk_tot
         integer :: i,j,k
         integer :: ierr
 
@@ -1952,6 +1857,11 @@ contains
         w_max=0.
         w_max_tot=0.
 
+        ! bulk computational pressure
+        fi_bulk=0.
+        fi_bulk_tot=0.
+
+
         do k=kparasta,kparaend
             do j=1,jy
                 do i=1,jx
@@ -1959,6 +1869,7 @@ contains
                         u_bulk=u_bulk+u(i,j,k)*giac(i,j,k)
                         v_bulk=v_bulk+v(i,j,k)*giac(i,j,k)
                         w_bulk=w_bulk+w(i,j,k)*giac(i,j,k)
+                        fi_bulk=fi_bulk+fi(i,j,k)
 
                         u_max=max(u_max,abs(u(i,j,k)))
                         v_max=max(v_max,abs(v(i,j,k)))
@@ -1972,7 +1883,9 @@ contains
         call MPI_REDUCE(u_bulk,u_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
         call MPI_REDUCE(v_bulk,v_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
         call MPI_REDUCE(w_bulk,w_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
-        ! u_max reduce between procs
+        call MPI_REDUCE(fi_bulk,fi_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+
+        ! u_max max between procs
         call MPI_REDUCE(u_max,u_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
         call MPI_REDUCE(v_max,v_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
         call MPI_REDUCE(w_max,w_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
@@ -1980,8 +1893,11 @@ contains
         if (myid==0) then
 
             u_bulk_tot=u_bulk_tot/fluid_vol
+            v_bulk_tot=v_bulk_tot/fluid_vol
+            w_bulk_tot=w_bulk_tot/fluid_vol
+            fi_bulk_tot=fi_bulk_tot/fluid_vol
 
-            write(*,*)'u_bulk:',u_bulk_tot,', u_max:',u_max_tot
+            write(*,*)'u_bulk:',u_bulk_tot,'fi_bulk:',fi_bulk_tot,', u_max:',u_max_tot
 
             open(bulkvel_file,file=filename_bulkvel,status='old',action='write',position='append')
             write(bulkvel_file,*) ti,u_bulk_tot,v_bulk_tot,w_bulk_tot
@@ -1990,34 +1906,44 @@ contains
             open(maxvel_file,file=filename_maxvel,status='old',action='write',position='append')
             write(maxvel_file,*) ti,u_max_tot,v_max_tot,w_max_tot
             close(maxvel_file)
+
         end if
 
     end subroutine print_velocity
 
-    !***********************************************************************
     subroutine print_drag()
 
-        use myarrays_ibm, only: x_force_sphere,y_force_sphere,z_force_sphere
-        use parti, only: ti
+        use particle_module, only: sphereShearForce,spherePressureForce,totParticles
 
         implicit none
 
-        real :: u_bulk,u_bulk_tot
-        integer :: i,j,k
-        integer :: ierr
+        real,dimension(3) :: averageShearForce,averagePressureForce
+        integer :: p
+
+        ! compute average drag
+        averageShearForce(:)=0.0
+        averagePressureForce(:)=0.0
+
+
+        do p=1,totParticles
+            averageShearForce(:)=averageShearForce(:)+sphereShearForce(:,p)/real(totParticles)
+            averagePressureForce(:)=averagePressureForce(:)+spherePressureForce(:,p)/real(totParticles)
+        end do
 
         if (myid==0) then
 
-            write(*,*)'u_bulk:',u_bulk_tot
-
             open(drag_file,file=filename_drag,status='old',action='write',position='append')
-            write(drag_file,*) ti,x_force_sphere(1),y_force_sphere(1),z_force_sphere(1)
+            write(*,*) 'Forces written on drag file :'
+            write(*,*) ti,averageShearForce(1),averageShearForce(2),averageShearForce(3), &
+                averagePressureForce(1),averagePressureForce(2),averagePressureForce(3)
+            write(drag_file,*) ti,averageShearForce(1),averageShearForce(2),averageShearForce(3), &
+                averagePressureForce(1),averagePressureForce(2),averagePressureForce(3)
             close(drag_file)
+
         end if
 
     end subroutine print_drag
 
-    !***********************************************************************
     subroutine update_medie()
 
         use myarrays_velo3, only: u,v,w,fi,rhov
@@ -2088,16 +2014,16 @@ contains
 
     end subroutine update_medie
 
-    !***********************************************************************
-    subroutine set_simulation_folder(simulation_folder_string) bind(C,name='set_simulation_folder')
+    subroutine get_cpp_strings(simulation_folder_string,grid_file_string,restart_file_string) bind(C,name='get_cpp_strings')
 
         use, intrinsic :: iso_c_binding
 
         implicit none
 
         character(kind=c_char), dimension(*), intent(IN) :: simulation_folder_string
-        integer :: i,l
-
+        character(kind=c_char), dimension(*), intent(IN) :: grid_file_string
+        character(kind=c_char), dimension(*), intent(IN) :: restart_file_string
+        integer :: l
 
         do l=1,500
             if (simulation_folder_string(l) == C_NULL_CHAR) exit
@@ -2105,10 +2031,328 @@ contains
         end do
         result_folder(l:500)=" "
 
+        do l=1,500
+            if (grid_file_string(l) == C_NULL_CHAR) exit
+            grid_file(l:l)=grid_file_string(l)
+        end do
+        grid_file(l:500)=" "
 
-        print *, 'In Fortran:'
-        print *, 'simulation folder: ', trim(result_folder)
-    end subroutine set_simulation_folder
+        do l=1,500
+            if (restart_file_string(l) == C_NULL_CHAR) exit
+            restart_file(l:l)=restart_file_string(l)
+        end do
+        restart_file(l:500)=" "
+
+        if (myid==0) then
+            print *, 'simulation folder: ', trim(result_folder)
+            print *, 'grid file: ', trim(grid_file)
+            print *, 'restart file: ', trim(restart_file)
+        end if
+
+    end subroutine get_cpp_strings
+
+    subroutine print_inflow_planes(ktime)
+
+        use mysettings, only: inf,niter
+        use myarrays_velo3, only: u,v,w,rhov
+
+        implicit none
+
+        integer,intent(in) :: ktime
+        !
+        integer ipiani
+        character*30 filepiano
+        character*2  idproc2
+        character*1  idpiano,idproc
+        integer i,j,k,isc
+        ! ----------------------------------------------
+
+        if (inf==1) then
+            !       open file
+            if (ktime == 1) then
+                do ipiani = 1,npiani
+                    if (myid<10) then
+                        write(idpiano,'(i1)')ipiani
+                        write(idproc ,'(i1)')myid
+                        filepiano = 'npiano'//idpiano//'processore0'//idproc//'.dat'
+                        open(5000+ipiani*100+myid,file=filepiano, status='unknown')
+                    else
+                        write(idpiano,'(i1)')ipiani
+                        write(idproc2,'(i2)')myid
+                        filepiano = 'npiano'//idpiano//'processore'//idproc2//'.dat'
+                        open(5000+ipiani*100+myid,file=filepiano, status='unknown')
+                    end if
+                end do
+            end if
+
+            do ipiani = 1,npiani
+                i = piani(ipiani)
+                write(5000+ipiani*100+myid,*)ktime
+                do k=kparasta,kparaend
+                    do j=1,jy
+                        write(5000+ipiani*100+myid,100)u(i,j,k),v(i,j,k),w(i,j,k),(rhov(isc,i,j,k),isc=1,nscal)
+                    end do
+                end do
+            end do
+
+            !       close file
+            if (ktime==niter) then
+                do ipiani=1,npiani
+                    close(5000+ipiani*100+myid)
+                end do
+            end if
+        end if
+
+100     format(10e13.5)
+
+    end subroutine print_inflow_planes
+
+    !    subroutine print_del(tipo)
+    !
+    !        use myarrays_metri3, only: fluid_vol,giac
+    !        use myarrays_velo3, only: delu,delv,delw
+    !
+    !        implicit none
+    !
+    !        integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+    !
+    !        real :: delu_bulk,delu_bulk_tot,delv_bulk,delv_bulk_tot,delw_bulk,delw_bulk_tot
+    !        real :: delu_max,delu_max_tot,delv_max,delv_max_tot,delw_max,delw_max_tot
+    !        integer :: i,j,k
+    !        integer :: ierr
+    !
+    !        ! bulk del velocity
+    !        delu_bulk=0.
+    !        delu_bulk_tot=0.
+    !        delv_bulk=0.
+    !        delv_bulk_tot=0.
+    !        delw_bulk=0.
+    !        delw_bulk_tot=0.
+    !
+    !        ! max delvelocity
+    !        delu_max=0.
+    !        delu_max_tot=0.
+    !        delv_max=0.
+    !        delv_max_tot=0.
+    !        delw_max=0.
+    !        delw_max_tot=0.
+    !
+    !        do k=kparasta,kparaend
+    !            do j=1,jy
+    !                do i=1,jx
+    !                    if (tipo(i,j,k)/=0) then
+    !                        delu_bulk=delu_bulk+delu(i,j,k)*giac(i,j,k)
+    !                        delv_bulk=delv_bulk+delv(i,j,k)*giac(i,j,k)
+    !                        delw_bulk=delw_bulk+delw(i,j,k)*giac(i,j,k)
+    !
+    !                        delu_max=max(delu_max,abs(delu(i,j,k)))
+    !                        delv_max=max(delv_max,abs(delv(i,j,k)))
+    !                        delw_max=max(delw_max,abs(delw(i,j,k)))
+    !                    end if
+    !                end do
+    !            end do
+    !        end do
+    !
+    !        ! u_bulk sum between procs
+    !        call MPI_REDUCE(delu_bulk,delu_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(delv_bulk,delv_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(delw_bulk,delw_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !
+    !        ! u_max max between procs
+    !        call MPI_REDUCE(delu_max,delu_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(delv_max,delv_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(delw_max,delw_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !
+    !        if (myid==0) then
+    !
+    !            delu_bulk_tot=delu_bulk_tot/fluid_vol
+    !            delv_bulk_tot=delv_bulk_tot/fluid_vol
+    !            delw_bulk_tot=delw_bulk_tot/fluid_vol
+    !
+    !            write(*,*)'delu_bulk:',delu_bulk_tot,', delu_max:',delu_max_tot
+    !            write(*,*)'delv_bulk:',delv_bulk_tot,', delv_max:',delv_max_tot
+    !            write(*,*)'delw_bulk:',delw_bulk_tot,', delw_max:',delw_max_tot
+    !
+    !        end if
+    !
+    !    end subroutine print_del
+    !
+    !    subroutine print_rh(rh)
+    !
+    !        use myarrays_metri3, only: fluid_vol,giac
+    !
+    !        implicit none
+    !
+    !        real,intent(in) :: rh(n1*n2*n3)
+    !
+    !        real :: rh_bulk,rh_bulk_tot
+    !        real :: rh_max,rh_max_tot
+    !        integer :: i,j,k
+    !        integer :: ierr
+    !
+    !        ! bulk del velocity
+    !        rh_bulk=0.
+    !        rh_bulk_tot=0.
+    !
+    !        ! max delvelocity
+    !        rh_max=0.
+    !        rh_max_tot=0.
+    !
+    !        do k=kparasta,kparaend
+    !            do j=1,jy
+    !                do i=1,jx
+    !                    rh_bulk=rh_bulk+rh(i+(j-1)*jx+(k-1)*jy)*giac(i,j,k)
+    !
+    !                    rh_max=max(rh_max,abs(rh(i+(j-1)*n1+(k-1)*n1*n2)))
+    !                end do
+    !            end do
+    !        end do
+    !
+    !        ! u_bulk sum between procs
+    !        call MPI_REDUCE(rh_bulk,rh_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !
+    !        ! u_max max between procs
+    !        call MPI_REDUCE(rh_max,rh_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !
+    !        if (myid==0) then
+    !
+    !            rh_bulk_tot=rh_bulk_tot/fluid_vol
+    !
+    !            write(*,*)'rh_bulk:',rh_bulk_tot,', rh_max:',rh_max_tot
+    !
+    !        end if
+    !
+    !    end subroutine print_rh
+    !
+    !    subroutine print_delT(del)
+    !
+    !        use myarrays_metri3, only: fluid_vol,giac
+    !
+    !        implicit none
+    !
+    !        real,intent(in) :: del(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+    !
+    !        real :: del_bulk,del_bulk_tot
+    !        real :: del_max,del_max_tot
+    !        integer :: i,j,k
+    !        integer :: ierr
+    !
+    !        ! bulk del velocity
+    !        del_bulk=0.
+    !        del_bulk_tot=0.
+    !
+    !        ! max delvelocity
+    !        del_max=0.
+    !        del_max_tot=0.
+    !
+    !        do k=kparasta,kparaend
+    !            do j=1,jy
+    !                do i=1,jx
+    !                    del_bulk=del_bulk+del(i,j,k)*giac(i,j,k)
+    !                    del_max=max(del_max,abs(del(i,j,k)))
+    !                end do
+    !            end do
+    !        end do
+    !
+    !        ! u_bulk sum between procs
+    !        call MPI_REDUCE(del_bulk,del_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !
+    !        ! u_max max between procs
+    !        call MPI_REDUCE(del_max,del_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !
+    !
+    !        if (myid==0) then
+    !
+    !            del_bulk_tot=del_bulk_tot/fluid_vol
+    !
+    !            write(*,*)'del_bulk:',del_bulk_tot,', del_max:',del_max_tot
+    !
+    !        end if
+    !
+    !    end subroutine print_delT
+    !
+    !    subroutine print_diff(annit,annitV,akapt,akaptV)
+    !
+    !        use myarrays_metri3, only: fluid_vol,giac
+    !
+    !        implicit none
+    !
+    !        real,intent(in) :: annit(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+    !        real,intent(in) :: annitV(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+    !        real,intent(in) :: akapt(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+    !        real,intent(in) :: akaptV(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+    !
+    !        real :: annit_bulk,annit_bulk_tot
+    !        real :: annitV_bulk,annitV_bulk_tot
+    !        real :: akapt_bulk,akapt_bulk_tot
+    !        real :: akaptV_bulk,akaptV_bulk_tot
+    !        real :: annit_max,annit_max_tot
+    !        real :: annitV_max,annitV_max_tot
+    !        real :: akapt_max,akapt_max_tot
+    !        real :: akaptV_max,akaptV_max_tot
+    !        integer :: i,j,k
+    !        integer :: ierr
+    !
+    !        ! bulk del velocity
+    !        annit_bulk=0.
+    !        annit_bulk_tot=0.
+    !        annitV_bulk=0.
+    !        annitV_bulk_tot=0.
+    !        akapt_bulk=0.
+    !        akapt_bulk_tot=0.
+    !        akaptV_bulk=0.
+    !        akaptV_bulk_tot=0.
+    !
+    !        ! max delvelocity
+    !        annit_max=0.
+    !        annit_max_tot=0.
+    !        annitV_max=0.
+    !        annitV_max_tot=0.
+    !        akapt_max=0.
+    !        akapt_max_tot=0.
+    !        akaptV_max=0.
+    !        akaptV_max_tot=0.
+    !
+    !        do k=kparasta,kparaend
+    !            do j=1,jy
+    !                do i=1,jx
+    !                    annit_bulk=annit_bulk+annit(i,j,k)*giac(i,j,k)
+    !                    annitV_bulk=annitV_bulk+annitV(i,j,k)*giac(i,j,k)
+    !                    akapt_bulk=akapt_bulk+akapt(i,j,k)*giac(i,j,k)
+    !                    akaptV_bulk=akaptV_bulk+akaptV(i,j,k)*giac(i,j,k)
+    !                    annit_max=max(annit_max,abs(annit(i,j,k)))
+    !                    annitV_max=max(annitV_max,abs(annitV(i,j,k)))
+    !                    akapt_max=max(akapt_max,abs(akapt(i,j,k)))
+    !                    akaptV_max=max(akaptV_max,abs(akaptV(i,j,k)))
+    !                end do
+    !            end do
+    !        end do
+    !
+    !        ! u_bulk sum between procs
+    !        call MPI_REDUCE(annit_bulk,annit_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(annitV_bulk,annitV_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(akapt_bulk,akapt_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(akaptV_bulk,akaptV_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+    !
+    !        ! u_max max between procs
+    !        call MPI_REDUCE(annit_max,annit_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(annitV_max,annitV_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(akapt_max,akapt_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !        call MPI_REDUCE(akaptV_max,akaptV_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+    !
+    !
+    !        if (myid==0) then
+    !
+    !            akaptV_bulk_tot=akaptV_bulk_tot/fluid_vol
+    !
+    !            write(*,*)'annit_bulk_tot:',annit_bulk_tot,', annit_max_tot:',annit_max_tot
+    !            write(*,*)'annitV_bulk_tot:',annitV_bulk_tot,', annitV_max_tot:',annitV_max_tot
+    !            write(*,*)'akapt_bulk_tot:',akapt_bulk_tot,', akapt_max_tot:',akapt_max_tot
+    !            write(*,*)'akaptV_bulk_tot:',akaptV_bulk_tot,', akaptV_max_tot:',akaptV_max_tot
+    !
+    !        end if
+    !
+    !    end subroutine print_diff
 
 end module output_module
 

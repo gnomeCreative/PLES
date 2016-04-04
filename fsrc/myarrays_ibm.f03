@@ -7,8 +7,8 @@ module myarrays_ibm
 
     use,intrinsic :: iso_c_binding
 
-    integer,bind(C) :: bodyforce,num_iter
-    logical,bind(C) :: bodyupdate
+    integer,bind(C) :: num_iter
+    logical,bind(C) :: particles,bodyforce
     !MN,MP matrix dimension to store mesh: points and triangle
     integer :: MN,MP
     integer :: numero_celle_IB,numero_celle_bloccate,numero_celle_bloccate_real
@@ -20,7 +20,8 @@ module myarrays_ibm
     real,allocatable :: distanze_CELLE_IB(:,:)
     real,allocatable :: dist_pp_ib(:)
     real,allocatable :: dist_ib_parete(:)
-    real,allocatable :: ustar(:),pressure_ib(:),shear_ib(:,:)
+    real,allocatable :: ustar(:),pressure_ib(:,:),shear_ib(:,:)
+    integer,allocatable :: caso_ib(:)
     real,allocatable :: proiezioni(:,:)
       
     !     array for rotation with eulerian angles c
@@ -68,14 +69,9 @@ module myarrays_ibm
     integer,allocatable :: solidIndexSize(:,:,:)
     ! IP coordinates
     real,allocatable :: nodo_vicino_x_array(:,:,:), nodo_vicino_y_array(:,:,:), nodo_vicino_z_array(:,:,:)
-
-    integer :: totParticles
-    real,allocatable :: radius(:)
-    real,allocatable :: radius2(:),surface_sphere(:)
-    real,allocatable :: x_sphere(:),y_sphere(:),z_sphere(:)
-    real,allocatable :: x_force_sphere(:),y_force_sphere(:),z_force_sphere(:)
-    real,allocatable :: x_moment_sphere(:),y_moment_sphere(:),z_moment_sphere(:)
-    integer,allocatable :: sphereIndex(:)
+    ! move this to the subroutine in ricerca
+    real,allocatable :: normalVectorX(:,:,:), normalVectorY(:,:,:), normalVectorZ(:,:,:)
+    real,allocatable :: surfaceDistance(:,:,:)
 
 
 !***********************************************************************

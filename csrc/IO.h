@@ -30,19 +30,16 @@
 
 using namespace std;
 extern ProblemName problemName;
+extern int myid;
 
 class IO{
 public:
     // dem config file
     string demConfigFile;
-    // les config file
-    string lesConfigFile;
+    // les files
+    string lesConfigFile,lesGridFile,lesRestartFile;
     // time integration
-    unsigned int currentTimeStep, maximumTimeSteps;
-    // maximum real time for simulation
-    double maximumRealTime;
-    // maximum time variable
-    double maxTime;
+    unsigned int currentTimeStep;
     // intervals for output
     double screenExpTime, partExpTime, objectExpTime, recycleExpTime, outputExpTime;
     // support variables for output

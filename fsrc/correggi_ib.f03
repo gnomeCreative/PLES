@@ -1,7 +1,6 @@
 !***********************************************************************
 subroutine correggi_ib(ktime,tipo)
 
-
     !***********************************************************************
     !
     ! Roman et al. 2008 Computer and Fluids
@@ -22,6 +21,7 @@ subroutine correggi_ib(ktime,tipo)
     use mysending
     use myarrays_velo3
     use myarrays_metri3
+    use particle_module
     !
     use scala3
     use period
@@ -52,13 +52,7 @@ subroutine correggi_ib(ktime,tipo)
     ! velocity at ib points
     real :: uib,vib,wib
     real,allocatable :: u_ib(:),v_ib(:),w_ib(:)
-
-    ! for output
     real :: tautot,tautot_loc
-     
-    integer :: solidIndexHere,p,index_here
-    real :: ib_counter
-    real :: x_force_here,y_force_here,z_force_here
 
     !-----------------------------------------------------------------------
     ! check call subroutine
@@ -74,6 +68,13 @@ subroutine correggi_ib(ktime,tipo)
     end if
 
     allocate(u_ib(num_ib),v_ib(num_ib),w_ib(num_ib))
+
+
+    ! intialize stuff
+    ustar(:)=0.0
+    shear_ib(:,:)=0.0
+    pressure_ib(:,:)=0.0
+    caso_ib(:)=5
 
     !-----------------------------------------------------------------------
     !     solid border
@@ -96,6 +97,7 @@ subroutine correggi_ib(ktime,tipo)
 
     !-----------------------------------------------------------------------
     ! correction to solid for IB without V
+
     do l=1,num_ib
 
         ! index ib
@@ -134,6 +136,7 @@ subroutine correggi_ib(ktime,tipo)
         w_ib(l)=w(i0,j0,k0)
 
     end do
+
 
     !-----------------------------------------------------------------------
     ! iterative procedure, necessary if the stencil has IB nodes
@@ -323,29 +326,29 @@ subroutine correggi_ib(ktime,tipo)
 
         ! WHAT ABOUT THIS??? :
 
-    !        do l=1,num_ib
+    !    !        do l=1,num_ib
     !
-    !            !        index IB
-    !            i0 = indici_CELLE_IB(l,1)
-    !            j0 = indici_CELLE_IB(l,2)
-    !            k0 = indici_CELLE_IB(l,3)
+    !                !        index IB
+    !                i0 = indici_CELLE_IB(l,1)
+    !                j0 = indici_CELLE_IB(l,2)
+    !                k0 = indici_CELLE_IB(l,3)
     !
-    !            !        index V
-    !            i = indici_CELLE_IB(l,4)
-    !            j = indici_CELLE_IB(l,5)
-    !            k = indici_CELLE_IB(l,6)
+    !                !        index V
+    !                i = indici_CELLE_IB(l,4)
+    !                j = indici_CELLE_IB(l,5)
+    !                k = indici_CELLE_IB(l,6)
     !
-    !            fip= tricoef(l,1)*fi(trind(l,1,1),trind(l,1,2),trind(l,1,3)) &
-    !                +tricoef(l,2)*fi(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
-    !                +tricoef(l,3)*fi(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
-    !                +tricoef(l,4)*fi(trind(l,4,1),trind(l,4,2),trind(l,4,3))
+    !                fip= tricoef(l,1)*fi(trind(l,1,1),trind(l,1,2),trind(l,1,3)) &
+    !                    +tricoef(l,2)*fi(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
+    !                    +tricoef(l,3)*fi(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
+    !                    +tricoef(l,4)*fi(trind(l,4,1),trind(l,4,2),trind(l,4,3))
     !
-    !            fib = fi(i0,j0,k0)
+    !                fib = fi(i0,j0,k0)
     !
-    !            fi_pro =  ((dist_ib_parete(l)+dist_pp_ib(l))*fib &
-    !                - fip*dist_ib_parete(l)) / dist_pp_ib(l)
+    !                fi_pro =  ((dist_ib_parete(l)+dist_pp_ib(l))*fib &
+    !                    - fip*dist_ib_parete(l)) / dist_pp_ib(l)
     !
-    !        end do
+    !            end do
 
 
 
@@ -389,69 +392,16 @@ subroutine correggi_ib(ktime,tipo)
         write(*,*)'-----------------------------------------------'
     end if
 
-
-    ! Force on particles
-    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-    !write(*,*) 'Proc = ',myid,' num_ib=',num_ib
-    !call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-
-    do p=1,totParticles
-
-        x_force_here=0.0
-        y_force_here=0.0
-        z_force_here=0.0
-
-        index_here=sphereIndex(p)
-
-        ib_counter=0.0
-
-        do l=1,num_ib
-
-            i0=indici_CELLE_IB(l,1)
-            j0=indici_CELLE_IB(l,2)
-            k0=indici_CELLE_IB(l,3)
-
-            solidIndexHere=solidIndex(i0,j0,k0,1)
-
-            if (solidIndexHere==index_here) then
-
-                x_force_here=y_force_here+shear_ib(l,1)
-                y_force_here=y_force_here+shear_ib(l,2)
-                z_force_here=z_force_here+shear_ib(l,3)
-                ib_counter=ib_counter+1.0
-
-            end if
-
-        end do
-
-        if (ib_counter>0.001) then
-            x_force_here=x_force_here/ib_counter
-            y_force_here=y_force_here/ib_counter
-            z_force_here=z_force_here/ib_counter
-        end if
-
-        call MPI_REDUCE(x_force_here,x_force_sphere(p),1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
-        call MPI_REDUCE(y_force_here,y_force_sphere(p),1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
-        call MPI_REDUCE(z_force_here,z_force_sphere(p),1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
-
-    end do
-
-
-    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-    if (myid==0) then
-        do p=1,totParticles
-            x_force_sphere(p)=x_force_sphere(p)*surface_sphere(p)
-            y_force_sphere(p)=y_force_sphere(p)*surface_sphere(p)
-            z_force_sphere(p)=z_force_sphere(p)*surface_sphere(p)
-            write(*,*) '--> Force = (',x_force_sphere(p),',',y_force_sphere(p),',',z_force_sphere(p),') surf = ',surface_sphere(p)
-        end do
-    end if
-
     !-----------------------------------------------------------------------
     deallocate(u_ib)
     deallocate(v_ib)
     deallocate(w_ib)
     !-----------------------------------------------------------------------
+
+    ! compute forces on the spheres
+    if (particles) then
+        call compute_sphere_forces()
+    end if
 
     return
 end
@@ -492,7 +442,7 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
     real :: local_shear1,local_shear2
     real :: right_hand_side
     real :: u1,u2,u3
-    real :: ypp,yib_plus,u_tau_linear
+    real :: yib_plus,u_tau_linear
     real :: vtangente1_pp,vtangente2_pp,vnormale_pp
     real :: vtangente1_ib,vtangente2_ib,vnormale_ib
     real :: vtan,vtan_ib
@@ -506,21 +456,21 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
     distanza = dist_ib_parete(l)+dist_pp_ib(l)
     fattore_distanza =  dist_ib_parete(l)/distanza
 
-    ! velocity at interpolation points (V?)
+    ! velocity at interpolation points (PP, V?)
     uip=tricoef(l,1)*u(trind(l,1,1),trind(l,1,2),trind(l,1,3)) &
-       +tricoef(l,2)*u(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
-       +tricoef(l,3)*u(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
-       +tricoef(l,4)*u(trind(l,4,1),trind(l,4,2),trind(l,4,3))
+        +tricoef(l,2)*u(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
+        +tricoef(l,3)*u(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
+        +tricoef(l,4)*u(trind(l,4,1),trind(l,4,2),trind(l,4,3))
     vip=tricoef(l,1)*v(trind(l,1,1),trind(l,1,2),trind(l,1,3)) &
-       +tricoef(l,2)*v(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
-       +tricoef(l,3)*v(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
-       +tricoef(l,4)*v(trind(l,4,1),trind(l,4,2),trind(l,4,3))
+        +tricoef(l,2)*v(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
+        +tricoef(l,3)*v(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
+        +tricoef(l,4)*v(trind(l,4,1),trind(l,4,2),trind(l,4,3))
     wip=tricoef(l,1)*w(trind(l,1,1),trind(l,1,2),trind(l,1,3)) &
-       +tricoef(l,2)*w(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
-       +tricoef(l,3)*w(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
-       +tricoef(l,4)*w(trind(l,4,1),trind(l,4,2),trind(l,4,3))
+        +tricoef(l,2)*w(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
+        +tricoef(l,3)*w(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
+        +tricoef(l,4)*w(trind(l,4,1),trind(l,4,2),trind(l,4,3))
 
-    ! velocity at IB points
+    ! velocity at IB points (initial)
     uib=u(i0,j0,k0)
     vib=v(i0,j0,k0)
     wib=w(i0,j0,k0)
@@ -530,6 +480,7 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
     yib=ycd(i0,j0,k0)
     zib=zcd(i0,j0,k0)
 
+    ! location of IP points (attention! NOT where uip,vip,wip refer to)
     pro1=proiezioni(l,1)
     pro2=proiezioni(l,2)
     pro3=proiezioni(l,3)
@@ -555,7 +506,7 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
         (abs(uip)<1.e-9 .and. abs(vip)<1.e-9 .and. abs(wip)<1.e-9 )) then !1.d-9
         caso=0 ! zero velocity
     else
-        caso=2
+        caso=2 !parabolic
     end if
 
     !write(*,*) 'Case = ',caso
@@ -564,8 +515,7 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
     if (caso==2) then
 
         ! find the u_tau with linear profile
-        ypp=distanza
-        u_tau_linear=sqrt(vtan/(ypp*re))
+        u_tau_linear=sqrt(vtan/(distanza*re))
 
         ! find the u_tau with log profile
         !if (modelloparete==1) then
@@ -638,15 +588,15 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
 
         !end if
 
-        ! choose the ustar
-        !ustar(l) = max(ustar(l),u_tau_linear)
-        ustar(l) = u_tau_linear
-
         if (ustar(l)>u_tau_linear) then
-            write(*,*) 'U* Log'
+            !write(*,*) 'U* Log', ustar(l)
         else
-            write(*,*) 'U* Linear'
+            !write(*,*) 'U* Linear', u_tau_linear
         end if
+
+        ! choose the ustar
+        ustar(l) = max(ustar(l),u_tau_linear)
+        !ustar(l) = u_tau_linear
 
         ! I know ustar which is fix for the normal
 
@@ -656,13 +606,13 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
         ! viscous layer
         if (yib_plus<=5.0) then
             vtan_ib=yib_plus*ustar(l)
-            write(*,*) 'y+ Linear',yib_plus
+            !write(*,*) 'y+ Linear',yib_plus
         end if
 
         ! log layer
         if(yib_plus>=30.0)then
             vtan_ib = (kdynamic*log(yib_plus)+coef_rough_const)*ustar(l)
-            write(*,*) 'y+ Log',yib_plus
+            !write(*,*) 'y+ Log',yib_plus
             ! old:
             !vtan_ib = (kdynamic*log(yib_plus)+coef_rough)*ustar(l)
         end if
@@ -670,7 +620,7 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
         ! buffer layer
         if(yib_plus > 5.0 .and. yib_plus < 30.0)then
             call smooth_ibm(yib_plus,vtan_ib,kdynamic,coef_rough_const)
-            write(*,*) 'y+ Trans',yib_plus
+            !write(*,*) 'y+ Trans',yib_plus
             ! old:
             !call smooth_ibm(yib_plus,vtan_ib,kdynamic,coef_rough)
             vtan_ib = vtan_ib * ustar(l)
@@ -697,68 +647,92 @@ subroutine compute_u_ib(kiter,ktime,uib,vib,wib,l,i0,j0,k0)
         vib=fattore_distanza*vip
         wib=fattore_distanza*wip
 
-        ustar(l)=sqrt( abs(uip) / (distanza*re) )
+        !ustar(l)=sqrt(abs(uip)/(distanza*re)) ! bug???
+        ustar(l)=sqrt(abs(vtan/(distanza*re)))
 
     else if (caso==2) then
         ! log profile
 
         ! normal and tangential component at IB in the local frame of reference
-        vtangente1_ib =  vtangente1_pp * (vtan_ib/vtan)
-        vtangente2_ib =  vtangente2_pp * (vtan_ib/vtan)
-        vnormale_ib   =  vnormale_pp   * (vtan_ib/vtan) !  fattore_distanza**2.
+        vtangente1_ib=vtangente1_pp*(vtan_ib/vtan)
+        vtangente2_ib=vtangente2_pp*(vtan_ib/vtan)
+        vnormale_ib=vnormale_pp*(vtan_ib/vtan) !  fattore_distanza**2.
+        ! here above something is not clear...
 
         ! construct the cartesian component in the general frame of reference
-        u1  = vtangente1_ib*rot_inverse(l,1,1)  &
-            + vtangente2_ib*rot_inverse(l,1,2)  &
-            + vnormale_ib  *rot_inverse(l,1,3)
+        u1=vtangente1_ib*rot_inverse(l,1,1) &
+            +vtangente2_ib*rot_inverse(l,1,2) &
+            +vnormale_ib*rot_inverse(l,1,3)
 
-        u2  = vtangente1_ib*rot_inverse(l,2,1)  &
-            + vtangente2_ib*rot_inverse(l,2,2)  &
-            + vnormale_ib  *rot_inverse(l,2,3)
+        u2=vtangente1_ib*rot_inverse(l,2,1) &
+            +vtangente2_ib*rot_inverse(l,2,2) &
+            +vnormale_ib*rot_inverse(l,2,3)
 
-        u3  = vtangente1_ib*rot_inverse(l,3,1)  &
-            + vtangente2_ib*rot_inverse(l,3,2)  &
-            + vnormale_ib  *rot_inverse(l,3,3)
+        u3=vtangente1_ib*rot_inverse(l,3,1) &
+            +vtangente2_ib*rot_inverse(l,3,2) &
+            +vnormale_ib*rot_inverse(l,3,3)
 
-        uib = u1
-        vib = u3
-        wib = u2
+        uib=u1
+        vib=u3
+        wib=u2
 
     end if
 
-    ! compute components of shear stress
-    local_shear1 =  vtangente1_pp * (ustar(l)*ustar(l)/vtan)
-    local_shear2=  vtangente2_pp * (ustar(l)*ustar(l)/vtan)
+        caso_ib(l)=caso
 
-    ! and pressure by interpolation
-    fip= tricoef(l,1)*fi(trind(l,1,1),trind(l,1,2),trind(l,1,3)) &
-        +tricoef(l,2)*fi(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
-        +tricoef(l,3)*fi(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
-        +tricoef(l,4)*fi(trind(l,4,1),trind(l,4,2),trind(l,4,3))
+        ! compute components of shear stress (conserve sign)
+        local_shear1=sign((vtangente1_pp*(ustar(l)/vtan))**2,vtangente1_pp)
+        local_shear2=sign((vtangente2_pp*(ustar(l)/vtan))**2,vtangente2_pp)
 
-    fib = fi(i0,j0,k0)
+        ! and pressure by interpolation and linear extrapolation
+        fip=tricoef(l,1)*fi(trind(l,1,1),trind(l,1,2),trind(l,1,3)) &
+            +tricoef(l,2)*fi(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
+            +tricoef(l,3)*fi(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
+            +tricoef(l,4)*fi(trind(l,4,1),trind(l,4,2),trind(l,4,3))
 
-    fi_pro = ((dist_ib_parete(l)+dist_pp_ib(l))*fib - fip*dist_ib_parete(l)) /dist_pp_ib(l)
+        fib=fi(i0,j0,k0)
+
+        ! this assumes a linear behavior of pressure along the normal line
+        fi_pro=((dist_ib_parete(l)+dist_pp_ib(l))*fib-fip*dist_ib_parete(l))/dist_pp_ib(l)
+
+        ! force on solid objects are made up of two components: pressure and shear
+        shear_ib(l,1)=local_shear1*rot_inverse(l,1,1)+local_shear2*rot_inverse(l,1,2)
+        shear_ib(l,3)=local_shear1*rot_inverse(l,2,1)+local_shear2*rot_inverse(l,2,2)
+        shear_ib(l,2)=local_shear1*rot_inverse(l,3,1)+local_shear2*rot_inverse(l,3,2)
+
+        ! pressure has a minus sign because the normal is directed outwards
+        pressure_ib(l,1)=-1.0*fi_pro*rot_inverse(l,1,3)
+        pressure_ib(l,3)=-1.0*fi_pro*rot_inverse(l,2,3)
+        pressure_ib(l,2)=-1.0*fi_pro*rot_inverse(l,3,3)
 
 
-    shear_ib(l,1) = local_shear1*rot_inverse(l,1,1)  &
-        + local_shear2*rot_inverse(l,1,2) &
-        + fi_pro*rot_inverse(l,1,3)
 
-    shear_ib(l,2)= local_shear1*rot_inverse(l,2,1)  &
-        + local_shear2*rot_inverse(l,2,2)  &
-        + fi_pro*rot_inverse(l,2,3)
-
-    shear_ib(l,3)= local_shear1*rot_inverse(l,3,1)  &
-        + local_shear2*rot_inverse(l,3,2)  &
-        + fi_pro*rot_inverse(l,3,3)
+    !   the following is valid if rotationAle is used!!!!
+    ! force on solid objects are made up of two components: pressure and shear
+    !   fluidShearForce(i0,j0,k0,1)=local_shear1*rot_inverse(l,1,1) &
+    !                +local_shear2*rot_inverse(l,1,2)
+    !   fluidShearForce(i0,j0,k0,2)=local_shear1*rot_inverse(l,2,1) &
+    !                +local_shear2*rot_inverse(l,2,2)
+    !   fluidShearForce(i0,j0,k0,3)=local_shear1*rot_inverse(l,3,1) &
+    !                +local_shear2*rot_inverse(l,3,2)
+    !   ! pressure has a minus sign because the normal is directed outwards
+    !   fluidPressureForce(i0,j0,k0,1)=-1.0*fi_pro*rot_inverse(l,1,3)
+    !   fluidPressureForce(i0,j0,k0,2)=-1.0*fi_pro*rot_inverse(l,2,3)
+    !   fluidPressureForce(i0,j0,k0,3)=-1.0*fi_pro*rot_inverse(l,3,3)
+    !
+    !    shear_ib(l,1)=fluidShearForce(i0,j0,k0,1)
+    !    shear_ib(l,2)=fluidShearForce(i0,j0,k0,2)
+    !    shear_ib(l,3)=fluidShearForce(i0,j0,k0,3)
+    !
+    !    pressure_ib(l,1)=fluidPressureForce(i0,j0,k0,1)
+    !    pressure_ib(l,2)=fluidPressureForce(i0,j0,k0,2)
+    !    pressure_ib(l,3)=fluidPressureForce(i0,j0,k0,3)
 
 
 
 end subroutine compute_u_ib
 
 
-!***********************************************************************
 subroutine smooth_ibm(yib_plus,vtan_ib,kdynamic,coef_rough)
     !***********************************************************************
 

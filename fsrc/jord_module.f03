@@ -15,7 +15,6 @@ module jord_module
 
    public :: jord1,jord2,jord3
 
-
 contains
    !***********************************************************************
    subroutine jord1(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1, &
