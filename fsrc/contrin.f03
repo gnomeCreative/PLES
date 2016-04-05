@@ -10,7 +10,6 @@ subroutine contrin
    !
    use scala3
    use period
-   use tipologia
    !
    use mpi
 

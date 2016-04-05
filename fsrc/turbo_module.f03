@@ -1,8 +1,7 @@
-!***********************************************************************
-      module turbo_module
-!***********************************************************************
-!  array for turbulence model
-!-----------------------------------------------------------------------
+module turbo_module
+
+    !  array for turbulence model
+    !-----------------------------------------------------------------------
 
     ! THIS IS THE OLD TURBO2_DATA
 
@@ -133,91 +132,91 @@
     real,allocatable :: alammrho(:,:,:)
 
 
-!      real,allocatable :: piano1dp(:,:)
-!      real,allocatable :: piano2dp(:,:)
-!      real,allocatable :: piano3dp(:,:)
-!      real,allocatable :: piano4dp(:,:)
+    !      real,allocatable :: piano1dp(:,:)
+    !      real,allocatable :: piano2dp(:,:)
+    !      real,allocatable :: piano3dp(:,:)
+    !      real,allocatable :: piano4dp(:,:)
 
- ! THIS IS THE OLD TURBO3BIS
+    ! THIS IS THE OLD TURBO3BIS
 
-      real,allocatable :: smod(:,:,:)
-      real,allocatable :: smodV(:,:,:)
-      real,allocatable :: smodH(:,:,:)
+    real,allocatable :: smod(:,:,:)
+    real,allocatable :: smodV(:,:,:)
+    real,allocatable :: smodH(:,:,:)
 
-      real,allocatable :: s11(:,:,:)
-      real,allocatable :: s12(:,:,:)
-      real,allocatable :: s13(:,:,:)
-      real,allocatable :: s21(:,:,:)
-      real,allocatable :: s22(:,:,:)
-      real,allocatable :: s23(:,:,:)
-      real,allocatable :: s31(:,:,:)
-      real,allocatable :: s32(:,:,:)
-      real,allocatable :: s33(:,:,:)
-!
-      real,allocatable :: uco(:,:,:)
-      real,allocatable :: vco(:,:,:)
-      real,allocatable :: wco(:,:,:)
-      real,allocatable :: uuco(:,:,:)
-      real,allocatable :: uvco(:,:,:)
-      real,allocatable :: uwco(:,:,:)
-      real,allocatable :: vuco(:,:,:)
-      real,allocatable :: vvco(:,:,:)
-      real,allocatable :: vwco(:,:,:)
-      real,allocatable :: wuco(:,:,:)
-      real,allocatable :: wvco(:,:,:)
-      real,allocatable :: wwco(:,:,:)
-!
-      real,allocatable :: rhofl(:,:,:)
-      real,allocatable :: rho11(:,:,:,:)
-      real,allocatable :: rho22(:,:,:,:)
-      real,allocatable :: rho33(:,:,:,:)
-      real,allocatable :: rhouco(:,:,:)
-      real,allocatable :: rhovco(:,:,:)
-      real,allocatable :: rhowco(:,:,:)
-!
-      real,allocatable :: apcsx(:,:,:)
-      real,allocatable :: apcsy(:,:,:)
-      real,allocatable :: apcsz(:,:,:)
-      real,allocatable :: apetx(:,:,:)
-      real,allocatable :: apety(:,:,:)
-      real,allocatable :: apetz(:,:,:)
-      real,allocatable :: apztx(:,:,:)
-      real,allocatable :: apzty(:,:,:)
-      real,allocatable :: apztz(:,:,:)
-!
-      real,allocatable :: ap11(:,:,:)
-      real,allocatable :: ap12(:,:,:)
-      real,allocatable :: ap13(:,:,:)
-      real,allocatable :: ap21(:,:,:)
-      real,allocatable :: ap22(:,:,:)
-      real,allocatable :: ap23(:,:,:)
-      real,allocatable :: ap31(:,:,:)
-      real,allocatable :: ap32(:,:,:)
-      real,allocatable :: ap33(:,:,:)
-      real,allocatable :: pp0(:,:,:)
-      real,allocatable :: pp1(:,:,:)
-      real,allocatable :: pp2(:,:,:)
-      real,allocatable :: pp3(:,:,:)
-      real,allocatable :: pc1(:,:,:)
-      real,allocatable :: pc2(:,:,:)
-      real,allocatable :: pc3(:,:,:)	  
-      real,allocatable :: p0a(:,:,:)
-      real,allocatable :: p0b(:,:,:)
+    real,allocatable :: s11(:,:,:)
+    real,allocatable :: s12(:,:,:)
+    real,allocatable :: s13(:,:,:)
+    real,allocatable :: s21(:,:,:)
+    real,allocatable :: s22(:,:,:)
+    real,allocatable :: s23(:,:,:)
+    real,allocatable :: s31(:,:,:)
+    real,allocatable :: s32(:,:,:)
+    real,allocatable :: s33(:,:,:)
+    !
+    real,allocatable :: uco(:,:,:)
+    real,allocatable :: vco(:,:,:)
+    real,allocatable :: wco(:,:,:)
+    real,allocatable :: uuco(:,:,:)
+    real,allocatable :: uvco(:,:,:)
+    real,allocatable :: uwco(:,:,:)
+    real,allocatable :: vuco(:,:,:)
+    real,allocatable :: vvco(:,:,:)
+    real,allocatable :: vwco(:,:,:)
+    real,allocatable :: wuco(:,:,:)
+    real,allocatable :: wvco(:,:,:)
+    real,allocatable :: wwco(:,:,:)
+    !
+    real,allocatable :: rhofl(:,:,:)
+    real,allocatable :: rho11(:,:,:,:)
+    real,allocatable :: rho22(:,:,:,:)
+    real,allocatable :: rho33(:,:,:,:)
+    real,allocatable :: rhouco(:,:,:)
+    real,allocatable :: rhovco(:,:,:)
+    real,allocatable :: rhowco(:,:,:)
+    !
+    real,allocatable :: apcsx(:,:,:)
+    real,allocatable :: apcsy(:,:,:)
+    real,allocatable :: apcsz(:,:,:)
+    real,allocatable :: apetx(:,:,:)
+    real,allocatable :: apety(:,:,:)
+    real,allocatable :: apetz(:,:,:)
+    real,allocatable :: apztx(:,:,:)
+    real,allocatable :: apzty(:,:,:)
+    real,allocatable :: apztz(:,:,:)
+    !
+    real,allocatable :: ap11(:,:,:)
+    real,allocatable :: ap12(:,:,:)
+    real,allocatable :: ap13(:,:,:)
+    real,allocatable :: ap21(:,:,:)
+    real,allocatable :: ap22(:,:,:)
+    real,allocatable :: ap23(:,:,:)
+    real,allocatable :: ap31(:,:,:)
+    real,allocatable :: ap32(:,:,:)
+    real,allocatable :: ap33(:,:,:)
+    real,allocatable :: pp0(:,:,:)
+    real,allocatable :: pp1(:,:,:)
+    real,allocatable :: pp2(:,:,:)
+    real,allocatable :: pp3(:,:,:)
+    real,allocatable :: pc1(:,:,:)
+    real,allocatable :: pc2(:,:,:)
+    real,allocatable :: pc3(:,:,:)
+    real,allocatable :: p0a(:,:,:)
+    real,allocatable :: p0b(:,:,:)
 
-      real,allocatable :: sbuff1(:)
-      real,allocatable :: rbuff1(:)
+    real,allocatable :: sbuff1(:)
+    real,allocatable :: rbuff1(:)
 
-      contains
+contains
 
-      subroutine initialize_turbo()
+    subroutine initialize_turbo()
 
-      use scala3
-      use mysending, only: kparasta,kparaend,myid,nproc
-      use mysettings, only: inmod,inmodrho,nsgs
+        use scala3, only: n1,n2,n3,nscal
+        use mysending, only: kparasta,kparaend,myid,nproc
+        use mysettings, only: inmod,inmodrho,nsgs
 
-      implicit none
+        implicit none
 
-      if (myid==0) write(*,*) myid,'start allocation for turbo_statico'
+        if (myid==0) write(*,*) myid,'start allocation for turbo_statico'
 
         if (inmod==1 .or. inmodrho==1 .or. nsgs>=2) then
 
@@ -479,10 +478,10 @@
             allocate (appo2rho(0:n1+1,0:n2+1,kparasta-1:kparaend+1)) !0:n3+1))
 
             if (myid==0) then
-                allocate(   appo1_piano(0:n1+1,0:n2+1,jz:jz)) !0:n3+1))
-                allocate(   appo2_piano(0:n1+1,0:n2+1,jz:jz)) !0:n3+1))
-                allocate(appo1rho_piano(0:n1+1,0:n2+1,jz:jz)) !0:n3+1))
-                allocate(appo2rho_piano(0:n1+1,0:n2+1,jz:jz)) !0:n3+1))
+                allocate(   appo1_piano(0:n1+1,0:n2+1,n3:n3)) !0:n3+1))
+                allocate(   appo2_piano(0:n1+1,0:n2+1,n3:n3)) !0:n3+1))
+                allocate(appo1rho_piano(0:n1+1,0:n2+1,n3:n3)) !0:n3+1))
+                allocate(appo2rho_piano(0:n1+1,0:n2+1,n3:n3)) !0:n3+1))
             elseif (myid==nproc-1) then
                 allocate(   appo1_piano(0:n1+1,0:n2+1,1:1)) !0:n3+1))
                 allocate(   appo2_piano(0:n1+1,0:n2+1,1:1)) !0:n3+1))
@@ -603,8 +602,77 @@
 
         end if ! dynamic
 
-        end subroutine initialize_turbo
-!
+    end subroutine initialize_turbo
+
+    subroutine execute_turbo(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
+
+        use mysettings, only: nsgs
+        use scala3, only: re,jx,jy,n1,n2,nscal
+        use mysending, only: kparasta,kparaend,myid,nproc
+        use myarrays_metri3, only: annit,annitV,annit_piano,annitV_piano
+        use myarrays_density
+
+        implicit none
+
+        integer,intent(in) :: ktime,i_rest,i_print
+        integer,intent(in) :: kpstamg(0:4),kpendmg(0:4)
+        integer,intent(in) :: in_dx1(n1,n2,kpstamg(1):kpendmg(1))
+        integer,intent(in) :: in_sn1(n1,n2,kpstamg(1):kpendmg(1))
+        integer,intent(in) :: in_sp1(n1,n2,kpstamg(1):kpendmg(1))
+        integer,intent(in) :: in_st1(n1,n2,kpstamg(1):kpendmg(1))
+        integer,intent(in) :: in_av1(n1,n2,kpstamg(1):kpendmg(1))
+        integer,intent(in) :: in_in1(n1,n2,kpstamg(1):kpendmg(1))
+
+        integer i,j,k,isc
+
+        ! -----------------------------------------------------------------
+
+        ! this external loop is a temporary solution to have the eddy diffusivity computed
+        ! for each scalar without reynolds analogy
+
+        if (nsgs==1) then
+            ! compute the eddy viscosity and diffusivity with smagorinksy
+            ! model with fixed constant
+            call turbo_statico(ktime,i_print,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
+
+        else if (nsgs==2 .or. nsgs==3) then
+            !   compute the eddy viscosity and diffusivity with smagorinksy
+            !   model with dynamic procedure for the constant
+            call turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
+
+        else if (nsgs==0) then
+            ! if DNS:
+            do k=kparasta-1,kparaend+1 !0,jz+1
+                do j=0,jy+1
+                    do i=0,jx+1
+                        ! eddy viscosity
+                        annit(i,j,k) =1./re
+                        annitV(i,j,k)=1./re
+                        ! eddy diffusivity
+                        do isc=1,nscal
+                            akapt(isc,i,j,k) =1./re/pran(isc)
+                            akaptV(isc,i,j,k)=1./re/pran(isc)
+                        end do
+                    end do
+                end do
+            end do
+            if (myid==0 .or. myid==nproc-1) then
+                annit_piano  = 1./re
+                annitV_piano = 1./re
+            end if
+
+            if (myid==0 .or. myid==nproc-1) then
+                do isc=1,nscal
+                    akapt_piano  = 1./re/pran(isc)
+                    akaptV_piano = 1./re/pran(isc)
+                end do
+            end if
+
+        end if
+
+    end subroutine execute_turbo
+
+
 !***********************************************************************
-      end module turbo_module
+end module turbo_module
 !***********************************************************************

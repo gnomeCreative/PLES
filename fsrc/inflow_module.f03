@@ -2,7 +2,7 @@ module inflow_module
 
     use orlansky_module
     use scala3
-    use tipologia
+    use mysending, only: kparasta,kparaend,rightpe,leftpe,nproc,myid
     !
     use mpi
 
@@ -27,9 +27,6 @@ contains
 
     subroutine intialize_myarrays2()
         ! compute total area for each sides and cell
-
-        use mysending, only: kparasta,kparaend
-        use scala3, only: n1,n2
 
         implicit none
 
@@ -216,8 +213,6 @@ contains
         use myarrays_velo3
 
         use mysettings, only: lett
-        !
-        use mysending
 
         implicit none
 
@@ -511,7 +506,6 @@ contains
         use myarrays_metri3
         use myarrays_velo3
         use output_module, only: info_run_file
-        use mysending, only: kparasta,kparaend,rightpe,leftpe,nproc,myid
         !
         use period
 
@@ -1473,7 +1467,6 @@ contains
         !
         !use myarrays_nesting
         use myarrays_velo3
-        use mysending, only: kparasta,kparaend,myid,nproc
         use myarrays_ibm, only: bodyforce
 
         implicit none
@@ -1714,7 +1707,6 @@ contains
         !     find area of cells at the sides
 
         use myarrays_metri3
-        use mysending, only: myid,nproc,kparasta,kparaend
         use output_module, only: info_run_file
 
         implicit none
@@ -2164,7 +2156,6 @@ contains
         !***********************************************************************
         use myarrays_metri3
         use mysettings, only: lett,i_rest
-        use mysending, only: myid,nproc,kparasta,kparaend
         use myarrays_ibm
 
         implicit none

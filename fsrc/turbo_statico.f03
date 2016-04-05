@@ -2,7 +2,7 @@
 subroutine turbo_statico(ktime,i_print, &
     in_dx1,in_sn1,in_sp1, &
     in_st1,in_av1,in_in1, &
-    isotropo,kpstamg,kpendmg)
+    kpstamg,kpendmg)
     !***********************************************************************
     ! compute the eddy viscosity and diffusivity with Smagorinsky
     ! with fixed constant
@@ -20,7 +20,6 @@ subroutine turbo_statico(ktime,i_print, &
     use scala3
     use subgrid
     use period
-    use tipologia
     use velpar
     !
     use mpi

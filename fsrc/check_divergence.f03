@@ -1,14 +1,12 @@
-!***********************************************************************
 subroutine check_divergence(tipo)
-   !***********************************************************************
-   use mysending, only: deepl, deepr, kparaend, kparasta, myid, nproc
+
+   use mysending, only: deepl, deepr, kparaend, kparasta, myid, nproc, MPI_REAL_SD
    use mysettings, only: lett
    use myarrays_velo3, only: uc, uc1_orl, uc2_orl, vc, vc3_orl, vc4_orl, wc, wc5_orl, wc6_orl
    use myarrays_metri3, only: giac
    use myarrays_ibm, only: bodyforce
    !
    use scala3, only: jx, jy, jz, n1, n2
-   use tipologia
    use orlansky_module, only: infout1, infout2, infout3, infout4, infout5, infout6
    !
    use mpi

@@ -25,7 +25,6 @@ subroutine correggi_ib(ktime,tipo)
     !
     use scala3
     use period
-    use tipologia
     !
     use mpi
 

@@ -6,10 +6,8 @@ module nesting_module
     use contour_module
     use orlansky_module
     !
-    use mysending, only: kparasta,kparaend,myid,nproc
+    use mysending, only: kparasta,kparaend,myid,nproc,MPI_REAL_SD
     use scala3
-    use tipologia
-
     !
     use mpi
 

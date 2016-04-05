@@ -22,7 +22,6 @@ subroutine carico_immb()
    integer ireq1,ireq2,ireq3,ireq4
    integer status(MPI_STATUS_SIZE),ierror,ierr
 
-   integer itipo
    integer contatore,num_solide_real
    integer ib_totali,solide_totali
 

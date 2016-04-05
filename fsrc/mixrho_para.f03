@@ -11,7 +11,6 @@ subroutine mixrho_para(inmod,rho)
    !
    use scala3
    use period
-   use tipologia
    !
    use mpi
 

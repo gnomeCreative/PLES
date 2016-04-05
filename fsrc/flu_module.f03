@@ -4,10 +4,10 @@ module flu_module
     use myarrays_metri3
     use myarrays_velo3
     use myarrays_wallmodel, only: att_mod_par, eseguo34, u_t, utangente
+    use myarrays_ibm, only: bodyforce
     !
     use scala3
     use period
-    use tipologia
     !
     use mpi
 
@@ -17,7 +17,7 @@ module flu_module
 
 contains
 
-    subroutine flucn(r,visualizzo,coef_wall,ti,tipo,bodyforce,tau_wind)
+    subroutine flucn(r,visualizzo,coef_wall,ti,tipo,tau_wind)
         !***********************************************************************
         ! compute explicit diffusive term
         !
@@ -56,7 +56,6 @@ contains
 
         ! giulia aggiungo questi per eliminare i flussi tra i solidi
         integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
-        logical,intent(in) :: bodyforce
         !-----------------------------------------------------------------------
         ! term nni*g11*d/d(csi)
         !
@@ -350,7 +349,7 @@ contains
 
     end subroutine flucn
 
-    subroutine flu_turbo(kparasta,kparaend)
+    subroutine flu_turbo()
         !***********************************************************************
         ! compute explicit terms for turbulence model like
         ! d/dcsi(Uf*annit), periodic version
@@ -360,12 +359,9 @@ contains
         !     array declaration
         integer i,j,k,kper
         !
-        integer ierr,myid,nproc
-        integer ncolperproc,kparasta,kparaend,m
+        integer ierr
         integer kparaendp
-        !-----------------------------------------------------------------------
-        CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
-        CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
+
         !-----------------------------------------------------------------------
         ! compute controvariant flux Uf (jordan notation)
         !
@@ -494,7 +490,7 @@ contains
         return
     end subroutine flu_turbo
 
-    subroutine flucnesp(r,visualizzo,tipo,bodyforce,tau_wind)
+    subroutine flucnesp(r,visualizzo,tipo,tau_wind)
         !***********************************************************************
         ! compute explicit diffusive term
         !
@@ -527,7 +523,6 @@ contains
 
         ! giulia aggiungo questi per eliminare i flussi tra i solidi
         integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
-        logical,intent(in) :: bodyforce
         !-----------------------------------------------------------------------
         ! term nni*g11*d/d(csi)
         !
@@ -777,7 +772,7 @@ contains
         return
     end subroutine flucnesp
 
-    subroutine flucrho(ti,r,akaptV,akapt,isc,tipo,bodyforce)
+    subroutine flucrho(ti,r,akaptV,akapt,isc,tipo)
         !***********************************************************************
         ! compute diffusive explicit terms
         !
@@ -807,7 +802,6 @@ contains
 
         ! giulia aggiungo questi per eliminare i flussi tra i solidi
         integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
-        logical,intent(in) :: bodyforce
         !-----------------------------------------------------------------------
         ! term nni*g11*d/d(csi)
         !
@@ -1039,7 +1033,7 @@ contains
         return
     end subroutine flucrho
 
-    subroutine flucrhoesp(r,isc,tipo,bodyforce)
+    subroutine flucrhoesp(r,isc,tipo)
         !***********************************************************************
         ! compute explicit diffusive term
         !
@@ -1062,7 +1056,6 @@ contains
 
         ! giulia aggiungo questi per eliminare i flussi tra i solidi
         integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
-        logical,intent(in) :: bodyforce
         !-----------------------------------------------------------------------
         ! term nni*g11*d/d(csi)
         !
@@ -1256,7 +1249,7 @@ contains
         return
     end subroutine flucrhoesp
 
-    subroutine flud1(rc,cgra1,r,akapt,insc,isc,tipo,bodyforce)
+    subroutine flud1(rc,cgra1,r,akapt,insc,isc,tipo)
         !***********************************************************************
         ! compute explicit flux on csi component for scalar equation
         !
@@ -1283,7 +1276,6 @@ contains
 
         real phic(n1,n2,kparasta:kparaend)
         real den, num, myv
-        logical,intent(in) :: bodyforce
         logical found_solid
         !-----------------------------------------------------------------------
         ! periodicity not in eta
@@ -2182,7 +2174,7 @@ contains
         return
     end subroutine flud1
 
-    subroutine flud2(rc,cgra2,r,akapt,insc,isc,tipo,bodyforce)
+    subroutine flud2(rc,cgra2,r,akapt,insc,isc,tipo)
         !***********************************************************************
         ! compute explicit flux on eta component for scalar equation
         !
@@ -2209,7 +2201,6 @@ contains
         !
         real phic(n1,n2,kparasta:kparaend)
         real den, num, myv
-        logical,intent(in) :: bodyforce
         logical found_solid
         !-----------------------------------------------------------------------
         ! CONVECTIVE TERM Vc*rho:
@@ -3068,7 +3059,7 @@ contains
         return
     end subroutine flud2
 
-    subroutine flud3(rc,cgra3,r,akapt,insc,isc,tipo,bodyforce)
+    subroutine flud3(rc,cgra3,r,akapt,insc,isc,tipo)
         !***********************************************************************
         ! compute explicit flux on zita component for scalar equation
         !
@@ -3099,8 +3090,6 @@ contains
 
         real phic(n1,n2,kparasta:kparaend)
         real den, num, myv
-        logical,intent(in) :: bodyforce
-
 
         integer req1,req2
         integer istatus(MPI_STATUS_SIZE)
@@ -4087,7 +4076,7 @@ contains
         return
     end subroutine flud3
 
-    subroutine flux1(rc,cgra1,r,insc,tipo,bodyforce)
+    subroutine flux1(rc,cgra1,r,insc,tipo)
         !***********************************************************************
         ! compute explict flux on csi component:
         !
@@ -4120,7 +4109,6 @@ contains
 
         real phic(n1,n2,kparasta:kparaend)
         real den, num, myv
-        logical,intent(in) :: bodyforce
         !-----------------------------------------------------------------------
         ! CONVECTIVE TERM Uc*u
         ! implemented with central scheme or with quick depending on setting
@@ -4816,7 +4804,7 @@ contains
         return
     end subroutine flux1
 
-    subroutine flux2(rc,cgra2,r,insc,tipo,bodyforce)
+    subroutine flux2(rc,cgra2,r,insc,tipo)
         !***********************************************************************
         ! compute explicit flux on eta component
         !
@@ -4847,7 +4835,6 @@ contains
         !
         real phic(n1,n2,kparasta:kparaend)
         real den, num, myv
-        logical,intent(in) :: bodyforce
         !-----------------------------------------------------------------------
         ! CONVECTIVE TERM Vc*u
         ! implemented with central scheme or with quick depending on settings
@@ -5553,7 +5540,7 @@ contains
         return
     end subroutine flux2
 
-    subroutine flux3(rc,cgra3,r,insc,tipo,bodyforce)
+    subroutine flux3(rc,cgra3,r,insc,tipo)
         !***********************************************************************
         ! compute explicit flux on component zita
         !
@@ -5587,7 +5574,6 @@ contains
 
         real phic(n1,n2,kparasta:kparaend)
         real den, num, myv
-        logical,intent(in) :: bodyforce
         !-----------------------------------------------------------------------
         ! CONVECTIVE TERM  Wc*u:
         ! implemented with central scheme or with quick depending on settings

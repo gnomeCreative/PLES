@@ -7,8 +7,7 @@ subroutine fmassa(bcsi,beta,bzet,ktime)
     use myarrays_velo3, only: u,v,w,rhov
     !
     use scala3
-    use tipologia
-    use mysending, only: myid,nproc,kparasta,kparaend
+    use mysending, only: myid,nproc,kparasta,kparaend,MPI_REAL_SD
     use mysettings, only: bbx,bby,bbz,rich,latitude
     !
     use mpi

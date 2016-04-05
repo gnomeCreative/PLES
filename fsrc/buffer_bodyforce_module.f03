@@ -7,7 +7,6 @@ module buffer_bodyforce_module
     use orlansky_module
     !
     use scala3
-    use tipologia
     !
     use mpi
 

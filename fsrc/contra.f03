@@ -5,10 +5,10 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
    ! and boundary condition cs for pressure
    use myarrays_metri3
    use myarrays_velo3
+   use mysending, only: MPI_REAL_SD
    !
    use scala3
    use period
-   use tipologia
    !
    use mpi
 

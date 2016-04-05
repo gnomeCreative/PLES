@@ -1,18 +1,19 @@
 !***********************************************************************
 module multigrid_module
 
+    use tridag_module, only: tridag
     use scala3
     use period
-    use tipologia
+    use mysending, only: MPI_REAL_SD
     !
     use mpi
 
     use iso_c_binding
 
-    integer,bind(C),public :: jpos
-    integer,bind(C),public :: islor
-    integer,bind(C),public :: nlevmultimax
-    real,bind(C),public :: omega
+    !integer(kind=c_int),bind(C),public :: jpos
+    integer(kind=c_int),bind(C),public :: islor
+    integer(kind=c_int),bind(C),public :: nlevmultimax
+    real(kind=c_double),bind(C),public :: omega
 
     private
 
@@ -22,37 +23,41 @@ module multigrid_module
     integer,allocatable :: in_dx3(:,:,:),in_sn3(:,:,:),in_sp3(:,:,:),in_st3(:,:,:),in_av3(:,:,:),in_in3(:,:,:)
     integer,allocatable :: in_dx4(:,:,:),in_sn4(:,:,:),in_sp4(:,:,:),in_st4(:,:,:),in_av4(:,:,:),in_in4(:,:,:)
 
-    real,allocatable,private :: g11_2(:,:,:),g12_2(:,:,:),g13_2(:,:,:)
-    real,allocatable,private :: g21_2(:,:,:),g22_2(:,:,:),g23_2(:,:,:)
-    real,allocatable,private :: g31_2(:,:,:),g32_2(:,:,:),g33_2(:,:,:)
-    real,allocatable,private :: g11_3(:,:,:),g12_3(:,:,:),g13_3(:,:,:)
-    real,allocatable,private :: g21_3(:,:,:),g22_3(:,:,:),g23_3(:,:,:)
-    real,allocatable,private :: g31_3(:,:,:),g32_3(:,:,:),g33_3(:,:,:)
-    real,allocatable,private :: g11_4(:,:,:),g12_4(:,:,:),g13_4(:,:,:)
-    real,allocatable,private :: g21_4(:,:,:),g22_4(:,:,:),g23_4(:,:,:)
-    real,allocatable,private :: g31_4(:,:,:),g32_4(:,:,:),g33_4(:,:,:)
+    real,allocatable :: g11_2(:,:,:),g12_2(:,:,:),g13_2(:,:,:)
+    real,allocatable :: g21_2(:,:,:),g22_2(:,:,:),g23_2(:,:,:)
+    real,allocatable :: g31_2(:,:,:),g32_2(:,:,:),g33_2(:,:,:)
+    real,allocatable :: g11_3(:,:,:),g12_3(:,:,:),g13_3(:,:,:)
+    real,allocatable :: g21_3(:,:,:),g22_3(:,:,:),g23_3(:,:,:)
+    real,allocatable :: g31_3(:,:,:),g32_3(:,:,:),g33_3(:,:,:)
+    real,allocatable :: g11_4(:,:,:),g12_4(:,:,:),g13_4(:,:,:)
+    real,allocatable :: g21_4(:,:,:),g22_4(:,:,:),g23_4(:,:,:)
+    real,allocatable :: g31_4(:,:,:),g32_4(:,:,:),g33_4(:,:,:)
       
-    real,allocatable,private :: den_1(:,:,:),den_2(:,:,:),den_3(:,:,:),den_4(:,:,:)
+    real,allocatable :: den_1(:,:,:),den_2(:,:,:),den_3(:,:,:),den_4(:,:,:)
 
     ! coefficent for tridiagonal system (see sett.f)
     ! for each level implicit solution in eta
-    real,allocatable,private :: aa1(:,:,:),bb1(:,:,:),cc1(:,:,:)
-    real,allocatable,private :: aa2(:,:,:),bb2(:,:,:),cc2(:,:,:)
-    real,allocatable,private :: aa3(:,:,:),bb3(:,:,:),cc3(:,:,:)
-    real,allocatable,private :: aa4(:,:,:),bb4(:,:,:),cc4(:,:,:)
+    real,allocatable :: aa1(:,:,:),bb1(:,:,:),cc1(:,:,:)
+    real,allocatable :: aa2(:,:,:),bb2(:,:,:),cc2(:,:,:)
+    real,allocatable :: aa3(:,:,:),bb3(:,:,:),cc3(:,:,:)
+    real,allocatable :: aa4(:,:,:),bb4(:,:,:),cc4(:,:,:)
 
     public :: multi,mul_met,wall
 
+    ! these where in strati (the main)
+    integer,public :: kpstamg(0:4),kpendmg(0:4),kfacepstamg(0:4)
+    integer,public :: ncolprocmg(0:4)
+
 contains
 
-    subroutine multi(eps,ficycle,nlevel,jxc,jyc,jzc,kparasta,kparaend,myid,nproc, &
-        rightpe,leftpe,tagls,taglr,tagrs,tagrr,islor,bodyforce,bodypressure,tipo,deepl,deepr,iterat, &
-        freesurface,ti)
-        !***********************************************************************
+    subroutine multi(eps,ficycle,nlevel,jxc,jyc,jzc,islor,tipo,iterat,freesurface)
+
         ! pressure solution with sor+multigrid
         !
         use myarrays_metri3
         use myarrays_velo3
+        use mysending
+        use myarrays_ibm, only: bodyforce,bodypressure
         !
         implicit none
 
@@ -79,30 +84,17 @@ contains
         real,allocatable :: pr3(:,:,:) !0:n33+1)
         real,allocatable :: pr4(:,:,:) !0:n34+1)
 
-        integer kparasta,kparaend
         !
-        integer ierr,myid,nproc
-        integer tagls,taglr,tagrs,tagrr
-        integer leftpe,rightpe
-        integer iw,jw,kw,lll
+        integer ierr
         integer islor
         integer ficycle
         !
-        integer req1,req2,req3,req4
-        integer rightpem,leftpem
-        integer istatus,status,prplan
-        integer ii,jj,kk,kkk
         integer freesurface,iterat
 
         !
         !     for potential flow with ibm
-        integer deepl,deepr
         integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
         integer itipo,finetipo
-        logical bodyforce
-        integer bodypressure,ibodypressure
-        real fi_old
-        real ti
         !-----------------------------------------------------------------------
         !
         ! matrix initialization
@@ -123,12 +115,12 @@ contains
         !
         !     nlevel=1 is the first multigrid level
         !
-        if(myid.eq.0)then
+        if (myid==0) then
             !write(*,*) 'nlevmultimax=',nlevmultimax
             do n=1,nlevel
                 !write(*,*) 'level=',n,myid,jxc(n),jyc(n),jzc(n)
             end do
-        endif
+        end if
 
         ! AAA chicco: mettere meglio la allocazione nel caso si riducano i livelli
         ! di multigrid, oppure non siano garantiti tutti i livelli
@@ -154,16 +146,14 @@ contains
         allocate(pr3(0:n13+1,0:n23+1,kstamg(3)-1:kendmg(3)+1)) !0:n33+1)
         allocate(pr4(0:n14+1,0:n24+1,kstamg(4)-1:kendmg(4)+1)) !0:n34+1)
 
-        call mul_ini(n1,n2,n3,n12,n22,n32,n13,n23,n33,n14,n24,n34, &
-            rhsn,rhs2v,rhs3v,rhs4v,pr2,pr3,pr4,kstamg,kendmg)
-
+        call mul_ini(n1,n2,n12,n13,n14,n22,n23,n24,rhsn,rhs2v,rhs3v,rhs4v,pr2,pr3,pr4,kstamg,kendmg)
 
         !
         ! sor iteration for each level
         !
         do n=1,nlevel
             kss(n)=5
-            if (n.gt.1) kss(n)=10
+            if (n>1) kss(n)=10
         end do
         !
         !------------------------------------------------------------------------
@@ -172,7 +162,7 @@ contains
         ktime=0
         resmax=1.
         !
-        do while (ktime.lt.ficycle .and. resmax.ge.eps)
+        do while (ktime<ficycle .and. resmax>=eps)
             ktime=ktime+1
 
             if (nlevel>=1) then
@@ -188,7 +178,7 @@ contains
                 do k=kstamg(2)-1,kendmg(2)+1 !0,jzc(2)+1
                     do j=0,jyc(2)+1
                         do i=0,jxc(2)+1
-                            pr2(i,j,k)=0.
+                            pr2(i,j,k)=0.0
                         end do
                     end do
                 end do
@@ -197,7 +187,7 @@ contains
                 do k=kstamg(3)-1,kendmg(3)+1 !0,jzc(3)+1
                     do j=0,jyc(3)+1
                         do i=0,jxc(3)+1
-                            pr3(i,j,k)=0.
+                            pr3(i,j,k)=0.0
                         end do
                     end do
                 end do
@@ -206,7 +196,7 @@ contains
                 do k=kstamg(4)-1,kendmg(4)+1 !0,jzc(4)+1
                     do j=0,jyc(4)+1
                         do i=0,jxc(4)+1
-                            pr4(i,j,k)=0.
+                            pr4(i,j,k)=0.0
                         end do
                     end do
                 end do
@@ -218,198 +208,149 @@ contains
                 !
                 !
                 !-----------------------------------------------------------------------
-                if (n.eq.1) then        ! first grid
+                if (n==1) then        ! first grid
                     !-----------------------------------------------------------------------
                     !
-                    if(islor.eq.0)then
-                        call solut_sndrcv_sor(n,n1,n2,n3, &
+                    if (islor==0) then
+                        call solut_sndrcv_sor(n,n1,n2, &
                             kss,jxc,jyc,jzc,pr1,rhs, &
-                            cs1,cs2,cs3,cs4,cs5,cs6, &
                             g11,g12,g13,g21,g22,g23,g31,g32,g33, &
-                            in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            bodyforce,bodypressure, &
-                            kparasta,kparaend, &
-                            iterat,freesurface,ti)
+                            iterat,freesurface)
 
-                        if (bodyforce) then
-                            do ibodypressure=1,bodypressure
+                        if (bodyforce .and. bodypressure) then
                                 call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
-                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs, &
-                                    tagrr)
-                            end do
+                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
                         end if
 
 
-                    elseif(islor.eq.1)then
-                        call solut_sndrcv_slor(n,n1,n2,n3, &
+                    elseif (islor==1) then
+                        call solut_sndrcv_slor(n,n1,n2, &
                             kss,jxc,jyc,jzc,pr1,rhs, &
                             cs1,cs2,cs3,cs4,cs5,cs6, &
                             g11,g12,g13,g21,g22,g23,g31,g32,g33, &
-                            in_dx1,in_sn1,in_sp1, &
-                            in_st1,in_av1,in_in1, &
+                            in_dx1,in_sn1,in_av1,in_in1, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
                             aa1,bb1,cc1)
 
                     end if
 
-                    call resid_sndrcv(n,n1,n2,n3,jxc,jyc,jzc, &
-                        pr1,rhsn,rhs, &
-                        cs1,cs2,cs3,cs4,cs5,cs6,&
-                        g11,g12,g13,g21,g22,g23,g31,g32,g33, &
-                        in_dx1,in_sn1,in_sp1, &
-                        in_st1,in_av1,in_in1, &
-                        kstamg,kendmg, &
-                        bodyforce,bodypressure, &
-                        kparasta,kparaend)
+                    call resid_sndrcv(n,n1,n2,jxc,jyc, &
+                        pr1,rhsn,rhs,g11,g22,g33,kstamg,kendmg)
 
                     !
-                    if(nlevel .ne. 1)then
-                        call restrict_sndrcv(n,n1,n2,n3,n12,n22,n32, &
-                            jxc,jyc,jzc,rhsn,rhs2v, &
-                            kstamg,kendmg)
-                    endif
+                    if (nlevel /= 1) then
+                        call restrict_sndrcv(n,n1,n2,n12,n22, &
+                            jxc,jyc,rhsn,rhs2v,kstamg,kendmg)
+                    end if
                 !
                 !-----------------------------------------------------------------------
-                else if (n.eq.2) then           !second grid
+                else if (n==2) then           !second grid
                     !-----------------------------------------------------------------------
                     !
-                    if(islor.eq.0)then
-                        call solut_sndrcv_sor(n,n12,n22,n32, &
+                    if (islor==0) then
+                        call solut_sndrcv_sor(n,n12,n22, &
                             kss,jxc,jyc,jzc, &
                             pr2,rhs2v, &
-                            cs1,cs2,cs3,cs4,cs5,cs6, &
                             g11_2,g12_2,g13_2, &
                             g21_2,g22_2,g23_2, &
                             g31_2,g32_2,g33_2, &
-                            in_dx2,in_sn2,in_sp2, &
-                            in_st2,in_av2,in_in2, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            bodyforce,bodypressure,kparasta,kparaend, &
-                            iterat,freesurface,ti)
-                    elseif(islor.eq.1)then
+                            iterat,freesurface)
+                    elseif (islor==1) then
 
-                        call solut_sndrcv_slor(n,n12,n22,n32, &
+                        call solut_sndrcv_slor(n,n12,n22, &
                             kss,jxc,jyc,jzc, &
                             pr2,rhs2v, &
                             cs1,cs2,cs3,cs4,cs5,cs6, &
                             g11_2,g12_2,g13_2, &
                             g21_2,g22_2,g23_2, &
                             g31_2,g32_2,g33_2, &
-                            in_dx2,in_sn2,in_sp2, &
-                            in_st2,in_av2,in_in2, &
+                            in_dx2,in_sn2,in_av2,in_in2, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
                             aa2,bb2,cc2)
                     end if
                     !
-                    if (n.lt.nlevel) then
+                    if (n<nlevel) then
 
-                        call resid_sndrcv(n,n12,n22,n32,jxc,jyc,jzc,pr2,rhs2n,rhs2v, &
-                            cs1,cs2,cs3,cs4,cs5,cs6, &
-                            g11_2,g12_2,g13_2, &
-                            g21_2,g22_2,g23_2, &
-                            g31_2,g32_2,g33_2, &
-                            in_dx2,in_sn2,in_sp2, &
-                            in_st2,in_av2,in_in2, &
-                            kstamg,kendmg, &
-                            bodyforce,bodypressure,kparasta,kparaend)
+                        call resid_sndrcv(n,n12,n22,jxc,jyc,pr2,rhs2n,rhs2v, &
+                            g11_2,g22_2,g33_2,kstamg,kendmg)
 
-                        call restrict_sndrcv(n,n12,n22,n32,n13,n23,n33, &
-                            jxc,jyc,jzc,rhs2n,rhs3v, &
+                        call restrict_sndrcv(n,n12,n22,n13,n23, &
+                            jxc,jyc,rhs2n,rhs3v, &
                             kstamg,kendmg)
                     !
                     end if
                 !
                 !
                 !-----------------------------------------------------------------------
-                else if (n.eq.3) then           !third grid
+                else if (n==3) then           !third grid
                     !-----------------------------------------------------------------------
                     !
                     !
-                    if(islor.eq.0)then
-                        call solut_sndrcv_sor(n,n13,n23,n33,kss,jxc,jyc,jzc, &
+                    if (islor==0) then
+                        call solut_sndrcv_sor(n,n13,n23,kss,jxc,jyc,jzc, &
                             pr3,rhs3v, &
-                            cs1,cs2,cs3, &
-                            cs4,cs5,cs6, &
                             g11_3,g12_3,g13_3, &
                             g21_3,g22_3,g23_3, &
                             g31_3,g32_3,g33_3, &
-                            in_dx3,in_sn3,in_sp3, &
-                            in_st3,in_av3,in_in3, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            bodyforce,bodypressure,kparasta,kparaend, &
-                            iterat,freesurface,ti)
-                    elseif(islor.eq.1)then
+                            iterat,freesurface)
+                    elseif (islor==1) then
 
-                        call solut_sndrcv_slor(n,n13,n23,n33,kss,jxc,jyc,jzc, &
+                        call solut_sndrcv_slor(n,n13,n23,kss,jxc,jyc,jzc, &
                             pr3,rhs3v, &
-                            cs1,cs2,cs3, &
-                            cs4,cs5,cs6, &
+                            cs1,cs2,cs3,cs4,cs5,cs6, &
                             g11_3,g12_3,g13_3, &
                             g21_3,g22_3,g23_3, &
                             g31_3,g32_3,g33_3, &
-                            in_dx3,in_sn3,in_sp3, &
-                            in_st3,in_av3,in_in3, &
+                            in_dx3,in_sn3,in_av3,in_in3, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
                             aa3,bb3,cc3)
                     end if
                     !
-                    if (n.lt.nlevel) then
+                    if (n<nlevel) then
 
-                        call resid_sndrcv(n,n13,n23,n33,jxc,jyc,jzc,pr3,rhs3n,rhs3v, &
-                            cs1,cs2,cs3, &
-                            cs4,cs5,cs6, &
-                            g11_3,g12_3,g13_3, &
-                            g21_3,g22_3,g23_3, &
-                            g31_3,g32_3,g33_3, &
-                            in_dx3,in_sn3,in_sp3, &
-                            in_st3,in_av3,in_in3, &
-                            kstamg,kendmg, &
-                            bodyforce,bodypressure,kparasta,kparaend)
+                        call resid_sndrcv(n,n13,n23,jxc,jyc,pr3,rhs3n,rhs3v, &
+                            g11_3,g22_3,g33_3,kstamg,kendmg)
                         !
-                        call restrict_sndrcv(n,n13,n23,n33,n14,n24,n34, &
-                            jxc,jyc,jzc,rhs3n,rhs4v, &
+                        call restrict_sndrcv(n,n13,n23,n14,n24, &
+                            jxc,jyc,rhs3n,rhs4v, &
                             kstamg,kendmg)
                     !
                     end if
                 !
                 !
                 !-----------------------------------------------------------------------
-                else if (n.eq.4) then           !fourth grid
+                else if (n==4) then           !fourth grid
                     !-----------------------------------------------------------------------
                     !
-                    if(islor.eq.0)then
-                        call solut_sndrcv_sor(n,n14,n24,n34,kss,jxc,jyc,jzc, &
+                    if (islor==0) then
+                        call solut_sndrcv_sor(n,n14,n24,kss,jxc,jyc,jzc, &
                             pr4,rhs4v, &
-                            cs1,cs2,cs3, &
-                            cs4,cs5,cs6, &
                             g11_4,g12_4,g13_4, &
                             g21_4,g22_4,g23_4, &
                             g31_4,g32_4,g33_4, &
-                            in_dx4,in_sn4,in_sp4, &
-                            in_st4,in_av4,in_in4, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            bodyforce,bodypressure,kparasta,kparaend, &
-                            iterat,freesurface,ti)
+                            iterat,freesurface)
 
-                    elseif(islor.eq.1)then
+                    elseif (islor==1) then
 
-                        call solut_sndrcv_slor(n,n14,n24,n34,kss,jxc,jyc,jzc, &
+                        call solut_sndrcv_slor(n,n14,n24,kss,jxc,jyc,jzc, &
                             pr4,rhs4v, &
                             cs1,cs2,cs3, &
                             cs4,cs5,cs6, &
                             g11_4,g12_4,g13_4, &
                             g21_4,g22_4,g23_4, &
                             g31_4,g32_4,g33_4, &
-                            in_dx4,in_sn4,in_sp4, &
-                            in_st4,in_av4,in_in4, &
+                            in_dx4,in_sn4,in_av4,in_in4, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
                             aa4,bb4,cc4)
@@ -418,7 +359,7 @@ contains
                 end if
             !
 
-            enddo
+            end do
 
             !-----------------------------------------------------------------------
             !-------------- start cycle from coarse to fine ------------------------
@@ -427,135 +368,103 @@ contains
             do n=nlevel-1,1,-1
                 !
                 !-----------------------------------------------------------------------
-                if (n.eq.3)      then           !third grid
+                if (n==3)      then           !third grid
                     !-----------------------------------------------------------------------
                     !
-                    call prolong(n,n13,n23,n33,n14,n24,n34,jxc,jyc,jzc,pr3,pr4, &
-                        kstamg,kendmg,rightpe,leftpe, &
-                        tagls,taglr,tagrs,tagrr)
+                    call prolong(n,n13,n23,n14,n24,jxc,jyc,pr3,pr4, &
+                        kstamg,kendmg,rightpe,leftpe,taglr,tagrs)
                     !
-                    if(islor.eq.0)then
-                        call solut_sndrcv_sor(n,n13,n23,n33,kss,jxc,jyc,jzc, &
+                    if (islor==0) then
+                        call solut_sndrcv_sor(n,n13,n23,kss,jxc,jyc,jzc, &
                             pr3,rhs3v, &
-                            cs1,cs2,cs3, &
-                            cs4,cs5,cs6, &
                             g11_3,g12_3,g13_3, &
                             g21_3,g22_3,g23_3, &
                             g31_3,g32_3,g33_3, &
-                            in_dx3,in_sn3,in_sp3, &
-                            in_st3,in_av3,in_in3, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            bodyforce,bodypressure,kparasta,kparaend, &
-                            iterat,freesurface,ti)
-                    elseif(islor.eq.1)then
+                            iterat,freesurface)
+                    elseif (islor==1) then
 
-                        call solut_sndrcv_slor(n,n13,n23,n33,kss,jxc,jyc,jzc, &
+                        call solut_sndrcv_slor(n,n13,n23,kss,jxc,jyc,jzc, &
                             pr3,rhs3v, &
                             cs1,cs2,cs3, &
                             cs4,cs5,cs6, &
                             g11_3,g12_3,g13_3, &
                             g21_3,g22_3,g23_3, &
                             g31_3,g32_3,g33_3, &
-                            in_dx3,in_sn3,in_sp3, &
-                            in_st3,in_av3,in_in3, &
+                            in_dx3,in_sn3,in_av3,in_in3, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
                             aa3,bb3,cc3)
                     end if
                 !
                 !-----------------------------------------------------------------------
-                else if (n.eq.2) then           !second grid
+                else if (n==2) then           !second grid
                     !-----------------------------------------------------------------------
                     !
-                    call prolong(n,n12,n22,n32,n13,n23,n33,jxc,jyc,jzc,pr2,pr3, &
-                        kstamg,kendmg,rightpe,leftpe, &
-                        tagls,taglr,tagrs,tagrr)
+                    call prolong(n,n12,n22,n13,n23,jxc,jyc,pr2,pr3, &
+                        kstamg,kendmg,rightpe,leftpe,taglr,tagrs)
                     !
-                    if(islor.eq.0)then
-                        call solut_sndrcv_sor(n,n12,n22,n32, &
+                    if (islor==0) then
+                        call solut_sndrcv_sor(n,n12,n22, &
                             kss,jxc,jyc,jzc, &
                             pr2,rhs2v, &
-                            cs1,cs2,cs3,cs4,cs5,cs6, &
                             g11_2,g12_2,g13_2, &
                             g21_2,g22_2,g23_2, &
                             g31_2,g32_2,g33_2, &
-                            in_dx2,in_sn2,in_sp2, &
-                            in_st2,in_av2,in_in2, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            bodyforce,bodypressure,kparasta,kparaend, &
-                            iterat,freesurface,ti)
-                    elseif(islor.eq.1)then
+                            iterat,freesurface)
+                    elseif (islor==1) then
 
-                        call solut_sndrcv_slor(n,n12,n22,n32, &
+                        call solut_sndrcv_slor(n,n12,n22, &
                             kss,jxc,jyc,jzc, &
                             pr2,rhs2v, &
                             cs1,cs2,cs3,cs4,cs5,cs6, &
                             g11_2,g12_2,g13_2, &
                             g21_2,g22_2,g23_2, &
                             g31_2,g32_2,g33_2, &
-                            in_dx2,in_sn2,in_sp2, &
-                            in_st2,in_av2,in_in2, &
+                            in_dx2,in_sn2,in_av2,in_in2, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
                             aa2,bb2,cc2)
                     end if
                 !
                 !-----------------------------------------------------------------------
-                else if (n.eq.1) then           !first grid
+                else if (n==1) then           !first grid
                     !-----------------------------------------------------------------------
                     !
-                    !hicco      call prolong(n,n1,n2,n3,n12,n22,n32,jxc,jyc,jzc,fi,pr2,
-                    call prolong(n,n1,n2,n3,n12,n22,n32,jxc,jyc,jzc,pr1,pr2, &
-                        kstamg,kendmg,rightpe,leftpe, &
-                        tagls,taglr,tagrs,tagrr)
+                    call prolong(n,n1,n2,n12,n22,jxc,jyc,pr1,pr2, &
+                        kstamg,kendmg,rightpe,leftpe,taglr,tagrs)
                     !
-                    if(islor.eq.0)then
+                    if (islor==0) then
 
-                        if (bodyforce) then
-                            do ibodypressure=1,bodypressure
+                        if (bodyforce .and. bodypressure) then
                                 call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
-                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs, &
-                                    tagrr)
-                            end do
+                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
                         end if
 
-                        call solut_sndrcv_sor(n,n1,n2,n3, &
+                        call solut_sndrcv_sor(n,n1,n2, &
                             kss,jxc,jyc,jzc,pr1,rhs, &
-                            cs1,cs2,cs3, &
-                            cs4,cs5,cs6, &
-                            g11,g12,g13, &
-                            g21,g22,g23, &
-                            g31,g32,g33, &
-                            in_dx1,in_sn1,in_sp1, &
-                            in_st1,in_av1,in_in1, &
+                            g11,g12,g13,g21,g22,g23,g31,g32,g33, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            bodyforce,bodypressure,kparasta,kparaend, &
-                            iterat,freesurface,ti)
+                            iterat,freesurface)
 
-                        if (bodyforce) then
-                            do ibodypressure=1,bodypressure
+                        if (bodyforce .and. bodypressure) then
                                 call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
-                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs, &
-                                    tagrr)
-                            end do
+                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
                         end if
 
-                    elseif(islor.eq.1)then
+                    elseif (islor==1) then
 
-                        call solut_sndrcv_slor(n,n1,n2,n3, &
+                        call solut_sndrcv_slor(n,n1,n2, &
                             kss,jxc,jyc,jzc,pr1,rhs, &
-                            cs1,cs2,cs3, &
-                            cs4,cs5,cs6, &
-                            g11,g12,g13, &
-                            g21,g22,g23, &
-                            g31,g32,g33, &
-                            in_dx1,in_sn1,in_sp1, &
-                            in_st1,in_av1,in_in1, &
+                            cs1,cs2,cs3,cs4,cs5,cs6, &
+                            g11,g12,g13,g21,g22,g23,g31,g32,g33, &
+                            in_dx1,in_sn1,in_av1,in_in1, &
                             kstamg,kendmg,rightpe,leftpe, &
-                            tagls,taglr,tagrs,tagrr,       &
+                            tagls,taglr,tagrs,tagrr, &
                             aa1,bb1,cc1)
                     end if
                 !
@@ -567,21 +476,12 @@ contains
             !
             n=1
 
-            if (nlevel.gt.1) then
+            if (nlevel>1) then
 
-                call resid_sndrcv(n,n1,n2,n3,jxc,jyc,jzc, &
-                    pr1,rhsn,rhs, &
-                    cs1,cs2,cs3, &
-                    cs4,cs5,cs6,       &
-                    g11,g12,g13, &
-                    g21,g22,g23, &
-                    g31,g32,g33, &
-                    in_dx1,in_sn1,in_sp1, &
-                    in_st1,in_av1,in_in1, &
-                    kstamg,kendmg, &
-                    bodyforce,bodypressure,kparasta,kparaend)
+                call resid_sndrcv(n,n1,n2,jxc,jyc, &
+                    pr1,rhsn,rhs,g11,g22,g33,kstamg,kendmg)
 
-            endif
+            end if
             !-----------------------------------------------------------------------
 
             do k=kstamg(n)-1,kendmg(n)+1 !kparasta,kparaend
@@ -605,9 +505,9 @@ contains
                             aresi=abs(rhsn(i,j,k))
                             resmax_loc=max(resmax_loc,aresi)
                         !
-                        enddo
-                    enddo
-                enddo
+                        end do
+                    end do
+                end do
             end if
 
             !     with IBM
@@ -621,19 +521,19 @@ contains
                             do itipo=2,finetipo
                                 aresi=abs(rhsn(i,j,k))
                                 resmax_loc=max(resmax_loc,aresi)
-                            enddo
+                            end do
                         !
-                        enddo
-                    enddo
-                enddo
+                        end do
+                    end do
+                end do
             end if
             !
             call MPI_ALLREDUCE(resmax_loc,resmax,1,MPI_REAL_SD,MPI_MAX, &
                 MPI_COMM_WORLD,ierr)
 
-            if(myid.eq.0)then
+            if (myid==0) then
                 write(*,*)myid,' ','ktime, resmax',ktime,resmax
-            endif
+            end if
 
         end do
         !
@@ -653,15 +553,12 @@ contains
         return
     end subroutine multi
 
-    subroutine solut_sndrcv_sor(n,i1,j1,k1, &
+    subroutine solut_sndrcv_sor(n,i1,j1, &
         kss,jxc,jyc,jzc,pr,rh, &
-        cs1,cs2,cs3,cs4,cs5,cs6, &
         r11,r12,r13,r21,r22,r23,r31,r32,r33, &
-        i_dx,i_sn,i_sp,i_st,i_av,i_in, &
         kstamg,kendmg,rightpe,leftpe, &
         tagls,taglr,tagrs,tagrr, &
-        bodyforce,bodypressure,kparasta,kparaend, &
-        iterat,freesurface,ti)
+        iterat,freesurface)
         !***********************************************************************
         ! smoothing on every level with SOR
 
@@ -670,24 +567,14 @@ contains
         !-----------------------------------------------------------------------
         !     array declaration
         integer kstamg(4),kendmg(4)
-        integer kparasta,kparaend
-        integer i,j,k,ipot,i1,j1,k1,ics,jcs,kcs,n1i,n1j,n1k,n,kk
-        integer i_dx(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_sn(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_sp(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_st(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_av(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_in(i1,j1,kstamg(n):kendmg(n)) !k1)
+        integer i,j,k,ipot,i1,j1,n,kk
         integer kss(4)
         integer jxc(0:4),jyc(0:4),jzc(0:4)
         !
         integer ierr,myid,nproc,status(MPI_STATUS_SIZE)
-        integer ncolperproc,m
-        integer leftpe,rightpe,ktime
+        integer leftpe,rightpe
         integer leftpem,rightpem
-        integer lll,iw,jw,kw
-        integer prplan,req1,req2,req3,req4
-        integer istatus(MPI_STATUS_SIZE)
+        integer prplan
         integer iii,jjj,kkk
         !
         real pot,ppot1,ppot2,resi,den
@@ -707,20 +594,11 @@ contains
 
         real pr(0:i1+1,0:j1+1,kstamg(n)-1:kendmg(n)+1)
         real rh(i1,j1,kstamg(n):kendmg(n))
-        real cs1(n2,n3),cs2(n2,n3)
-        real cs3(n1,n3),cs4(n1,n3)
-        real cs5(n1,n2),cs6(n1,n2)
         !
-        real, allocatable :: prcol(:),prtot(:)
         integer tagls,taglr,tagrs,tagrr
         !
         !      integer tipo(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
-        logical bodyforce
-        integer bodypressure,ibodypressure
-        integer ilivello,itipo_ib,itipo_solida
-        integer ibloop,solidaloop
         integer freesurface,iterat
-        real ti
 
         !-----------------------------------------------------------------------
         CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
@@ -738,16 +616,16 @@ contains
         sq_ppot1 = ppot1*ppot1
         ppot2=1/pot/pot
         !
-        if(myid.eq.0)then
+        if (myid==0) then
             leftpem=MPI_PROC_NULL
             rightpem=rightpe
-        else if(myid.eq.nproc-1)then
+        else if (myid==nproc-1) then
             leftpem=leftpe
             rightpem=MPI_PROC_NULL
-        else if((myid.ne.0).and.(myid.ne.nproc-1))then
+        else if ((myid/=0).and.(myid/=nproc-1)) then
             leftpem=leftpe
             rightpem=rightpe
-        endif
+        end if
 
 
 
@@ -755,12 +633,12 @@ contains
 
             !
             !     boundary condition
-            call mul_boun_sndrcv(n,i1,j1,k1, &
+            call mul_boun_sndrcv(n,i1,j1, &
                 jxc,jyc,jzc, &
                 r11,r12,r13,r21,r22,r23,r31,r32,r33,pr, &
                 kstamg,kendmg,rightpe,leftpe, &
                 tagls,taglr,tagrs,tagrr, &
-                iterat,freesurface,ti)
+                iterat,freesurface)
 
             ! smoothing with SOR
             ! on vertical plane zebra! odd and even
@@ -778,33 +656,25 @@ contains
             ! exchange boundary values for k=0 and k=jzc(n)
             do kkk=1,1-kp
 
-                !c      if (kcs.eq.1) then
+                !c      if (kcs==1) then
 
-                if (myid.eq.nproc-1) then
-                    call MPI_SSEND(pr(1,1,jzc(n)),1,prplan,0,11, &
-                        MPI_COMM_WORLD,ierr)
-                !      call MPI_WAIT(req1,istatus,ierr)
-                else if (myid.eq.0) then
-                    call MPI_RECV(pr(1,1,0),1,prplan,nproc-1,11, &
-                        MPI_COMM_WORLD,status,ierr)
-                !      call MPI_WAIT(req2,istatus,ierr)
-                endif
+                if (myid==nproc-1) then
+                    call MPI_SSEND(pr(1,1,jzc(n)),1,prplan,0,11,MPI_COMM_WORLD,ierr)
+                else if (myid==0) then
+                    call MPI_RECV(pr(1,1,0),1,prplan,nproc-1,11,MPI_COMM_WORLD,status,ierr)
+                end if
 
-                !c      else if (kcs.eq.2) then
+                !c      else if (kcs==2) then
 
-                if (myid.eq.0) then
-                    call MPI_SSEND(pr(1,1,1),1,prplan,nproc-1,12, &
-                        MPI_COMM_WORLD,ierr)
-                !      call MPI_WAIT(req1,istatus,ierr)
-                else if (myid.eq.nproc-1) then
-                    call MPI_RECV(pr(1,1,jzc(n)+1),1,prplan,0,12, &
-                        MPI_COMM_WORLD,status,ierr)
-                !      call MPI_WAIT(req2,istatus,ierr)
-                endif
+                if (myid==0) then
+                    call MPI_SSEND(pr(1,1,1),1,prplan,nproc-1,12,MPI_COMM_WORLD,ierr)
+                else if (myid==nproc-1) then
+                    call MPI_RECV(pr(1,1,jzc(n)+1),1,prplan,0,12,MPI_COMM_WORLD,status,ierr)
+                end if
 
-            !c      endif
+            !c      end if
 
-            enddo
+            end do
 
 
             do k=kstamg(n),kendmg(n)
@@ -818,7 +688,7 @@ contains
                         pr(0,j,k)=pr(jxc(n),j,k)
                         pr(jxc(n)+1,j,k)=pr(1,j,k)
 
-                    enddo
+                    end do
                     !
                     do i=1,jxc(n)
                         !      do i=n1i,jxc(n),2
@@ -828,7 +698,7 @@ contains
                             pr(i,0,k)=pr(i,jyc(n),k)
                             pr(i,jyc(n)+1,k)=pr(i,1,k)
 
-                        enddo
+                        end do
 
                         !
                         !      right residual
@@ -909,131 +779,101 @@ contains
                     !
 
 
-                    enddo   ! done one complete sweep for 1 plane
-                enddo   ! done one complete sweep for 1 plane
-            enddo   ! done one complete sweep for odd or even lines
+                    end do   ! done one complete sweep for 1 plane
+                end do   ! done one complete sweep for 1 plane
+            end do   ! done one complete sweep for odd or even lines
             !
 
-            !      enddo   ! done the 2 colors
-            !      enddo   ! done the 2 colors
+            !      end do   ! done the 2 colors
+            !      end do   ! done the 2 colors
 
 
 
-            !c      if (kcs.eq.1) then
+            !c      if (kcs==1) then
 
-            if(leftpem /= MPI_PROC_NULL) then
+            if (leftpem /= MPI_PROC_NULL) then
                 call MPI_SSEND(pr(1,1,kstamg(n)),1, &
                     prplan,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
-            endif
-            if(rightpem /= MPI_PROC_NULL) then
+            end if
+            if (rightpem /= MPI_PROC_NULL) then
                 call MPI_RECV(pr(1,1,kendmg(n)+1),1, &
                     prplan,rightpem,tagrr, &
                     MPI_COMM_WORLD,status,ierr)
-            endif
+            end if
 
-            if(leftpem /= MPI_PROC_NULL) then
-            !      call MPI_WAIT(req1,istatus,ierr)
-            endif
-            if(rightpem /= MPI_PROC_NULL) then
-            !      call MPI_WAIT(req2,istatus,ierr)
-            endif
+            !c      else if (kcs==2) then
 
-
-            !c      else if (kcs.eq.2) then
-
-            if(rightpem /= MPI_PROC_NULL) then
+            if (rightpem /= MPI_PROC_NULL) then
                 call MPI_SSEND(pr(1,1,kendmg(n)),1, &
                     prplan,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
-            endif
-            if(leftpem /= MPI_PROC_NULL) then
+            end if
+            if (leftpem /= MPI_PROC_NULL) then
                 call MPI_RECV(pr(1,1,kstamg(n)-1),1, &
                     prplan,leftpem,taglr, &
                     MPI_COMM_WORLD,status,ierr)
-            endif
+            end if
 
-            if(rightpem /= MPI_PROC_NULL) then
-            !      call MPI_WAIT(req1,istatus,ierr)
-            endif
-            if(leftpem /= MPI_PROC_NULL) then
-            !      call MPI_WAIT(req2,istatus,ierr)
-            endif
+        !c      end if
 
-        !c      endif
+        !      end do   ! done the 2 colors
 
-        !      enddo   ! done the 2 colors
-
-        enddo   ! end of a pseudo time iteration
+        end do   ! end of a pseudo time iteration
 
         call MPI_TYPE_FREE(prplan,ierr)
 
         !     send ghost cell
-        if(leftpem /= MPI_PROC_NULL) then
+        if (leftpem /= MPI_PROC_NULL) then
             call MPI_SSEND(pr(0,0,kstamg(n)),(jxc(n)+2)*(jyc(n)+2), &
                 MPI_REAL_SD,leftpem,tagls, &
                 MPI_COMM_WORLD,ierr)
-        endif
-        if(rightpem /= MPI_PROC_NULL) then
+        end if
+        if (rightpem /= MPI_PROC_NULL) then
             call MPI_RECV(pr(0,0,kendmg(n)+1),(jxc(n)+2)*(jyc(n)+2), &
                 MPI_REAL_SD,rightpem,tagrr, &
                 MPI_COMM_WORLD,status,ierr)
-        endif
-        if(rightpem /= MPI_PROC_NULL) then
+        end if
+        if (rightpem /= MPI_PROC_NULL) then
             call MPI_SSEND(pr(0,0,kendmg(n)),(jxc(n)+2)*(jyc(n)+2), &
                 MPI_REAL_SD,rightpem,tagrs, &
                 MPI_COMM_WORLD,ierr)
-        endif
-        if(leftpem /= MPI_PROC_NULL) then
+        end if
+        if (leftpem /= MPI_PROC_NULL) then
             call MPI_RECV(pr(0,0,kstamg(n)-1),(jxc(n)+2)*(jyc(n)+2), &
                 MPI_REAL_SD,leftpem,taglr, &
                 MPI_COMM_WORLD,status,ierr)
-        endif
-
-        if(leftpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req1,istatus,ierr)
-        !      call MPI_WAIT(req4,istatus,ierr)
-        endif
-        if(rightpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req2,istatus,ierr)
-        !      call MPI_WAIT(req3,istatus,ierr)
-        endif
-
-
+        end if
 
         return
 
     end subroutine solut_sndrcv_sor
 
-	subroutine mul_boun_sndrcv(n,i1,j1,k1, &
+    subroutine mul_boun_sndrcv(n,i1,j1, &
         jxc,jyc,jzc, &
         r11,r12,r13,r21,r22,r23,r31,r32,r33,pr, &
         kstamg,kendmg,rightpe,leftpe, &
         tagls,taglr,tagrs,tagrr, &
-        iterat,freesurface,ti)
+        iterat,freesurface)
         !***********************************************************************
         ! update boundary condition for pressure with multigrid
         !
         use myarrays_velo3
-        use myarrays_metri3 !added to calculate the surface pressure
+        use myarrays_metri3
 
         implicit none
 
         !-----------------------------------------------------------------------
         !     array declaration
-        integer i,j,k,ii,jj,kk,i1,j1,k1,n,kkk
+        integer i,j,k,ii,jj,kk,i1,j1,n,kkk
         integer jxc(0:4),jyc(0:4),jzc(0:4)
         !
         integer kstamg(4),kendmg(4)
         integer ierr,myid,nproc,status(MPI_STATUS_SIZE)
-        integer lll
-        integer countsnd,countrcv
         integer prplan
         integer leftpe,rightpe
         integer leftpem,rightpem
         integer tagls,taglr,tagrs,tagrr
-        integer req1,req2,req3,req4
-        integer istatus(MPI_STATUS_SIZE)
         integer iterat,freesurface
         !
         real an
@@ -1065,8 +905,7 @@ contains
 
         real inv_dt,coef
         real inv_r11,inv_r22,inv_r33
-        real pi,ti
-        real wavel,Kwavel,x_i,Tperiod,Wperiod
+        real pi
         !-----------------------------------------------------------------------
         CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
         CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
@@ -1076,19 +915,19 @@ contains
         coef = 0.25
         pi = acos(-1.)
 
-        if(myid.eq.0)then
+        if (myid==0) then
             leftpem=MPI_PROC_NULL
             rightpem=rightpe
-        else if(myid.eq.nproc-1)then
+        else if (myid==nproc-1) then
             leftpem=leftpe
             rightpem=MPI_PROC_NULL
-        else if((myid.ne.0).and.(myid.ne.nproc-1))then
+        else if ((myid/=0).and.(myid/=nproc-1)) then
             leftpem=leftpe
             rightpem=rightpe
-        endif
+        end if
         !
         !     compute boundary condition for pressure
-        if (n.eq.1) then    ! first grid
+        if (n==1) then    ! first grid
             an=1.
         else                ! other grids
             an=0.
@@ -1127,8 +966,8 @@ contains
                             (pr(jxc(n)+1,j,k+1)+pr(jxc(n),j,k+1)- &
                             pr(jxc(n)+1,j,k-1)-pr(jxc(n),j,k-1)))
                     !
-                    enddo
-                enddo
+                    end do
+                end do
 
             end do
             !
@@ -1163,7 +1002,7 @@ contains
                         !
                         inv_r22 = 1./r22(i,jyc(n),k)
 
-                        if(freesurface.eq.0)then !no free surface <<<<<<<<<<<<<<<
+                        if (freesurface==0) then !no free surface <<<<<<<<<<<<<<<
                             !    ORIGINAL code for the pressure at the surface:
                             pr(i,jyc(n)+1,k)=pr(i,jyc(n),k)+an*cs4(i,k)*inv_dt*inv_r22 & !/dt/r22(i,jyc(n),k)
                                 -coef*inv_r22* &
@@ -1174,11 +1013,11 @@ contains
                                 (pr(i,jyc(n)+1,k+1)+pr(i,jyc(n),k+1) &
                                 -pr(i,jyc(n)+1,k-1)-pr(i,jyc(n),k-1)))
                         !
-                        elseif(freesurface.eq.1)then !free surface on<<<<<<<<<<<<<<<<
+                        elseif (freesurface==1) then !free surface on<<<<<<<<<<<<<<<<
                             !
                             !      the following if condition is to have an initial imposed surface pressure
                             PrS0=0.
-                            if(iterat.eq.1)then ! the initial surface pressure to be imposed HERE! <<<<<<<<<
+                            if (iterat==1) then ! the initial surface pressure to be imposed HERE! <<<<<<<<<
                                 !         PrS0 = ((16.5-i)/77.5)  !the value i want exactly at the surface
                                 !         PrS0 = (9.81*0.02)*sin((i-1)*2*pi/31)  !the value i want exactly at the surface
                                 !         wavel=20.
@@ -1195,8 +1034,8 @@ contains
                                 !c                                     ! wavelength = Lx
                                 !
                                 PrS0=0.
-                            else ! the pressure at surface is imposed at iteration.gt.1
-                                if(n.eq.1)then
+                            else ! the pressure at surface is imposed at iteration>1
+                                if (n==1) then
                                     PrS0=next_prs(i,k)
                                 end if
                             end if ! to have an initial imposed surface pressure
@@ -1210,45 +1049,11 @@ contains
                                 (pr(i,jyc(n)+1,k+1)+pr(i,jyc(n),k+1) &
                                 -pr(i,jyc(n)+1,k-1)-pr(i,jyc(n),k-1))))
                         !
-
-
-                        !
-
-                        !c       The following to impose the surface pressure AT ALL ITERATIONS
-                        !c         PrS0 = (9.81*0.02)*sin((i-1)*2*pi/31)  !the value i want exactly at the surface
-                        !         wavel=20.
-                        !         Kwavel=2.*pi/wavel
-                        !         x_i=((10./32)*(i-1))+((10./32)*(1./2))
-                        !         Tperiod=4.5
-                        !         Wperiod=2.*pi/Tperiod
-                        !         PrS0= 9.81*(0.02)*
-                        !     >       (cos(Wperiod*ti) )*
-                        !c                                     ! cos [ (2 * pi / T(period) ) * (time in seconds) ]
-                        !c                                     ! T = 12hour * 3600(seconds in 1 hour)
-                        !     >       (cos(Kwavel*x_i) )
-                        !c                                     ! sin [ (2 * pi / wavelength) * (x function of i) ]
-                        !c                                     ! wavelength = Lx
-                        !c       if((iterat.eq.1).and.(k.eq.10))then
-                        !c         write(*,*)'PrS0',i,x_i,PrS0
-                        !c       end if
-                        !
-                        !         pr(i,jyc(n)+1,k)=(PrS0*2)-(pr(i,jyc(n),k)
-                        !     >      -coef*inv_r22*
-                        !     >        (r21(i,jyc(n),k)*
-                        !     >                       (pr(i+1,jyc(n)+1,k)+pr(i+1,jyc(n),k)
-                        !     >                       -pr(i-1,jyc(n)+1,k)-pr(i-1,jyc(n),k))
-                        !     >        +r23(i,jyc(n),k)*
-                        !     >                       (pr(i,jyc(n)+1,k+1)+pr(i,jyc(n),k+1)
-                        !     >                       -pr(i,jyc(n)+1,k-1)-pr(i,jyc(n),k-1))))
-
-
-
-                        !
                         end if !free surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
                     !
-                    enddo
-                enddo
+                    end do
+                end do
             !
             end do
             !
@@ -1269,7 +1074,7 @@ contains
             !     back and front
             do kk=1,kp
 
-                if(myid.eq.0)then
+                if (myid==0) then
                     do i=1,jxc(n)
                         do j=1,jyc(n)
 
@@ -1281,11 +1086,11 @@ contains
                                 (pr(i+1,j,1)+pr(i+1,j,0)-pr(i-1,j,1)-pr(i-1,j,0)) &
                                 +r32(i,j,0)* &
                                 (pr(i,j+1,1)+pr(i,j+1,0)-pr(i,j-1,1)-pr(i,j-1,0)))
-                        enddo
-                    enddo
-                endif
+                        end do
+                    end do
+                end if
 
-                if(myid.eq.nproc-1)then
+                if (myid==nproc-1) then
                     do i=1,jxc(n)
                         do j=1,jyc(n)
 
@@ -1299,11 +1104,11 @@ contains
                                 +r32(i,j,jzc(n))* &
                                 (pr(i,j+1,jzc(n)+1)+pr(i,j+1,jzc(n)) &
                                 -pr(i,j-1,jzc(n)+1)-pr(i,j-1,jzc(n))))
-                        enddo
-                    enddo
-                endif
+                        end do
+                    end do
+                end if
 
-            enddo
+            end do
             !
             ! to exchange the necessary points I use a new data type of MPI
             ! avoiding the boundary
@@ -1321,20 +1126,20 @@ contains
                 call MPI_TYPE_COMMIT(prplan,ierr)
 
 
-                if (myid.eq.0) then
+                if (myid==0) then
                     call MPI_SENDRECV(pr(1,1,1),1, &
                         prplan,nproc-1,12, &
                         pr(1,1,0),1, &
                         prplan,nproc-1,11, &
                         MPI_COMM_WORLD,status,ierr)
 
-                else if (myid.eq.nproc-1) then
+                else if (myid==nproc-1) then
                     call MPI_SENDRECV(pr(1,1,jzc(n)),1, &
                         prplan,0,11, &
                         pr(1,1,jzc(n)+1),1, &
                         prplan,0,12, &
                         MPI_COMM_WORLD,status,ierr)
-                endif
+                end if
 
                 call MPI_TYPE_FREE(prplan,ierr)
 
@@ -1355,43 +1160,43 @@ contains
                     !ccc      pr(i,       0,jzc(n)+1)=pr(i,       0,     1)
                     !ccc      pr(i,jyc(n)+1,       0)=pr(i,jyc(n)+1,jzc(n))
                     !ccc      pr(i,jyc(n)+1,jzc(n)+1)=pr(i,jyc(n)+1,     1)
-                    !ccc      enddo
+                    !ccc      end do
                     !
                     ! 1.1) put values on buffer vector
                     !
-                    if (myid.eq.0) then
+                    if (myid==0) then
 
                         allocate(buffprs1(2*jxc(n)))
                         allocate(buffprr1(2*jxc(n)))
                         do i=1,2*jxc(n)
                             buffprs1(i)=0.
                             buffprr1(i)=0.
-                        enddo
+                        end do
 
                         do i=1,jxc(n)
                             buffprs1(i)       =pr(i,jyc(n)+1,1)
                             buffprs1(i+jxc(n))=pr(i,       0,1)
-                        enddo
+                        end do
 
-                    else if (myid.eq.nproc-1) then
+                    else if (myid==nproc-1) then
 
                         allocate(buffprs2(2*jxc(n)))
                         allocate(buffprr2(2*jxc(n)))
                         do i=1,2*jxc(n)
                             buffprs2(i)=0.
                             buffprr2(i)=0.
-                        enddo
+                        end do
 
                         do i=1,jxc(n)
                             buffprs2(i)       =pr(i,jyc(n)+1,jzc(n))
                             buffprs2(i+jxc(n))=pr(i,       0,jzc(n))
-                        enddo
+                        end do
 
-                    endif
+                    end if
                     !
                     !c 1.2) exchange buffer between  PE=0 and PE=nproc-1
                     !
-                    if (myid.eq.0) then
+                    if (myid==0) then
 
                         call MPI_SENDRECV(buffprs1(1),2*jxc(n), &
                             MPI_REAL_SD,nproc-1,22, &
@@ -1399,7 +1204,7 @@ contains
                             MPI_REAL_SD,nproc-1,21, &
                             MPI_COMM_WORLD,status,ierr)
 
-                    else if (myid.eq.nproc-1) then
+                    else if (myid==nproc-1) then
 
                         call MPI_SENDRECV(buffprs2(1),2*jxc(n), &
                             MPI_REAL_SD,0,21, &
@@ -1407,29 +1212,29 @@ contains
                             MPI_REAL_SD,0,22, &
                             MPI_COMM_WORLD,status,ierr)
 
-                    endif
+                    end if
                     !
                     ! 1.3) put values from buffer to variables
                     !
-                    if (myid.eq.0) then
+                    if (myid==0) then
 
                         do i=1,jxc(n)
                             pr(i,jyc(n)+1,0)=buffprr1(i)
                             pr(i,       0,0)=buffprr1(i+jxc(n))
-                        enddo
+                        end do
 
                         deallocate(buffprs1,buffprr1)
 
-                    else if (myid.eq.nproc-1) then
+                    else if (myid==nproc-1) then
 
                         do i=1,jxc(n)
                             pr(i,jyc(n)+1,jzc(n)+1)=buffprr2(i)
                             pr(i,       0,jzc(n)+1)=buffprr2(i+jxc(n))
-                        enddo
+                        end do
 
                         deallocate(buffprs2,buffprr2)
 
-                    endif
+                    end if
                     !
                     ! 2) riquadro di cornice verticale (piani k=0,jzc(n)+1)
                     !
@@ -1440,43 +1245,43 @@ contains
                         !ccc      pr(0,       j,jzc(n)+1)=pr(jxc(n),j,     1)
                         !ccc      pr(jxc(n)+1,j,       0)=pr(     1,j,jzc(n))
                         !ccc      pr(jxc(n)+1,j,jzc(n)+1)=pr(     1,j,     1)
-                        !ccc      enddo
+                        !ccc      end do
                         !
                         ! 2.1) put the values in a buffer vector
                         !
-                        if (myid.eq.0) then
+                        if (myid==0) then
 
                             allocate(buffprs1(2*(jyc(n)+2)))
                             allocate(buffprr1(2*(jyc(n)+2)))
                             do j=1,2*(jyc(n)+2)
                                 buffprs1(j)=0.
                                 buffprr1(j)=0.
-                            enddo
+                            end do
 
                             do j=0,jyc(n)+1
                                 buffprs1(j+1)         =pr(jxc(n),j,1)
                                 buffprs1(j+1+jyc(n)+2)=pr(     1,j,1)
-                            enddo
+                            end do
 
-                        else if (myid.eq.nproc-1) then
+                        else if (myid==nproc-1) then
 
                             allocate(buffprs2(2*(jyc(n)+2)))
                             allocate(buffprr2(2*(jyc(n)+2)))
                             do j=1,2*(jyc(n)+2)
                                 buffprs2(j)=0.
                                 buffprr2(j)=0.
-                            enddo
+                            end do
 
                             do j=0,jyc(n)+1
                                 buffprs2(j+1)         =pr(jxc(n),j,jzc(n))
                                 buffprs2(j+1+jyc(n)+2)=pr(     1,j,jzc(n))
-                            enddo
+                            end do
 
-                        endif
+                        end if
                         !
                         ! 2.2) exchange buffer between PE=0 and PE=nproc-1
                         !
-                        if (myid.eq.0) then
+                        if (myid==0) then
 
                             call MPI_SENDRECV(buffprs1(1),2*(jyc(n)+2), &
                                 MPI_REAL_SD,nproc-1,32, &
@@ -1484,7 +1289,7 @@ contains
                                 MPI_REAL_SD,nproc-1,31, &
                                 MPI_COMM_WORLD,status,ierr)
 
-                        else if (myid.eq.nproc-1) then
+                        else if (myid==nproc-1) then
 
                             call MPI_SENDRECV(buffprs2(1),2*(jyc(n)+2), &
                                 MPI_REAL_SD,0,31, &
@@ -1492,31 +1297,31 @@ contains
                                 MPI_REAL_SD,0,32, &
                                 MPI_COMM_WORLD,status,ierr)
 
-                        endif
+                        end if
                         !
                         ! 2.3) put values from buffer to variables
                         !
-                        if (myid.eq.0) then
+                        if (myid==0) then
 
                             do j=0,jyc(n)+1
                                 pr(0       ,j,0)=buffprr1(j+1)
                                 pr(jxc(n)+1,j,0)=buffprr1(j+1+jyc(n)+2)
-                            enddo
+                            end do
 
                             deallocate(buffprs1,buffprr1)
 
-                        else if (myid.eq.nproc-1) then
+                        else if (myid==nproc-1) then
 
                             do j=0,jyc(n)+1
                                 pr(0       ,j,jzc(n)+1)=buffprr2(j+1)
                                 pr(jxc(n)+1,j,jzc(n)+1)=buffprr2(j+1+jyc(n)+2)
-                            enddo
+                            end do
 
                             deallocate(buffprs2,buffprr2)
 
-                        endif
+                        end if
                     !
-                    enddo  !loop on ii
+                    end do  !loop on ii
                     !
                     do ii=1,ip
                         !
@@ -1525,43 +1330,43 @@ contains
                         !ccc      pr(0,       j,jzc(n)+1)=pr(0       ,j,     1)
                         !ccc      pr(jxc(n)+1,j,       0)=pr(jxc(n)+1,j,jzc(n))
                         !ccc      pr(jxc(n)+1,j,jzc(n)+1)=pr(jxc(n)+1,j,     1)
-                        !ccc      enddo
+                        !ccc      end do
                         !
                         ! 2.1) put data on a vector buffer
                         !
-                        if (myid.eq.0) then
+                        if (myid==0) then
 
                             allocate(buffprs1(2*(jyc(n)+2)))
                             allocate(buffprr1(2*(jyc(n)+2)))
                             do j=1,2*(jyc(n)+2)
                                 buffprs1(j)=0.
                                 buffprr1(j)=0.
-                            enddo
+                            end do
 
                             do j=0,jyc(n)+1
                                 buffprs1(j+1)         =pr(jxc(n)+1,j,1)
                                 buffprs1(j+1+jyc(n)+2)=pr(       0,j,1)
-                            enddo
+                            end do
 
-                        else if (myid.eq.nproc-1) then
+                        else if (myid==nproc-1) then
 
                             allocate(buffprs2(2*(jyc(n)+2)))
                             allocate(buffprr2(2*(jyc(n)+2)))
                             do j=1,2*(jyc(n)+2)
                                 buffprs2(j)=0.
                                 buffprr2(j)=0.
-                            enddo
+                            end do
 
                             do j=0,jyc(n)+1
                                 buffprs2(j+1)         =pr(jxc(n)+1,j,jzc(n))
                                 buffprs2(j+1+jyc(n)+2)=pr(       0,j,jzc(n))
-                            enddo
+                            end do
 
-                        endif
+                        end if
                         !
                         ! 2.2) exchange buffer between PE=0 and PE=nproc-1
                         !
-                        if (myid.eq.0) then
+                        if (myid==0) then
 
                             call MPI_SENDRECV(buffprs1(1),2*(jyc(n)+2), &
                                 MPI_REAL_SD,nproc-1,32, &
@@ -1569,7 +1374,7 @@ contains
                                 MPI_REAL_SD,nproc-1,31, &
                                 MPI_COMM_WORLD,status,ierr)
 
-                        else if (myid.eq.nproc-1) then
+                        else if (myid==nproc-1) then
 
                             call MPI_SENDRECV(buffprs2(1),2*(jyc(n)+2), &
                                 MPI_REAL_SD,0,31, &
@@ -1577,31 +1382,31 @@ contains
                                 MPI_REAL_SD,0,32, &
                                 MPI_COMM_WORLD,status,ierr)
 
-                        endif
+                        end if
                         !
                         ! 2.3) put values from buffer to variables
                         !
-                        if (myid.eq.0) then
+                        if (myid==0) then
 
                             do j=0,jyc(n)+1
                                 pr(jxc(n)+1,j,0)=buffprr1(j+1)
                                 pr(       0,j,0)=buffprr1(j+1+jyc(n)+2)
-                            enddo
+                            end do
 
                             deallocate(buffprs1,buffprr1)
 
-                        else if (myid.eq.nproc-1) then
+                        else if (myid==nproc-1) then
 
                             do j=0,jyc(n)+1
                                 pr(jxc(n)+1,j,jzc(n)+1)=buffprr2(j+1)
                                 pr(       0,j,jzc(n)+1)=buffprr2(j+1+jyc(n)+2)
-                            enddo
+                            end do
 
                             deallocate(buffprs2,buffprr2)
 
-                        endif
+                        end if
                     !
-                    enddo   !loop on ii
+                    end do   !loop on ii
                     !
                     ! 3) horizontal square (plane k=0,jzc(n)+1)
                     !
@@ -1611,8 +1416,8 @@ contains
                             pr(0,              0,k)=pr(jxc(n),       0,k)
                             pr(jxc(n)+1,jyc(n)+1,k)=pr(     1,jyc(n)+1,k)
                             pr(jxc(n)+1,       0,k)=pr(     1,       0,k)
-                        enddo
-                    enddo  !end loop ii
+                        end do
+                    end do  !end loop ii
                     !
                     do ii=1,ip !not periodic in x
                         do k=kstamg(n),kendmg(n)
@@ -1620,10 +1425,10 @@ contains
                             pr(0,              0,k)=pr(0       ,     1,k)
                             pr(jxc(n)+1,jyc(n)+1,k)=pr(jxc(n)+1,jyc(n),k)
                             pr(jxc(n)+1,       0,k)=pr(jxc(n)+1,     1,k)
-                        enddo
-                    enddo  !end loop ii
+                        end do
+                    end do  !end loop ii
 
-                enddo  !end loop kk
+                end do  !end loop kk
                 !
                 !
                 do kk=1,kp !not periodic in k
@@ -1637,17 +1442,17 @@ contains
                     !h         pr(i,       0,jzc(n)+1)=pr(i,     1,jzc(n)+1)
                     !h         pr(i,jyc(n)+1,       0)=pr(i,jyc(n),       0)
                     !h         pr(i,jyc(n)+1,jzc(n)+1)=pr(i,jyc(n),jzc(n)+1)
-                    !h      enddo
-                    if(myid.eq.0)then
+                    !h      end do
+                    if (myid==0) then
                         do i=1,jxc(n)
                             pr(i,       0,       0)=pr(i,     1,       0)
                             pr(i,jyc(n)+1,       0)=pr(i,jyc(n),       0)
-                        enddo
-                    elseif(myid.eq.nproc-1)then
+                        end do
+                    elseif (myid==nproc-1) then
                         do i=1,jxc(n)
                             pr(i,       0,jzc(n)+1)=pr(i,     1,jzc(n)+1)
                             pr(i,jyc(n)+1,jzc(n)+1)=pr(i,jyc(n),jzc(n)+1)
-                        enddo
+                        end do
                     end if
                     !
                     ! 2) vertical square (planes k=0,jzc(n)+1)
@@ -1660,22 +1465,22 @@ contains
                     !h         pr(0,       j,jzc(n)+1)=pr(jxc(n),j,jzc(n)+1)
                     !h         pr(jxc(n)+1,j,       0)=pr(     1,j,       0)
                     !h         pr(jxc(n)+1,j,jzc(n)+1)=pr(     1,j,jzc(n)+1)
-                    !h      enddo
-                    !h      enddo
+                    !h      end do
+                    !h      end do
 
                     do ii=1,1-ip
-                        if(myid.eq.0)then
+                        if (myid==0) then
                             do j=0,jyc(n)+1
                                 pr(0,       j,       0)=pr(jxc(n),j,       0)
                                 pr(jxc(n)+1,j,       0)=pr(     1,j,       0)
-                            enddo
-                        elseif(myid.eq.nproc-1)then
+                            end do
+                        elseif (myid==nproc-1) then
                             do j=0,jyc(n)+1
                                 pr(0,       j,jzc(n)+1)=pr(jxc(n),j,jzc(n)+1)
                                 pr(jxc(n)+1,j,jzc(n)+1)=pr(     1,j,jzc(n)+1)
-                            enddo
+                            end do
                         end if
-                    enddo
+                    end do
                     !
                     ! not periodic in x
                     !
@@ -1685,22 +1490,22 @@ contains
                     !h         pr(0,       j,jzc(n)+1)=pr(1     ,j,jzc(n)+1)
                     !h         pr(jxc(n)+1,j,       0)=pr(jxc(n),j,       0)
                     !h         pr(jxc(n)+1,j,jzc(n)+1)=pr(jxc(n),j,jzc(n)+1)
-                    !h      enddo
-                    !h      enddo
+                    !h      end do
+                    !h      end do
 
                     do ii=1,ip
-                        if(myid.eq.0)then
+                        if (myid==0) then
                             do j=0,jyc(n)+1
                                 pr(0,       j,       0)=pr(1     ,j,       0)
                                 pr(jxc(n)+1,j,       0)=pr(jxc(n),j,       0)
-                            enddo
-                        elseif(myid.eq.nproc-1)then
+                            end do
+                        elseif (myid==nproc-1) then
                             do j=0,jyc(n)+1
                                 pr(0,       j,jzc(n)+1)=pr(1     ,j,jzc(n)+1)
                                 pr(jxc(n)+1,j,jzc(n)+1)=pr(jxc(n),j,jzc(n)+1)
-                            enddo
+                            end do
                         end if
-                    enddo
+                    end do
                     !
                     ! 3) horizontal square (planes k=0,jzc(n)+1)
                     !
@@ -1712,8 +1517,8 @@ contains
                             pr(0,              0,k)=pr(jxc(n),       0,k)
                             pr(jxc(n)+1,jyc(n)+1,k)=pr(     1,jyc(n)+1,k)
                             pr(jxc(n)+1,       0,k)=pr(     1,       0,k)
-                        enddo
-                    enddo
+                        end do
+                    end do
                     !
                     ! not periodic in x
                     !
@@ -1723,16 +1528,16 @@ contains
                             pr(0,              0,k)=pr(1     ,       0,k)
                             pr(jxc(n)+1,jyc(n)+1,k)=pr(jxc(n),jyc(n)+1,k)
                             pr(jxc(n)+1,       0,k)=pr(jxc(n),       0,k)
-                        enddo
-                    enddo
+                        end do
+                    end do
                 !
-                enddo  !end loop kk
+                end do  !end loop kk
             !
-            enddo  !end loop jj
+            end do  !end loop jj
             !
             do jj=1,1-jp
                 print*,'periodico in y non in questa versione!'
-            enddo
+            end do
             !
             ! exchange k+1 and k-1 at the border
             !anna also for non periodic in x
@@ -1751,82 +1556,74 @@ contains
                     buff2s(j)=0.
                     buff1r(j)=0.
                     buff2r(j)=0.
-                enddo
+                end do
 
-                if(leftpem /= MPI_PROC_NULL) then
+                if (leftpem /= MPI_PROC_NULL) then
                     do j=1,jyc(n) !these are for k+1
                         buff1s(j)=pr(0,j,kstamg(n))
                         buff1s(j+jyc(n))=pr(1,j,kstamg(n))
                         buff1s(j+2*jyc(n))=pr(jxc(n),j,kstamg(n))
                         buff1s(j+3*jyc(n))=pr(jxc(n)+1,j,kstamg(n))
-                    enddo
-                endif
+                    end do
+                end if
 
-                if(rightpem /= MPI_PROC_NULL) then
+                if (rightpem /= MPI_PROC_NULL) then
                     do j=1,jyc(n) !these are for k-1
                         buff2s(j)=pr(0,j,kendmg(n))
                         buff2s(j+jyc(n))=pr(1,j,kendmg(n))
                         buff2s(j+2*jyc(n))=pr(jxc(n),j,kendmg(n))
                         buff2s(j+3*jyc(n))=pr(jxc(n)+1,j,kendmg(n))
-                    enddo
-                endif
+                    end do
+                end if
                 !
                 ! 2) exchange the vector
                 !
-                if(leftpem /= MPI_PROC_NULL) then
+                if (leftpem /= MPI_PROC_NULL) then
                     call MPI_SSEND(buff1s(1),4*jyc(n), &
                         MPI_REAL_SD,leftpem,tagls, &
                         MPI_COMM_WORLD,ierr)
-                endif
-                if(rightpem /= MPI_PROC_NULL) then
+                end if
+                if (rightpem /= MPI_PROC_NULL) then
                     call MPI_RECV(buff1r(1),4*jyc(n), &
                         MPI_REAL_SD,rightpem,tagrr, &
                         MPI_COMM_WORLD,status,ierr)
-                endif
-                if(rightpem /= MPI_PROC_NULL) then
+                end if
+                if (rightpem /= MPI_PROC_NULL) then
                     call MPI_SSEND(buff2s(1),4*jyc(n), &
                         MPI_REAL_SD,rightpem,tagrs, &
                         MPI_COMM_WORLD,ierr)
-                endif
-                if(leftpem /= MPI_PROC_NULL) then
+                end if
+                if (leftpem /= MPI_PROC_NULL) then
                     call MPI_RECV(buff2r(1),4*jyc(n), &
                         MPI_REAL_SD,leftpem,taglr, &
                         MPI_COMM_WORLD,status,ierr)
-                endif
+                end if
 
-                if(leftpem /= MPI_PROC_NULL) then
-                !      call MPI_WAIT(req1,istatus,ierr)
-                !      call MPI_WAIT(req4,istatus,ierr)
-                endif
-                if(rightpem /= MPI_PROC_NULL) then
-                !      call MPI_WAIT(req2,istatus,ierr)
-                !      call MPI_WAIT(req3,istatus,ierr)
-                endif
                 !
                 ! 3) reconstruct the planes k-1 and k+1
                 !
-                if(rightpem /= MPI_PROC_NULL) then
+                if (rightpem /= MPI_PROC_NULL) then
                     do j=1,jyc(n) !these are for k+1
                         pr(0       ,j,kendmg(n)+1)=buff1r(j)
                         pr(1       ,j,kendmg(n)+1)=buff1r(j+jyc(n))
                         pr(jxc(n)  ,j,kendmg(n)+1)=buff1r(j+2*jyc(n))
                         pr(jxc(n)+1,j,kendmg(n)+1)=buff1r(j+3*jyc(n))
-                    enddo
-                endif
+                    end do
+                end if
 
-                if(leftpem /= MPI_PROC_NULL) then
+                if (leftpem /= MPI_PROC_NULL) then
                     do j=1,jyc(n) !these are for k-1
                         pr(0       ,j,kstamg(n)-1)=buff2r(j)
                         pr(1       ,j,kstamg(n)-1)=buff2r(j+jyc(n))
                         pr(jxc(n)  ,j,kstamg(n)-1)=buff2r(j+2*jyc(n))
                         pr(jxc(n)+1,j,kstamg(n)-1)=buff2r(j+3*jyc(n))
-                    enddo
-                endif
+                    end do
+                end if
 
                 deallocate(buff1s,buff2s)
                 deallocate(buff1r,buff2r)
             !
-            enddo
+            end do
             !
             do jj=1,jp
                 !
@@ -1841,94 +1638,86 @@ contains
                     buff2s(i)=0.
                     buff1r(i)=0.
                     buff2r(i)=0.
-                enddo
+                end do
 
-                if(leftpem /= MPI_PROC_NULL) then
+                if (leftpem /= MPI_PROC_NULL) then
                     do i=1,jxc(n) !these are for k+1
                         buff1s(i)=pr(i,0,kstamg(n))
                         buff1s(i+jxc(n))=pr(i,1,kstamg(n))
                         buff1s(i+2*jxc(n))=pr(i,jyc(n),kstamg(n))
                         buff1s(i+3*jxc(n))=pr(i,jyc(n)+1,kstamg(n))
-                    enddo
-                endif
+                    end do
+                end if
 
-                if(rightpem /= MPI_PROC_NULL) then
+                if (rightpem /= MPI_PROC_NULL) then
                     do i=1,jxc(n) !these are for k-1
                         buff2s(i)=pr(i,0,kendmg(n))
                         buff2s(i+jxc(n))=pr(i,1,kendmg(n))
                         buff2s(i+2*jxc(n))=pr(i,jyc(n),kendmg(n))
                         buff2s(i+3*jxc(n))=pr(i,jyc(n)+1,kendmg(n))
-                    enddo
-                endif
+                    end do
+                end if
 
                 !
                 ! 2) exchange the vectors
                 !
-                if(leftpem /= MPI_PROC_NULL) then
+                if (leftpem /= MPI_PROC_NULL) then
                     call MPI_SSEND(buff1s(1),4*jxc(n), &
                         MPI_REAL_SD,leftpem,tagls, &
                         MPI_COMM_WORLD,ierr)
-                endif
-                if(rightpem /= MPI_PROC_NULL) then
+                end if
+                if (rightpem /= MPI_PROC_NULL) then
                     call MPI_RECV(buff1r(1),4*jxc(n), &
                         MPI_REAL_SD,rightpem,tagrr, &
                         MPI_COMM_WORLD,status,ierr)
-                endif
-                if(rightpem /= MPI_PROC_NULL) then
+                end if
+                if (rightpem /= MPI_PROC_NULL) then
                     call MPI_SSEND(buff2s(1),4*jxc(n), &
                         MPI_REAL_SD,rightpem,tagrs, &
                         MPI_COMM_WORLD,ierr)
-                endif
-                if(leftpem /= MPI_PROC_NULL) then
+                end if
+                if (leftpem /= MPI_PROC_NULL) then
                     call MPI_RECV(buff2r(1),4*jxc(n), &
                         MPI_REAL_SD,leftpem,taglr, &
                         MPI_COMM_WORLD,status,ierr)
-                endif
+                end if
 
-                if(leftpem /= MPI_PROC_NULL) then
-                !      call MPI_WAIT(req1,istatus,ierr)
-                !      call MPI_WAIT(req4,istatus,ierr)
-                endif
-                if(rightpem /= MPI_PROC_NULL) then
-                !      call MPI_WAIT(req2,istatus,ierr)
-                !      call MPI_WAIT(req3,istatus,ierr)
-                endif
                 !
                 ! 3) reconstruct the plane for k-1 and k+1
                 !
-                if(rightpem /= MPI_PROC_NULL) then
+                if (rightpem /= MPI_PROC_NULL) then
                     do i=1,jxc(n) !these are for k+1
                         pr(i,       0,kendmg(n)+1)=buff1r(i)
                         pr(i,       1,kendmg(n)+1)=buff1r(i+jxc(n))
                         pr(i,  jyc(n),kendmg(n)+1)=buff1r(i+2*jxc(n))
                         pr(i,jyc(n)+1,kendmg(n)+1)=buff1r(i+3*jxc(n))
-                    enddo
-                endif
+                    end do
+                end if
 
-                if(leftpem /= MPI_PROC_NULL) then
+                if (leftpem /= MPI_PROC_NULL) then
                     do i=1,jxc(n) !these are for k-1
                         pr(i,       0,kstamg(n)-1)=buff2r(i)
                         pr(i,       1,kstamg(n)-1)=buff2r(i+jxc(n))
                         pr(i,  jyc(n),kstamg(n)-1)=buff2r(i+2*jxc(n))
                         pr(i,jyc(n)+1,kstamg(n)-1)=buff2r(i+3*jxc(n))
-                    enddo
-                endif
+                    end do
+                end if
 
                 deallocate(buff1s,buff2s)
                 deallocate(buff1r,buff2r)
 
-            enddo
+            end do
         !
-        enddo ! loop kkk
+        end do ! loop kkk
         !
         return
     end subroutine mul_boun_sndrcv
 
-    subroutine solut_sndrcv_slor(n,i1,j1,k1, &
+    subroutine solut_sndrcv_slor(n,i1,j1, &
         kss,jxc,jyc,jzc,pr,rh, &
         cs1,cs2,cs3,cs4,cs5,cs6, &
         r11,r12,r13,r21,r22,r23,r31,r32,r33, &
-        i_dx,i_sn,i_sp,i_st,i_av,i_in, &
+        i_dx,i_sn,i_av,i_in, &
         kstamg,kendmg,rightpe,leftpe, &
         tagls,taglr,tagrs,tagrr, &
         aa,bb,cc)
@@ -1941,11 +1730,9 @@ contains
         !-----------------------------------------------------------------------
         !     array declaration
         integer kstamg(4),kendmg(4)
-        integer i,j,k,ipot,i1,j1,k1,ics,jcs,kcs,n1i,n1j,n1k,n,kk
+        integer i,j,k,ipot,i1,j1,n,kk
         integer i_dx(i1,j1,kstamg(n):kendmg(n)) !k1)
         integer i_sn(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_sp(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_st(i1,j1,kstamg(n):kendmg(n)) !k1)
         integer i_av(i1,j1,kstamg(n):kendmg(n)) !k1)
         integer i_in(i1,j1,kstamg(n):kendmg(n)) !k1)
 
@@ -1953,17 +1740,12 @@ contains
         integer jxc(0:4),jyc(0:4),jzc(0:4)
         !
         integer ierr,myid,nproc,status(MPI_STATUS_SIZE)
-        integer ncolperproc,m
-        integer leftpe,rightpe,ktime
+        integer leftpe,rightpe
         integer leftpem,rightpem
-        integer lll,iw,jw,kw
-        integer prplan,req1,req2,req3,req4
-        integer istatus(MPI_STATUS_SIZE)
-        integer iii,jjj,kkk
+        integer prplan
+        integer iii,kkk
         !
-        real pot,ppot1,ppot2,resi,den
-        real res_av,res_ind,res_sot,res_sop,res_sn,res_dx
-        real den_av,den_ind,den_sot,den_sop,den_sn,den_dx
+        real pot,ppot1,ppot2
 
         real r11(0:i1,  j1,  kstamg(n):kendmg(n))
         real r12(0:i1,  j1,  kstamg(n):kendmg(n))
@@ -1981,7 +1763,6 @@ contains
         real cs3(n1,n3),cs4(n1,n3)
         real cs5(n1,n2),cs6(n1,n2)
         !
-        real, allocatable :: prcol(:),prtot(:)
         integer tagls,taglr,tagrs,tagrr
         !
         real an
@@ -1996,7 +1777,6 @@ contains
         real ff0(0:jyc(n)+1)
 
         integer freesurface,iterat
-        real ti
 
         freesurface = 0
 
@@ -2011,7 +1791,7 @@ contains
         !-----------------------------------------------------------------------
 
 
-        if(n.eq.1)then
+        if (n==1) then
             an=1.
         else
             an=0.
@@ -2022,16 +1802,16 @@ contains
         ppot1=1/pot
         ppot2=1/pot/pot
         !
-        if(myid.eq.0)then
+        if (myid==0) then
             leftpem=MPI_PROC_NULL
             rightpem=rightpe
-        else if(myid.eq.nproc-1)then
+        else if (myid==nproc-1) then
             leftpem=leftpe
             rightpem=MPI_PROC_NULL
-        else if((myid.ne.0).and.(myid.ne.nproc-1))then
+        else if ((myid/=0).and.(myid/=nproc-1)) then
             leftpem=leftpe
             rightpem=rightpe
-        endif
+        end if
         !
         do kk=1,kss(n)
             !
@@ -2041,12 +1821,12 @@ contains
             ! also for line sor I need to compute pressure at the boundary to
             ! construct the gradient for the upgrade of velocity
             !     boundary condition
-            call mul_boun_sndrcv(n,i1,j1,k1, &
+            call mul_boun_sndrcv(n,i1,j1, &
                 jxc,jyc,jzc, &
                 r11,r12,r13,r21,r22,r23,r31,r32,r33,pr, &
                 kstamg,kendmg,rightpe,leftpe, &
                 tagls,taglr,tagrs,tagrr, &
-                iterat,freesurface,ti)
+                iterat,freesurface)
             !
             ! smoothing with line SOR zebra with four coulors
             !
@@ -2061,33 +1841,25 @@ contains
             ! exchange the boundary values k=0 and k=jzc(n)
             do kkk=1,1-kp
 
-                !c      if (kcs.eq.1) then
+                !c      if (kcs==1) then
 
-                if (myid.eq.nproc-1) then
-                    call MPI_SSEND(pr(1,1,jzc(n)),1,prplan,0,11, &
-                        MPI_COMM_WORLD,ierr)
-                !      call MPI_WAIT(req1,istatus,ierr)
-                else if (myid.eq.0) then
-                    call MPI_RECV(pr(1,1,0),1,prplan,nproc-1,11, &
-                        MPI_COMM_WORLD,status,ierr)
-                !      call MPI_WAIT(req2,istatus,ierr)
-                endif
+                if (myid==nproc-1) then
+                    call MPI_SSEND(pr(1,1,jzc(n)),1,prplan,0,11,MPI_COMM_WORLD,ierr)
+                else if (myid==0) then
+                    call MPI_RECV(pr(1,1,0),1,prplan,nproc-1,11,MPI_COMM_WORLD,status,ierr)
+                end if
 
-                !c      else if (kcs.eq.2) then
+                !c      else if (kcs==2) then
 
-                if (myid.eq.0) then
-                    call MPI_SSEND(pr(1,1,1),1,prplan,nproc-1,12, &
-                        MPI_COMM_WORLD,ierr)
-                !      call MPI_WAIT(req1,istatus,ierr)
-                else if (myid.eq.nproc-1) then
-                    call MPI_RECV(pr(1,1,jzc(n)+1),1,prplan,0,12, &
-                        MPI_COMM_WORLD,status,ierr)
-                !      call MPI_WAIT(req2,istatus,ierr)
-                endif
+                if (myid==0) then
+                    call MPI_SSEND(pr(1,1,1),1,prplan,nproc-1,12,MPI_COMM_WORLD,ierr)
+                else if (myid==nproc-1) then
+                    call MPI_RECV(pr(1,1,jzc(n)+1),1,prplan,0,12,MPI_COMM_WORLD,status,ierr)
+                end if
 
-            !c      endif
+            !c      end if
 
-            enddo
+            end do
             !
             do k=kstamg(n),kendmg(n)
                 !cc      do k=(n1k-1)+kstamg(n),kendmg(n),2
@@ -2100,7 +1872,7 @@ contains
                         pr(jxc(n)+1,j,k)=pr(1,j,k)
                     !
                     end do
-                enddo
+                end do
                 !
                 !c      do i=n1i,jxc(n),2
                 do i=1,jxc(n)
@@ -2180,92 +1952,67 @@ contains
                     end do
                 !
                 !
-                enddo   ! done one complete sweep for 1 plane
-            enddo   ! done one complete sweep for 1 plane
+                end do   ! done one complete sweep for 1 plane
+            end do   ! done one complete sweep for 1 plane
             !
-            !ccc      enddo   ! done the 2 colors
+            !ccc      end do   ! done the 2 colors
 
             !-----------------------------------------------------------------------
-            !c      if (kcs.eq.1) then
+            !c      if (kcs==1) then
             !
-            if(leftpem /= MPI_PROC_NULL) then
+            if (leftpem /= MPI_PROC_NULL) then
                 call MPI_SSEND(pr(1,1,kstamg(n)),1, &
                     prplan,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
-            endif
-            if(rightpem /= MPI_PROC_NULL) then
+            end if
+            if (rightpem /= MPI_PROC_NULL) then
                 call MPI_RECV(pr(1,1,kendmg(n)+1),1, &
                     prplan,rightpem,tagrr, &
                     MPI_COMM_WORLD,status,ierr)
-            endif
+            end if
+
+            !c      else if (kcs==2) then
             !
-            if(leftpem /= MPI_PROC_NULL) then
-            !      call MPI_WAIT(req1,istatus,ierr)
-            endif
-            if(rightpem /= MPI_PROC_NULL) then
-            !      call MPI_WAIT(req2,istatus,ierr)
-            endif
-            !
-            !c      else if (kcs.eq.2) then
-            !
-            if(rightpem /= MPI_PROC_NULL) then
+            if (rightpem /= MPI_PROC_NULL) then
                 call MPI_SSEND(pr(1,1,kendmg(n)),1, &
                     prplan,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
-            endif
-            if(leftpem /= MPI_PROC_NULL) then
+            end if
+            if (leftpem /= MPI_PROC_NULL) then
                 call MPI_RECV(pr(1,1,kstamg(n)-1),1, &
                     prplan,leftpem,taglr, &
                     MPI_COMM_WORLD,status,ierr)
-            endif
-            !
-            if(rightpem /= MPI_PROC_NULL) then
-            !      call MPI_WAIT(req1,istatus,ierr)
-            endif
-            if(leftpem /= MPI_PROC_NULL) then
-            !      call MPI_WAIT(req2,istatus,ierr)
-            endif
+            end if
+
         !
-        !c      endif
+        !c      end if
         !
         ! compute again values k=1 and k=jzc(n)
         !
-        !ccc      enddo   ! done the 2 colors
+        !ccc      end do   ! done the 2 colors
         !
-        enddo   ! end of a pseudo time iteration
+        end do   ! end of a pseudo time iteration
         !
         call MPI_TYPE_FREE(prplan,ierr)
         !
         !
-        if(leftpem /= MPI_PROC_NULL) then
+        if (leftpem /= MPI_PROC_NULL) then
             call MPI_SSEND(pr(0,0,kstamg(n)),(jxc(n)+2)*(jyc(n)+2), &
-                MPI_REAL_SD,leftpem,tagls, &
-                MPI_COMM_WORLD,ierr)
-        endif
-        if(rightpem /= MPI_PROC_NULL) then
+                MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+        end if
+        if (rightpem /= MPI_PROC_NULL) then
             call MPI_RECV(pr(0,0,kendmg(n)+1),(jxc(n)+2)*(jyc(n)+2), &
-                MPI_REAL_SD,rightpem,tagrr, &
-                MPI_COMM_WORLD,status,ierr)
-        endif
-        if(rightpem /= MPI_PROC_NULL) then
+                MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
+        end if
+        if (rightpem /= MPI_PROC_NULL) then
             call MPI_SSEND(pr(0,0,kendmg(n)),(jxc(n)+2)*(jyc(n)+2), &
-                MPI_REAL_SD,rightpem,tagrs, &
-                MPI_COMM_WORLD,ierr)
-        endif
-        if(leftpem /= MPI_PROC_NULL) then
+                MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
+        end if
+        if (leftpem /= MPI_PROC_NULL) then
             call MPI_RECV(pr(0,0,kstamg(n)-1),(jxc(n)+2)*(jyc(n)+2), &
-                MPI_REAL_SD,leftpem,taglr, &
-                MPI_COMM_WORLD,status,ierr)
-        endif
+                MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
+        end if
 
-        if(leftpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req1,istatus,ierr)
-        !      call MPI_WAIT(req4,istatus,ierr)
-        endif
-        if(rightpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req2,istatus,ierr)
-        !      call MPI_WAIT(req3,istatus,ierr)
-        endif
 
         !-----------------------------------------------------------------------
         return
@@ -2282,7 +2029,6 @@ contains
         !
         implicit none
 
-        integer ierr
         !-----------------------------------------------------------------------
         ! arrays declaration
         integer i,j,k,ic,jc,kc,i1,i2,j1,j2,k1,k2,n
@@ -2301,8 +2047,8 @@ contains
         integer jxc(0:4),jyc(0:4),jzc(0:4)
         !      integer inizio
 
-        integer kpstamg(0:4),kpendmg(0:4),ncolprocmg(0:4)
-        integer kfacepstamg(0:4),kfacependmg(0:4)
+        !integer kpstamg(0:4),kpendmg(0:4),ncolprocmg(0:4)
+        !integer kfacepstamg(0:4)
         !-----------------------------------------------------------------------
         ! allocation
 
@@ -2315,10 +2061,11 @@ contains
             kpendmg(n) = (myid+1)*ncolprocmg(n)
             !        only myid=0 has kfacepstamg = 0
             kfacepstamg(n) = kpstamg(n)-1
-        !    if(myid.eq.0)kfacepstamg(n) = kpstamg(n) -1
+        !    if (myid==0)kfacepstamg(n) = kpstamg(n) -1
         end do
+
         !-----------------------------------------------------------------------
-        if(nlevel .ge.1)then
+        if (nlevel >=1) then
             allocate(in_dx1(n1  ,n2  ,kpstamg(1):kpendmg(1)))
             allocate(in_sn1(n1  ,n2  ,kpstamg(1):kpendmg(1)))
             allocate(in_sp1(n1  ,n2  ,kpstamg(1):kpendmg(1)))
@@ -2346,7 +2093,7 @@ contains
 
         end if
         !-----------------------------------------------------------------------
-        if(nlevel .ge.2)then
+        if (nlevel >=2) then
             allocate(in_dx2(n1/2,n2/2,kpstamg(2):kpendmg(2)))
             allocate(in_sn2(n1/2,n2/2,kpstamg(2):kpendmg(2)))
             allocate(in_sp2(n1/2,n2/2,kpstamg(2):kpendmg(2)))
@@ -2394,7 +2141,7 @@ contains
 
         end if
         !-----------------------------------------------------------------------
-        if(nlevel .ge.3)then
+        if (nlevel >=3) then
             allocate(in_dx3(n1/4,n2/4,kpstamg(3):kpendmg(3)))
             allocate(in_sn3(n1/4,n2/4,kpstamg(3):kpendmg(3)))
             allocate(in_sp3(n1/4,n2/4,kpstamg(3):kpendmg(3)))
@@ -2442,7 +2189,7 @@ contains
 
         end if
         !-----------------------------------------------------------------------
-        if(nlevel .ge.4)then
+        if (nlevel >=4) then
             allocate(in_dx4(n1/8,n2/8,kpstamg(4):kpendmg(4)))
             allocate(in_sn4(n1/8,n2/8,kpstamg(4):kpendmg(4)))
             allocate(in_sp4(n1/8,n2/8,kpstamg(4):kpendmg(4)))
@@ -2510,7 +2257,7 @@ contains
                         !
                         ic=2* i   *2**(n-2)
                         !
-                        if (i.eq.0.and.ip.eq.1) then
+                        if (i==0.and.ip==1) then
                             !
                             i1=2*(i+1)*2**(n-2)
                             i2=2*(i+2)*2**(n-2)
@@ -2540,7 +2287,7 @@ contains
                             ycsi=.5 * ( -3.*y0 + 4.*y1 - y2 )
                             zcsi=.5 * ( -3.*z0 + 4.*z1 - z2 )
                         !
-                        else if (i.eq.jxc(n).and.ip.eq.1) then
+                        else if (i==jxc(n).and.ip==1) then
                             !
                             i1=2*(i-1)*2**(n-2)
                             i2=2*(i-2)*2**(n-2)
@@ -2619,21 +2366,21 @@ contains
                         call gprima(xcsi,ycsi,zcsi,xeta,yeta,zeta,xzet,yzet,zzet, &
                             t11,t22,t33)
                         !
-                        if (n.eq.2) then
+                        if (n==2) then
                             !
                             pot=2.
                             g11_2(i,j,k)=t11/pot
                             g12_2(i,j,k)=t22/pot
                             g13_2(i,j,k)=t33/pot
                         !
-                        else if (n.eq.3) then
+                        else if (n==3) then
                             !
                             pot=4.
                             g11_3(i,j,k)=t11/pot
                             g12_3(i,j,k)=t22/pot
                             g13_3(i,j,k)=t33/pot
                         !
-                        else if (n.eq.4) then
+                        else if (n==4) then
                             !
                             pot=8.
                             g11_4(i,j,k)=t11/pot
@@ -2668,7 +2415,7 @@ contains
                         !
                         jc=2* j   *2**(n-2)
                         !
-                        if      (j.eq.0.and.jp.eq.1)  then
+                        if      (j==0.and.jp==1)  then
                             !
                             j1=2*(j+1)*2**(n-2)
                             j2=2*(j+2)*2**(n-2)
@@ -2698,7 +2445,7 @@ contains
                             yeta=.5 * ( -3.*y0 + 4.*y1 - y2 )
                             zeta=.5 * ( -3.*z0 + 4.*z1 - z2 )
                         !
-                        else if (j.eq.jyc(n).and.jp.eq.1) then
+                        else if (j==jyc(n).and.jp==1) then
                             !
                             j1=2*(j-1)*2**(n-2)
                             j2=2*(j-2)*2**(n-2)
@@ -2774,21 +2521,21 @@ contains
                         !
                         call gseconda(xcsi,ycsi,zcsi,xeta,yeta,zeta,xzet,yzet,zzet, &
                             t11,t22,t33)
-                        if (n.eq.2) then
+                        if (n==2) then
                             !
                             pot=2.
                             g21_2(i,j,k)=t11/pot
                             g22_2(i,j,k)=t22/pot
                             g23_2(i,j,k)=t33/pot
                         !
-                        else if (n.eq.3) then
+                        else if (n==3) then
                             !
                             pot=4.
                             g21_3(i,j,k)=t11/pot
                             g22_3(i,j,k)=t22/pot
                             g23_3(i,j,k)=t33/pot
                         !
-                        else if (n.eq.4) then
+                        else if (n==4) then
                             !
                             pot=8.
                             g21_4(i,j,k)=t11/pot
@@ -2825,7 +2572,7 @@ contains
                         kc=2* k   *2**(n-2)
 
                         !
-                        if (k.eq.0.and.kp.eq.1) then
+                        if (k==0.and.kp==1) then
                             !
                             k1=2*(k+1)*2**(n-2)
                             k2=2*(k+2)*2**(n-2)
@@ -2855,8 +2602,8 @@ contains
                             yzet=.5 * ( -3.*y0 + 4.*y1 - y2 )
                             zzet=.5 * ( -3.*z0 + 4.*z1 - z2 )
                         !
-                        else if (k.eq.jzc(n).and.kp.eq.1 &
-                            .and.myid.eq.(nproc-1)) then
+                        else if (k==jzc(n).and.kp==1 &
+                            .and.myid==(nproc-1)) then
                             !
                             k1=2*(k-1)*2**(n-2)
                             k2=2*(k-2)*2**(n-2)
@@ -2935,21 +2682,21 @@ contains
                         call gterza(xcsi,ycsi,zcsi,xeta,yeta,zeta,xzet,yzet,zzet, &
                             t11,t22,t33)
                         !
-                        if (n.eq.2) then
+                        if (n==2) then
                             !
                             pot=2.
                             g31_2(i,j,k)=t11/pot
                             g32_2(i,j,k)=t22/pot
                             g33_2(i,j,k)=t33/pot
                         !
-                        else if (n.eq.3) then
+                        else if (n==3) then
                             !
                             pot=4.
                             g31_3(i,j,k)=t11/pot
                             g32_3(i,j,k)=t22/pot
                             g33_3(i,j,k)=t33/pot
                         !
-                        else if (n.eq.4) then
+                        else if (n==4) then
                             !
                             pot=8.
                             g31_4(i,j,k)=t11/pot
@@ -2966,7 +2713,7 @@ contains
 
         do n=1,nlevel
 
-            if(n==1)then
+            if (n==1) then
                 do k=kpstamg(n),kpendmg(n)
                     do j=1,jyc(n)
                         do i=1,jxc(n)
@@ -2980,7 +2727,7 @@ contains
                 end do
             end if
 
-            if(n==2)then
+            if (n==2) then
                 do k=kpstamg(n),kpendmg(n)
                     do j=1,jyc(n)
                         do i=1,jxc(n)
@@ -2994,7 +2741,7 @@ contains
                 end do
             end if
 
-            if(n==3)then
+            if (n==3) then
                 do k=kpstamg(n),kpendmg(n)
                     do j=1,jyc(n)
                         do i=1,jxc(n)
@@ -3008,7 +2755,7 @@ contains
                 end do
             end if
 
-            if(n==4)then
+            if (n==4) then
                 do k=kpstamg(n),kpendmg(n)
                     do j=1,jyc(n)
                         do i=1,jxc(n)
@@ -3028,16 +2775,16 @@ contains
 
     end subroutine mul_met
 
-    subroutine mul_ini(n1,n2,n3,n12,n22,n32,n13,n23,n33,n14,n24,n34,&
-        rhs1,rhs2,rhs3,rhs4,pr2,pr3,pr4,kstamg,kendmg)
+    subroutine mul_ini(n1,n2,n12,n13,n14,n22,n23,n24,rhs1,rhs2,rhs3,rhs4,pr2,pr3,pr4,kstamg,kendmg)
         !***********************************************************************
         ! matrix initialization for multigrid
         !
         implicit none
         !-----------------------------------------------------------------------
         ! array declaration
+        integer,intent(in) :: n1,n2,n12,n13,n14,n22,n23,n24
         integer kstamg(4),kendmg(4)
-        integer i,j,k,n1,n2,n3,n12,n22,n32,n13,n23,n33,n14,n24,n34
+        integer i,j,k
         real rhs1(n1 ,n2 ,kstamg(1):kendmg(1)) !n3)
         real rhs2(n12,n22,kstamg(2):kendmg(2)) !n32)
         real rhs3(n13,n23,kstamg(3):kendmg(3)) !n33)
@@ -3056,9 +2803,9 @@ contains
                     !
                     rhs1(i,j,k)=0.
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         do k=kstamg(2),kendmg(2) !1,n32
             do j=1,n22
@@ -3066,9 +2813,9 @@ contains
                     !
                     rhs2(i,j,k)=0.
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         do k=kstamg(2)-1,kendmg(2)+1  !0,n32+1
             do j=0,n22+1
@@ -3076,9 +2823,9 @@ contains
                     !
                     pr2(i,j,k)=0.
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         do k=kstamg(3),kendmg(3) !1,n33
             do j=1,n23
@@ -3086,9 +2833,9 @@ contains
                     !
                     rhs3(i,j,k)=0.
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         do k=kstamg(3)-1,kendmg(3)+1  !0,n33+1
             do j=0,n23+1
@@ -3096,9 +2843,9 @@ contains
                     !
                     pr3(i,j,k)=0.
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         do k=kstamg(4),kendmg(4) !1,n34
             do j=1,n24
@@ -3106,9 +2853,9 @@ contains
                     !
                     rhs4(i,j,k)=0.
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         do k=kstamg(4)-1,kendmg(4)+1  !0,n34+1
             do j=0,n24+1
@@ -3116,9 +2863,9 @@ contains
                     !
                     pr4(i,j,k)=0.
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         return
 
@@ -3148,7 +2895,7 @@ contains
         integer n14,n24,n34
         !
         integer kpstamg(0:4),kpendmg(0:4),ncolprocmg(0:4)
-        integer kfacepstamg(0:4),kfacependmg(0:4)
+        integer kfacepstamg(0:4)
         !-----------------------------------------------------------------------
 
         do n=1,nlevel
@@ -3156,8 +2903,9 @@ contains
             kpstamg(n) = myid*ncolprocmg(n)+1
             kpendmg(n) = (myid+1)*ncolprocmg(n)
             kfacepstamg(n) = kpstamg(n) -1
-        !    if(myid.eq.0)kfacepstamg(n) = kpstamg(n) -1
+        !    if (myid==0)kfacepstamg(n) = kpstamg(n) -1
         end do
+
         call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         n11=n1
@@ -3184,49 +2932,37 @@ contains
             iy=jyc(n)
             iz=jzc(n)
             !
-            if (n.eq.1) then
+            if (n==1) then
                 !
                 call sett(myid,nproc,n,kpstamg(n),kpendmg(n),kfacepstamg(n), &
                     ix,iy,iz,n11,n21,n31,   &
                     in_dx1,in_sn1,in_sp1, &
                     in_st1,in_av1,in_in1, &
-                    g11,g12,g13, &
-                    g21,g22,g23, &
-                    g31,g32,g33,      &
-                    aa1,bb1,cc1)
+                    g11,g22,g33,aa1,bb1,cc1)
             !
-            else if (n.eq.2) then
+            else if (n==2) then
                 !
                 call sett(myid,nproc,n,kpstamg(n),kpendmg(n),kfacepstamg(n), &
                     ix,iy,iz,n12,n22,n32, &
                     in_dx2,in_sn2,in_sp2, &
                     in_st2,in_av2,in_in2, &
-                    g11_2,g12_2,g13_2, &
-                    g21_2,g22_2,g23_2, &
-                    g31_2,g32_2,g33_2,      &
-                    aa2,bb2,cc2)
+                    g11_2,g22_2,g33_2,aa2,bb2,cc2)
             !
-            else if (n.eq.3) then
+            else if (n==3) then
                 !
                 call sett(myid,nproc,n,kpstamg(n),kpendmg(n),kfacepstamg(n), &
                     ix,iy,iz,n13,n23,n33, &
                     in_dx3,in_sn3,in_sp3, &
                     in_st3,in_av3,in_in3, &
-                    g11_3,g12_3,g13_3, &
-                    g21_3,g22_3,g23_3, &
-                    g31_3,g32_3,g33_3,      &
-                    aa3,bb3,cc3)
+                    g11_3,g22_3,g33_3,aa3,bb3,cc3)
             !
-            else if (n.eq.4) then
+            else if (n==4) then
                 !
                 call sett(myid,nproc,n,kpstamg(n),kpendmg(n),kfacepstamg(n), &
                     ix,iy,iz,n14,n24,n34, &
                     in_dx4,in_sn4,in_sp4, &
                     in_st4,in_av4,in_in4, &
-                    g11_4,g12_4,g13_4, &
-                    g21_4,g22_4,g23_4, &
-                    g31_4,g32_4,g33_4,      &
-                    aa4,bb4,cc4)
+                    g11_4,g22_4,g33_4,aa4,bb4,cc4)
             !
             end if
         !
@@ -3252,10 +2988,8 @@ contains
         integer i,j,k
         integer nproc,myid
         integer kparasta,kparaend
-        integer req1,req2,req3,req4
         integer rightpe ,leftpe
-        integer rightpem,leftpem
-        integer ierr,istatus,status(MPI_STATUS_SIZE)
+        integer ierr,status(MPI_STATUS_SIZE)
         integer tagls,taglr,tagrs,tagrr
         integer conto_ib
 
@@ -3270,42 +3004,42 @@ contains
             do j=1,jy
                 do i=1,jx
 
-                    if(tipo(i,j,k).eq.0)then
+                    if (tipo(i,j,k)==0) then
                         fi_old = fi(i,j,k)
                         fi(i,j,k)=0.
                         conto_ib=0
 
-                        if(tipo(i+1,j  ,k  ).eq.1)then
+                        if (tipo(i+1,j  ,k  )==1) then
                             fi(i  ,j  ,k  )=fi(i,j,k)+fi(i+1,j  ,k  )
                             conto_ib=conto_ib+1
                         end if
 
-                        if(tipo(i-1,j  ,k  ).eq.1)then
+                        if (tipo(i-1,j  ,k  )==1) then
                             fi(i  ,j  ,k  )=fi(i,j,k)+fi(i-1,j  ,k  )
                             conto_ib=conto_ib+1
                         end if
 
-                        if(tipo(i  ,j+1,k  ).eq.1)then
+                        if (tipo(i  ,j+1,k  )==1) then
                             fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j+1,k  )
                             conto_ib=conto_ib+1
                         end if
 
-                        if(tipo(i  ,j-1,k  ).eq.1)then
+                        if (tipo(i  ,j-1,k  )==1) then
                             fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j-1,k  )
                             conto_ib=conto_ib+1
                         end if
 
-                        if(tipo(i  ,j  ,k+1).eq.1)then
+                        if (tipo(i  ,j  ,k+1)==1) then
                             fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j  ,k+1)
                             conto_ib=conto_ib+1
                         end if
 
-                        if(tipo(i  ,j  ,k-1).eq.1)then
+                        if (tipo(i  ,j  ,k-1)==1) then
                             fi(i  ,j  ,k  )=fi(i,j,k)+fi(i  ,j  ,k-1)
                             conto_ib=conto_ib+1
                         end if
 
-                        if(conto_ib.ne.0)then
+                        if (conto_ib/=0) then
                             fi(i,j,k)=fi(i,j,k)/conto_ib
                         else
                             fi(i,j,k)=fi_old
@@ -3318,27 +3052,19 @@ contains
         end do
 
         !     send left
-        if(myid.ne.0)then
-            call MPI_SSEND(fi(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD, &
-                leftpe,tagls,MPI_COMM_WORLD,ierr)
-        !      call MPI_WAIT (req1,istatus,ierr)
+        if (myid/=0) then
+            call MPI_SSEND(fi(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierr)
         end if
-        if(myid.ne.nproc-1)then
-            call MPI_RECV(fi(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD, &
-                rightpe,tagrr,MPI_COMM_WORLD,status,ierr)
-        !      call MPI_WAIT (req2,istatus,ierr)
+        if (myid/=nproc-1) then
+            call MPI_RECV(fi(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierr)
         end if
 
         !     send right
-        if(myid.ne.nproc-1)then
-            call MPI_SSEND(fi(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD, &
-                rightpe,tagrs,MPI_COMM_WORLD,ierr)
-        !      call MPI_WAIT (req3,istatus,ierr)
+        if (myid/=nproc-1) then
+            call MPI_SSEND(fi(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierr)
         end if
-        if(myid.ne.0)then
-            call MPI_RECV(fi(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD, &
-                leftpe,taglr,MPI_COMM_WORLD,status,ierr)
-        !      call MPI_WAIT (req4,istatus,ierr)
+        if (myid/=0) then
+            call MPI_RECV(fi(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierr)
         end if
 
         return
@@ -3390,7 +3116,6 @@ contains
     end subroutine gprima
 
     subroutine gseconda(xcsi,ycsi,zcsi,xeta,yeta,zeta,xzet,yzet,zzet,t11,t22,t33)
-        !***********************************************************************
         !
         ! compute the second line elements of controvariant metric tensor on
         ! higher grid level for multigrid
@@ -3477,7 +3202,7 @@ contains
         return
     end subroutine gterza
 
-    subroutine restrict_sndrcv(n,i1,j1,k1,i2,j2,k2,jxc,jyc,jzc,rh,rh1,kstamg,kendmg)
+    subroutine restrict_sndrcv(n,i1,j1,i2,j2,jxc,jyc,rh,rh1,kstamg,kendmg)
         !***********************************************************************
         ! compute residual on lower level grid
         ! restriction operation with average value
@@ -3486,15 +3211,13 @@ contains
         !
         !-----------------------------------------------------------------------
         !     array declaration
-        integer ierr,myid,nproc,status
-        integer kstamg(4),kendmg(4),m
+        integer ierr,myid,nproc
+        integer kstamg(4),kendmg(4)
         !
-        integer i,j,k,id,jd,kd,n,i1,j1,k1,i2,j2,k2
-        integer jxc(0:4),jyc(0:4),jzc(0:4)
+        integer i,j,k,id,jd,kd,n,i1,j1,i2,j2
+        integer jxc(0:4),jyc(0:4)
         real  rh(i1,j1,kstamg(n):kendmg(n)) !k1)
         real rh1(i2,j2,kstamg(n+1):kendmg(n+1)) !k2)
-
-        real, allocatable :: rh1col(:),rh1tot(:)
 
         real inv_8
         !-----------------------------------------------------------------------
@@ -3522,20 +3245,15 @@ contains
                     !
                     rh1(i,j,k)=-rh1(i,j,k)*inv_8
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !
         return
 
     end subroutine restrict_sndrcv
 
-    subroutine resid_sndrcv(n,i1,j1,k1,jxc,jyc,jzc,pr,rh1,rh, &
-        cs1,cs2,cs3,cs4,cs5,cs6,       &
-        r11,r12,r13,r21,r22,r23,r31,r32,r33, &
-        i_dx,i_sn,i_sp,i_st,i_av,i_in, &
-        kstamg,kendmg, &
-        bodyforce,bodypressure,kparasta,kparaend)
+    subroutine resid_sndrcv(n,i1,j1,jxc,jyc,pr,rh1,rh,r11,r22,r33,kstamg,kendmg)
         !***********************************************************************
         ! compute residuals on current grid
         !
@@ -3544,15 +3262,8 @@ contains
         !-----------------------------------------------------------------------
         !     array declaration
         integer kstamg(4),kendmg(4)
-        integer kparasta,kparaend
-        integer i,j,k,n,i1,j1,k1,ipot
-        integer i_dx(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_sn(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_sp(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_st(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_av(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer i_in(i1,j1,kstamg(n):kendmg(n)) !k1)
-        integer jxc(0:4),jyc(0:4),jzc(0:4)
+        integer i,j,k,n,i1,j1,ipot
+        integer jxc(0:4),jyc(0:4)
         !
         real res_av,res_ind,res_sot,res_sop,res_sn,res_dx
         real pot,inv_pot,inv_dt,coef
@@ -3569,20 +3280,11 @@ contains
         real rh(i1,j1,kstamg(n):kendmg(n))  !k1)
         real rh1(i1,j1,kstamg(n):kendmg(n)) !k1)
 
-        real cs1(n2,n3),cs2(n2,n3)
-        real cs3(n1,n3),cs4(n1,n3)
-        real cs5(n1,n2),cs6(n1,n2)
         real an
 
         !
-        integer ierr,myid,nproc,status
-        integer ncolperproc,m
+        integer ierr,myid,nproc
         !
-        !integer tipo(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
-        logical bodyforce
-        integer bodypressure,ibodypressure
-        integer ilivello,itipo_ib,itipo_solida
-        integer ibloop,solidaloop
 
         !-----------------------------------------------------------------------
         CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
@@ -3597,7 +3299,7 @@ contains
 
         coef = 0.25
 
-        if(n.eq.1)then
+        if (n==1) then
             an=1.
         else
             an=0.
@@ -3673,9 +3375,9 @@ contains
                         res_sop - res_sot + &
                         res_av  - res_ind )*inv_pot - rh(i,j,k)
                 !
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
         !-----------------------------------------------------------------------
 
         return
@@ -3684,7 +3386,7 @@ contains
 
     subroutine sett(myid,nproc,n,ksta,kend,kfsta,ix,iy,iz,nx,ny,nz, &
         i_dx,i_sn,i_sp,i_st,i_av,i_in, &
-        r11,r12,r13,r21,r22,r23,r31,r32,r33,aa,bb,cc)
+        r11,r22,r33,aa,bb,cc)
         !***********************************************************************
         !     set index
         !
@@ -3692,9 +3394,8 @@ contains
 
         !-----------------------------------------------------------------------
         !     variables declaration
-        integer ierr
         integer ksta,kend,kfsta
-        integer i,j,k,ij
+        integer i,j,k
         integer ix,iy,iz
         integer nx,ny,nz
 
@@ -3710,15 +3411,7 @@ contains
         real  cc(nx,0:ny+1,ksta:kend)
 
         real r11(0:nx,ny,ksta:kend)
-        real r12(0:nx,ny,ksta:kend)
-        real r13(0:nx,ny,ksta:kend)
-
-        real r21(nx,0:ny,ksta:kend)
         real r22(nx,0:ny,ksta:kend)
-        real r23(nx,0:ny,ksta:kend)
-
-        real r31(nx,ny,kfsta:kend)
-        real r32(nx,ny,kfsta:kend)
         real r33(nx,ny,kfsta:kend)
 
         integer ipot
@@ -3773,13 +3466,13 @@ contains
 
         ! indici parete  indietro e avanti: (periodicita generalizzata)
         !
-        if(myid.eq.0)then
+        if (myid==0) then
             do j=1,ny
                 do i=1,nx
                     i_in(i,j,ksta) =1-kp
                 end do
             end do
-        elseif(myid.eq.nproc-1)then
+        elseif (myid==nproc-1) then
             write(*,*)'IZ,NZ',iz,nz,ksta,kend
             do j=1,ny
                 do i=1,nx
@@ -3826,5 +3519,285 @@ contains
         return
 
     end subroutine sett
+
+    subroutine prolong(n,i1,j1,i2,j2,jxc,jyc,prf,pr,kstamg,kendmg,rightpe,leftpe,taglr,tagrs)
+    !***********************************************************************
+    ! prolongation operation from coarse grid to fine one with bilinear
+    ! interpolation
+    !
+
+    implicit none
+    !
+
+    !-----------------------------------------------------------------------
+    !     array declaration
+    integer kstamg(4),kendmg(4)
+    integer i,j,k,i1,j1,i2,j2,n,if,jf,kf
+    integer jxc(0:4),jyc(0:4)
+    real a1,a2,a3,a4,a5,a6,a7,a8
+    real inv_64
+    real prf(0:i1+1,0:j1+1,kstamg(n  )-1:kendmg(n  )+1) !0:k1+1)
+    real  pr(0:i2+1,0:j2+1,kstamg(n+1)-1:kendmg(n+1)+1) !0:k2+1)
+
+    integer kstamg0(4)
+    integer nproc,myid,ierr
+    integer leftpe,rightpe
+    integer leftpem,rightpem,status(MPI_STATUS_SIZE)
+    integer taglr,tagrs
+    integer plantypef
+    !-----------------------------------------------------------------------
+    CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
+    !-----------------------------------------------------------------------
+    !
+    !     prf pressure on fine grid
+    !     pr  pressure on coarse grid
+    !
+    call MPI_TYPE_VECTOR(jyc(n)+1,jxc(n)+1,jxc(n)+2, &
+        MPI_REAL_SD,plantypef,ierr)
+    call MPI_TYPE_COMMIT(plantypef,ierr)
+
+    if (myid==0) then
+        leftpem=MPI_PROC_NULL
+        rightpem=rightpe
+        kstamg0(n+1)=0
+    else if (myid==nproc-1) then
+        leftpem=leftpe
+        rightpem=MPI_PROC_NULL
+        kstamg0(n+1)=kstamg(n+1)
+    else if ((myid/=0).and.(myid/=nproc-1)) then
+        leftpem=leftpe
+        rightpem=rightpe
+        kstamg0(n+1)=kstamg(n+1)
+    end if
+
+
+    inv_64 = 1./64.
+
+    do k=kstamg0(n+1),kendmg(n+1)
+        do j=0,jyc(n+1)
+            do i=0,jxc(n+1)
+                !
+                if=2*i
+                jf=2*j
+                kf=2*k
+                !
+                a1=27.
+                a2=9.
+                a3=9.
+                a4=9.
+                a5=3.
+                a6=3.
+                a7=3.
+                a8=1.
+                !
+                prf(if,jf,kf)=prf(if,jf,kf)+ &
+                    (  a1*pr(i  ,j  ,k  )+ &
+                    a2*pr(i+1,j  ,k  )+ &
+                    a3*pr(i  ,j+1,k  )+ &
+                    a4*pr(i  ,j  ,k+1)+ &
+                    a5*pr(i+1,j+1,k  )+ &
+                    a6*pr(i+1,j  ,k+1)+ &
+                    a7*pr(i  ,j+1,k+1)+ &
+                    a8*pr(i+1,j+1,k+1) )*inv_64
+
+
+                if=2*i+1
+                jf=2*j
+                kf=2*k
+                !
+                a1=9.
+                a2=27.
+                a3=3.
+                a4=3.
+                a5=9.
+                a6=9.
+                a7=1.
+                a8=3.
+                !
+                prf(if,jf,kf)=prf(if,jf,kf)+ &
+                    (  a1*pr(i  ,j  ,k  )+ &
+                    a2*pr(i+1,j  ,k  )+ &
+                    a3*pr(i  ,j+1,k  )+ &
+                    a4*pr(i  ,j  ,k+1)+ &
+                    a5*pr(i+1,j+1,k  )+ &
+                    a6*pr(i+1,j  ,k+1)+ &
+                    a7*pr(i  ,j+1,k+1)+ &
+                    a8*pr(i+1,j+1,k+1) )*inv_64
+                !
+                !
+                if=2*i
+                jf=2*j+1
+                kf=2*k
+                !
+                a1=9.
+                a2=3.
+                a3=27.
+                a4=3.
+                a5=9.
+                a6=1.
+                a7=9.
+                a8=3.
+                !
+                prf(if,jf,kf)=prf(if,jf,kf)+ &
+                    (  a1*pr(i  ,j  ,k  )+ &
+                    a2*pr(i+1,j  ,k  )+ &
+                    a3*pr(i  ,j+1,k  )+ &
+                    a4*pr(i  ,j  ,k+1)+ &
+                    a5*pr(i+1,j+1,k  )+ &
+                    a6*pr(i+1,j  ,k+1)+ &
+                    a7*pr(i  ,j+1,k+1)+ &
+                    a8*pr(i+1,j+1,k+1) )*inv_64
+                !
+                !
+                if=2*i
+                jf=2*j
+                kf=2*k+1
+                !
+                a1=9.
+                a2=3.
+                a3=3.
+                a4=27.
+                a5=1.
+                a6=9.
+                a7=9.
+                a8=3.
+                !
+                prf(if,jf,kf)=prf(if,jf,kf)+ &
+                    (  a1*pr(i  ,j  ,k  )+ &
+                    a2*pr(i+1,j  ,k  )+ &
+                    a3*pr(i  ,j+1,k  )+ &
+                    a4*pr(i  ,j  ,k+1)+ &
+                    a5*pr(i+1,j+1,k  )+ &
+                    a6*pr(i+1,j  ,k+1)+ &
+                    a7*pr(i  ,j+1,k+1)+ &
+                    a8*pr(i+1,j+1,k+1) )*inv_64
+                !
+                !
+                if=2*i+1
+                jf=2*j+1
+                kf=2*k
+                !
+                a1=3.
+                a2=9.
+                a3=9.
+                a4=1.
+                a5=27.
+                a6=3.
+                a7=3.
+                a8=9.
+                !
+                prf(if,jf,kf)=prf(if,jf,kf)+ &
+                    (  a1*pr(i  ,j  ,k  )+ &
+                    a2*pr(i+1,j  ,k  )+ &
+                    a3*pr(i  ,j+1,k  )+ &
+                    a4*pr(i  ,j  ,k+1)+ &
+                    a5*pr(i+1,j+1,k  )+ &
+                    a6*pr(i+1,j  ,k+1)+ &
+                    a7*pr(i  ,j+1,k+1)+ &
+                    a8*pr(i+1,j+1,k+1) )*inv_64
+                !
+                !
+                if=2*i+1
+                jf=2*j
+                kf=2*k+1
+                !
+                a1=3.
+                a2=9.
+                a3=1.
+                a4=9.
+                a5=3.
+                a6=27.
+                a7=3.
+                a8=9.
+                !
+                prf(if,jf,kf)=prf(if,jf,kf)+ &
+                    (  a1*pr(i  ,j  ,k  )+ &
+                    a2*pr(i+1,j  ,k  )+ &
+                    a3*pr(i  ,j+1,k  )+ &
+                    a4*pr(i  ,j  ,k+1)+ &
+                    a5*pr(i+1,j+1,k  )+ &
+                    a6*pr(i+1,j  ,k+1)+ &
+                    a7*pr(i  ,j+1,k+1)+ &
+                    a8*pr(i+1,j+1,k+1) )*inv_64
+                !
+                !
+                if=2*i+1
+                jf=2*j+1
+                kf=2*k+1
+                !
+                a1=1.
+                a2=3.
+                a3=3.
+                a4=3.
+                a5=9.
+                a6=9.
+                a7=9.
+                a8=27.
+                !
+                prf(if,jf,kf)=prf(if,jf,kf)+ &
+                    (  a1*pr(i  ,j  ,k  )+ &
+                    a2*pr(i+1,j  ,k  )+ &
+                    a3*pr(i  ,j+1,k  )+ &
+                    a4*pr(i  ,j  ,k+1)+ &
+                    a5*pr(i+1,j+1,k  )+ &
+                    a6*pr(i+1,j  ,k+1)+ &
+                    a7*pr(i  ,j+1,k+1)+ &
+                    a8*pr(i+1,j+1,k+1) )*inv_64
+                !
+                !
+                if=2*i
+                jf=2*j+1
+                kf=2*k+1
+                !
+                a1=3.
+                a2=1.
+                a3=9.
+                a4=9.
+                a5=3.
+                a6=3.
+                a7=27.
+                a8=9.
+                !
+                prf(if,jf,kf)=prf(if,jf,kf)+ &
+                    (  a1*pr(i  ,j  ,k  )+ &
+                    a2*pr(i+1,j  ,k  )+ &
+                    a3*pr(i  ,j+1,k  )+ &
+                    a4*pr(i  ,j  ,k+1)+ &
+                    a5*pr(i+1,j+1,k  )+ &
+                    a6*pr(i+1,j  ,k+1)+ &
+                    a7*pr(i  ,j+1,k+1)+ &
+                    a8*pr(i+1,j+1,k+1) )*inv_64
+            !
+            end do
+        end do
+    end do
+    !
+    ! before exchange I need to collocate in the proper position
+    ! the plane computed by each procs which belong to its right
+    !
+    if (rightpem /= MPI_PROC_NULL) then
+        call MPI_SSEND(prf(0,0,kendmg(n)+1),1, &
+            plantypef,rightpem,tagrs,MPI_COMM_WORLD,ierr)
+    end if
+    if (leftpem /= MPI_PROC_NULL) then
+        call MPI_RECV(prf(0,0,kstamg(n)),1, &
+            plantypef,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
+    end if
+
+    if (rightpem /= MPI_PROC_NULL) then
+        call MPI_SSEND(prf(0,0,kendmg(n)),1, &
+            plantypef,rightpem,tagrs,MPI_COMM_WORLD,ierr)
+    end if
+    if (leftpem /= MPI_PROC_NULL) then
+        call MPI_RECV(prf(0,0,kstamg(n)-1),1, &
+            plantypef,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
+    end if
+
+    call MPI_TYPE_FREE(plantypef,ierr)
+
+    return
+
+end subroutine prolong
 
 end module multigrid_module

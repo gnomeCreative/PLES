@@ -69,26 +69,22 @@ module strati
     use :: nesting_module
     use :: filtro_module
     use :: orlansky_module
+    use :: tridag_module
     !------------------------------------------------------------------------
     use :: scala3 !domain dimension + re + dt
     use :: subgrid
     use :: period ! periodicity
     use :: velpar
     !------------------------------------------------------------------------
-    use :: tipologia ! for the data type MPI_REAL_SD
     use :: mpi
 
     implicit none
 
+    private
+
     !-----------------------------------------------------------------------
     ! ARRAY AND VARIABLES DECLARATION
     ! index
-    integer :: i,j,k,i0,j0,k0,ii,jj,kk
-    integer :: l,n,iproc,mmm
-    integer :: iq1,isc
-    integer :: nlevel
-    integer :: jxc(0:4),jyc(0:4),jzc(0:4)
-    integer :: kpstamg(0:4),kpendmg(0:4),kfacepstamg(0:4)
     integer :: kgridparasta,kgridparaend
     integer :: kpsta,kpend
 
@@ -101,22 +97,19 @@ module strati
     real,allocatable :: fdve(:,:,:,:)
 
     ! for message passing
-    integer :: ierr,ierror
-    integer :: ncolprocmg(0:4)
-    integer :: kparastam,kparaendm
-    integer :: status(MPI_STATUS_SIZE)
+    integer :: ierr,status(MPI_STATUS_SIZE)
            
     ! coef species decay
     real,allocatable :: kdeg(:)
            
-    ! for reading grid and restart
-    real :: val_u,val_v,val_w
-    real,allocatable :: val_rhov(:)
-
     ! for transposed tridiag and approximate factorization
     real,allocatable :: g33_tr(:,:,:), giac_tr(:,:,:)
     real,allocatable :: aaa(:,:),rh(:)
     real,allocatable :: aa(:),bb(:),cc(:)
+
+    ! multigrid info
+    integer  :: nlevel
+    integer :: jxc(0:4),jyc(0:4),jzc(0:4)
 
     ! for timing to see code performance
     integer startc, endc, ratc
@@ -124,19 +117,25 @@ module strati
     real :: starttime,endtime
     real :: ticks
 
-    character*60 filename
-    real rhomin,rhomax
     real, allocatable :: rho_piano(:,:,:)
 
     public :: les_initialize,les_core,les_finalize,les_domain_size
     private :: init_parallel,read_grid
-
 
 contains
 
     subroutine les_initialize() bind (C, name="les_initialize")
 
         implicit none
+
+        ! for reading grid and restart
+        real :: val_u,val_v,val_w
+        real,allocatable :: val_rhov(:)
+
+        ! filename for wind, consider removing
+        character*60 filename
+
+        integer :: i,j,k,kk,l,isc
 
         ! grid has beeen read outside
 
@@ -182,12 +181,9 @@ contains
         ! temp matrix to allocate periodicity in k
         call indy(nlevel,jxc,jyc,jzc)
 
-        if (myid==0)write(*,*)'NLEVEL: ',nlevel
-
-        call iniz_metrica(nlevel)
+        call init_metrica(nlevmultimax,nlevel)
 
         call read_grid(grid_file)
-
         !-----------------------------------------------------------------------
         !  read IBM data
         call set_ibm(ktime)
@@ -307,16 +303,6 @@ contains
         end if
 
         !-----------------------------------------------------------------------
-        ! index computation for multigrid
-        !
-        !  call indy(jx,jy,jz,nlevel,jxc,jyc,jzc)
-        !  do n=0,nlevel
-        !  jxc(n) = jxc(n)
-        !  jyc(n) = jyc(n)
-        !  jzc(n) = jzc(n)
-        !  end do
-        !
-        !-----------------------------------------------------------------------
         ! compute metric terms as in Zang Street Koseff and index at the walls
         !
         call metrica()
@@ -412,8 +398,6 @@ contains
         call initialize_turbo()
 
         !
-        !-----------------------------------------------------------------------
-        !***********************************************************************
         !-----------------------------------------------------------------------
         ! variables allocation for WB and LC
         !
@@ -518,19 +502,6 @@ contains
         !
 
         !-----------------------------------------------------------------------
-        ! sett kparasta and kparaend for each multigrid level
-        ! k parallel start multigrid -> kpstamg
-        ! k parallel end multigrid   -> kpstamg
-        do n=1,nlevel
-            ncolprocmg(n) = jzc(n)/nproc
-            kpstamg(n) = myid*ncolprocmg(n)+1
-            kpendmg(n) = (myid+1)*ncolprocmg(n)
-            !    only myid=0 has kfacepstamg = 0
-            kfacepstamg(n) = kpstamg(n)
-            if (myid==0)kfacepstamg(n) = kpstamg(n) -1
-        end do
-        !
-        !-----------------------------------------------------------------------
         ! plane comunication for periodicity in k
 
         do kk=1,1-kp
@@ -547,8 +518,11 @@ contains
 
             do isc=1,nscal
 
-                rho  = 0.
-                if (myid==0 .or. myid==nproc-1)rho_piano=0.
+                rho(:,:,:)=0.0
+
+                if (myid==0 .or. myid==nproc-1) then
+                    rho_piano=0.0
+                end if
 
                 do k=kparasta-deepl,kparaend+deepr
                     do j=0,jy+1
@@ -607,7 +581,7 @@ contains
         call initialize_output()
 
         ! compute volume
-        call compute_volume(n1,n2,deepl,deepr,myid,kparasta,kparaend,tipo)
+        call compute_volume(tipo) !n1,n2,deepl,deepr,myid,kparasta,kparaend
 
     end subroutine les_initialize
 
@@ -628,13 +602,17 @@ contains
         real :: startdiv,enddiv
         real :: startgrad,endgrad
 
-        real :: massa1,massa2,massa3,massa4,massa5,massa6
-        real :: massa1tot,massa2tot,massa3tot,massa4tot,massa5tot,massa6tot
-        real :: bilancio
-
         real :: divint,divint_loc
 
         real :: l_x,l_y,l_z,l_f,coef_annit
+
+        ! iterators ad indices
+        integer :: i,j,k,ii,jj,kk,i0,j0,k0,l,isc
+
+        ! for clipping, consider removing
+        real :: rhomin,rhomax
+
+        integer :: iq1
 
         !***********************************************************************
         ! CYCLE
@@ -648,52 +626,14 @@ contains
 
         !-----------------------------------------------------------------------
         ! boundary conditions on du, dv, dw
-        call condi1()
-        call condi2()
-        call condi3()
+        call condi()
 
         ! boundary conditions for periodicity
         !call contourp_se()
         !call contour()
 
         ! average on fluxes in periodicity direction
-        do ii=1,1-ip
-            do k=kparasta,kparaend
-                do j=1,jy
-                    uc(0,j,k)=.5*(uc(0,j,k)+uc(jx,j,k))
-                    uc(jx,j,k)=uc(0,j,k)
-                end do
-            end do
-        end do
-
-        do jj=1,1-jp
-            do k=kparasta,kparaend
-                do i=1,jx
-                    vc(i,0,k)=.5*(vc(i,0,k)+vc(i,jy,k))
-                    vc(i,jy,k)=vc(i,0,k)
-                end do
-            end do
-        end do
-      
-        ! send wc(i,j,jz) to P0 in wc_piano of myid=0
-        do kk=1,1-kp
-            if (myid==nproc-1) then
-                call MPI_SSEND(wc(1,1,jz),jx*jy,MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
-            else if (myid==0) then
-                call MPI_RECV(wc_piano(1,1,jz),jx*jy,MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
-            end if
-            if (myid==0) then
-                do i=1,jx
-                    do j=1,jy
-                        wc(i,j,0)=.5*(wc(i,j,0)+wc_piano(i,j,jz))
-                    end do
-                end do
-                call MPI_SSEND(wc(1,1,0),jx*jy,MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
-            end if
-            if (myid==nproc-1) then
-                call MPI_RECV(wc(1,1,jz),jx*jy,MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
-            end if
-        end do
+        call average_periodicfluxes()
 
         !-----------------------------------------------------------------------
         ! compute the utau for wall model
@@ -702,81 +642,26 @@ contains
         end if
 
         !-----------------------------------------------------------------------
-        ! this external loop is a temporary solution to have the eddy diffusivity computed
-        ! for each scalar without reynolds analogy
-
-        if (nsgs==1) then
-            ! compute the eddy viscosity and diffusivity with smagorinksy
-            ! model with fixed constant
-            startturbotime=MPI_WTIME()
-            call turbo_statico(ktime,i_print,in_dx1,in_sn1,&
-                in_sp1,in_st1,in_av1,in_in1,isotropo,kpstamg,kpendmg)
-            endturbotime=MPI_WTIME()
-            if (myid==0) then
-                print*,myid,'trb static',endturbotime-startturbotime
-            end if
-        else if (nsgs==2) then
-            !   compute the eddy viscosity and diffusivity with smagorinksy
-            !   model with dynamic procedure for the constant
-            startturbotime=MPI_WTIME()
-            call turbo_dinamico(inmod,inmodrho,ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
-                in_st1,in_av1,in_in1,isotropo,kpstamg,kpendmg)
-            endturbotime=MPI_WTIME()
-            if (myid==0) then
-                print*,myid,'trb dynamic',endturbotime-startturbotime
-            end if
-        else if (nsgs==3) then
-            ! compute the eddy viscosity and diffusivity with smagorinksy
-            ! model with lagrangian procedure for the constant
-            startturbotime=MPI_WTIME()
-            call turbo_lagrangian(inmod,inmodrho,ktime,i_print,i_rest,in_dx1, &
-                in_sn1,in_sp1,in_st1,in_av1,in_in1,isotropo,kpstamg,kpendmg)
-            endturbotime=MPI_WTIME()
-            if (myid==0) then
-                print*,myid,'trb dynamic',endturbotime-startturbotime
-            end if
-        else if (nsgs==0) then
-            ! if DNS:
-            do k=kparasta-1,kparaend+1 !0,jz+1
-                do j=0,jy+1
-                    do i=0,jx+1
-                        ! eddy viscosity
-                        annit(i,j,k) =1./re
-                        annitV(i,j,k)=1./re
-                        ! eddy diffusivity
-                        do isc=1,nscal
-                            akapt(isc,i,j,k) =1./re/pran(isc)
-                            akaptV(isc,i,j,k)=1./re/pran(isc)
-                        end do
-                    end do
-                end do
-            end do
-            if (myid==0 .or. myid==nproc-1) then
-                annit_piano  = 1./re
-                annitV_piano = 1./re
-            end if
-
-            if (myid==0 .or. myid==nproc-1) then
-                do isc=1,nscal
-                    akapt_piano  = 1./re/pran(isc)
-                    akaptV_piano = 1./re/pran(isc)
-                end do
-            end if
-            inmod    = 0
-            inmodrho = 0
+        ! computation of turbulent viscosity and diffusion
+        startturbotime=MPI_WTIME()
+        call execute_turbo(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
+        endturbotime=MPI_WTIME()
+        if (myid==0 .and. nsgs/=0) then
+            print*,myid,'turbo procedure: ',endturbotime-startturbotime
         end if
 
         !-----------------------------------------------------------------------
         !  IBM CORRECTION
-        if (bodyforce .and. coef_wall>=1 .and. ktime==1 .and. i_rest/=0) then
-            ! call correggi_ib (...)
-            !correggo_rho = 0
-            !correggo_delu = 0
-            ipressione_ibm = 0
-            call correggi_ib(ktime,tipo)
-        end if
+        if (bodyforce .and. coef_wall>=1 .and. i_rest/=0) then
+            if (ktime==1) then
 
-        if (bodyforce .and. coef_wall >=1 .and. i_rest/=0) then
+                ! call correggi_ib (...)
+                !correggo_rho = 0
+                !correggo_delu = 0
+                ipressione_ibm = 0
+                call correggi_ib(ktime,tipo)
+
+            end if
 
             do l=1,num_solide
                 i=indici_celle_bloccate(l,1)
@@ -828,7 +713,7 @@ contains
                     coef_annit = 0.
                 end if
 
-                annit(i0,j0,k0)=coef_annit*.41*ustar(l)*dist_ib_parete(l)
+                annit(i0,j0,k0)=coef_annit*0.41*ustar(l)*dist_ib_parete(l)
 
                 if (annit(i0,j0,k0)<1./re) then
                     annit(i0,j0,k0)=1./re
@@ -867,7 +752,7 @@ contains
         end if
  
         !-----------------------------------------------------------------------
-        ! VISCOSITY COMUNICATION
+        ! viscosity communication
         call communication_viscosity()
 
         !-----------------------------------------------------------------------
@@ -924,12 +809,12 @@ contains
 
                 call mixrho_para(inmodrho,rho) ! scale similar part for the model
 
-                call flud1(uc,cgra1,rho,akapt,insc,isc,tipo2,bodyforce)  ! expl. term in R11 !tipo2
-                call flud2(vc,cgra2,rho,akapt,insc,isc,tipo2,bodyforce)  ! expl. term in R22 !tipo2
-                call flud3(wc,cgra3,rho,akapt,insc,isc,tipo2,bodyforce)  ! expl. term in R33 !tipo2
+                call flud1(uc,cgra1,rho,akapt,insc,isc,tipo2)  ! expl. term in R11 !tipo2
+                call flud2(vc,cgra2,rho,akapt,insc,isc,tipo2)  ! expl. term in R22 !tipo2
+                call flud3(wc,cgra3,rho,akapt,insc,isc,tipo2)  ! expl. term in R33 !tipo2
 
                 if (espl==1) then
-                    call flucrhoesp(rho,isc,tipo,bodyforce)  ! expl. term Crank-Nicolson
+                    call flucrhoesp(rho,isc,tipo)  ! expl. term Crank-Nicolson
 
                     call ada_rho(ktime,fdve,isc,rho,kdeg(isc))   ! Adams-Bashforth
        
@@ -944,7 +829,7 @@ contains
 
                     call ada_rho(ktime,fdve,isc,rho,kdeg(isc))   ! Adams-Bashforth
 
-                    call flucrho(ti,rho,akaptV,akapt,isc,tipo,bodyforce)  ! expl. term Crank-Nicolson
+                    call flucrho(ti,rho,akaptV,akapt,isc,tipo)  ! expl. term Crank-Nicolson
 
                     call rhs1_rho(kparasta,kparaend)    ! right hand side scalar eq.
 
@@ -1121,37 +1006,24 @@ contains
         !
         ! compute convective and diffusive explicit terms in first eq.
         iq1=1
-        call mix_para(inmod,iq1,kparasta,kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr, &
-            nproc,myid,rightpem,leftpem,ktime,i_print,lagr)
+        call mix_para(inmod,iq1,ktime,i_print,lagr)
 
-        if (myid==0) then
-            kparastam=kparasta+kp
-            kparaendm=kparaend
-        else if (myid==nproc-1) then
-            kparastam=kparasta
-            kparaendm=kparaend-kp
-        else
-            kparastam=kparasta
-            kparaendm=kparaend
-        end if
-
-        call jord1(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1, &
-            kparasta,kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr,rightpem,leftpem)
-        call flu_turbo(kparasta,kparaend)
+        call jord1(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1)
+        call flu_turbo()
 
         if (langyes==1) then
             call langmuir2(myid,nproc,kparasta,kparaend)
         end if
 
-        call flux1(uc,cgra1,u,insc,tipo,bodyforce)     ! explicit term in F21
-        call flux2(vc,cgra2,u,insc,tipo,bodyforce)     ! explicit term in F12
-        call flux3(wc,cgra3,u,insc,tipo,bodyforce)     ! explicit term in F13
+        call flux1(uc,cgra1,u,insc,tipo)     ! explicit term in F21
+        call flux2(vc,cgra2,u,insc,tipo)     ! explicit term in F12
+        call flux3(wc,cgra3,u,insc,tipo)     ! explicit term in F13
 
         if (espl==1) then
             if (windyes==1) then
-                call flucnesp(u,visualizzo,tipo,bodyforce,tauu_att) ! expl. term Crank-Nicolson
+                call flucnesp(u,visualizzo,tipo,tauu_att) ! expl. term Crank-Nicolson
             else
-                call flucnesp(u,visualizzo,tipo,bodyforce) ! expl. term Crank-Nicolson
+                call flucnesp(u,visualizzo,tipo) ! expl. term Crank-Nicolson
             end if
             call adams(ktime,f1ve,bcsi,kparasta,kparaend)     ! Adams-Bashforth
 
@@ -1174,9 +1046,9 @@ contains
                 eseguo34 = 1
             end if
             if (windyes==1) then
-                call flucn(u,visualizzo,coef_wall,ti,tipo,bodyforce,tauu_att)
+                call flucn(u,visualizzo,coef_wall,ti,tipo,tauu_att)
             else
-                call flucn(u,visualizzo,coef_wall,ti,tipo,bodyforce)
+                call flucn(u,visualizzo,coef_wall,ti,tipo)
             end if
             eseguo34=0
             call rhs1_rho(kparasta,kparaend)   ! right hand side of momentum eq.
@@ -1249,27 +1121,25 @@ contains
         ! compute convective and diffusive explicit terms in second eq.
         !
         iq1=2
-        call mix_para(inmod,iq1,kparasta,kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr, &
-            nproc,myid,rightpem,leftpem,ktime,i_print,lagr)
+        call mix_para(inmod,iq1,ktime,i_print,lagr)
 
-        call jord2(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1, &
-            kparasta,kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr,rightpem,leftpem)
+        call jord2(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1)
 
-        call flu_turbo(kparasta,kparaend)
+        call flu_turbo()
 
         if (langyes==1) then
             call langmuir2(myid,nproc,kparasta,kparaend)
         end if
 
-        call flux1(uc,cgra1,v,insc,tipo,bodyforce)     ! explicit term in F21
-        call flux2(vc,cgra2,v,insc,tipo,bodyforce)     ! explicit term in F22
-        call flux3(wc,cgra3,v,insc,tipo,bodyforce)     ! explicit term in F23
+        call flux1(uc,cgra1,v,insc,tipo)     ! explicit term in F21
+        call flux2(vc,cgra2,v,insc,tipo)     ! explicit term in F22
+        call flux3(wc,cgra3,v,insc,tipo)     ! explicit term in F23
 
         if (espl==1) then
             if (windyes==1) then
-                call flucnesp(v,visualizzo,tipo,bodyforce,v_att)
+                call flucnesp(v,visualizzo,tipo,v_att)
             else
-                call flucnesp(v,visualizzo,tipo,bodyforce)
+                call flucnesp(v,visualizzo,tipo)
             end if
             call adams(ktime,f2ve,beta,kparasta,kparaend)    ! Adams-Bashforth
 
@@ -1286,9 +1156,9 @@ contains
 
             eseguo34 = 0
             if (windyes==1) then
-                call flucn(v,visualizzo,coef_wall,ti,tipo,bodyforce,v_att)  ! expl. term Crank-Nicolson
+                call flucn(v,visualizzo,coef_wall,ti,tipo,v_att)  ! expl. term Crank-Nicolson
             else
-                call flucn(v,visualizzo,coef_wall,ti,tipo,bodyforce)  ! expl. term Crank-Nicolson
+                call flucn(v,visualizzo,coef_wall,ti,tipo)  ! expl. term Crank-Nicolson
             end if
        
             call rhs1_rho(kparasta,kparaend)  ! right hand side of momentum eq.
@@ -1356,27 +1226,25 @@ contains
         ! compute convective and diffusive explicit terms in third eq.
         !
         iq1=3
-        call mix_para(inmod,iq1,kparasta,kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr, &
-            nproc,myid,rightpem,leftpem,ktime,i_print,lagr)
+        call mix_para(inmod,iq1,ktime,i_print,lagr)
      
-        call jord3(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kparasta,kparaend,rightpe,leftpe,&
-            tagls,taglr,tagrs,tagrr,rightpem,leftpem)
+        call jord3(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1)
 
-        call flu_turbo(kparasta,kparaend)
+        call flu_turbo()
 
         if (langyes==1) then
             call langmuir2(myid,nproc,kparasta,kparaend)
         end if
 
-        call flux1(uc,cgra1,w,insc,tipo,bodyforce)     ! explicit term in F31
-        call flux2(vc,cgra2,w,insc,tipo,bodyforce)     ! explicit term in F32
-        call flux3(wc,cgra3,w,insc,tipo,bodyforce)     ! explicit term in F33
+        call flux1(uc,cgra1,w,insc,tipo)     ! explicit term in F31
+        call flux2(vc,cgra2,w,insc,tipo)     ! explicit term in F32
+        call flux3(wc,cgra3,w,insc,tipo)     ! explicit term in F33
 
         if (espl==1) then
             if (windyes==1) then
-                call flucnesp(w,visualizzo,tipo,bodyforce,tauw_att) ! expl. term in Crank-Nicolson
+                call flucnesp(w,visualizzo,tipo,tauw_att) ! expl. term in Crank-Nicolson
             else
-                call flucnesp(w,visualizzo,tipo,bodyforce) ! expl. term in Crank-Nicolson
+                call flucnesp(w,visualizzo,tipo) ! expl. term in Crank-Nicolson
             end if
 
             call adams(ktime,f3ve,bzet,kparasta,kparaend)    ! Adams-Bashforth
@@ -1399,9 +1267,9 @@ contains
                 eseguo34 = 2
             end if
             if (windyes==1) then
-                call flucn(w,visualizzo,coef_wall,ti,tipo,bodyforce,tauw_att)
+                call flucn(w,visualizzo,coef_wall,ti,tipo,tauw_att)
             else
-                call flucn(w,visualizzo,coef_wall,ti,tipo,bodyforce)
+                call flucn(w,visualizzo,coef_wall,ti,tipo)
             end if
             eseguo34=0
 
@@ -1502,135 +1370,9 @@ contains
         else
             call contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
         end if
-        !-----------------------------------------------------------------------
-        ! check mass on sides 1 and 2
-        massa1=0.
-        do k=kparasta,kparaend
-            do j=1,jy
-                massa1=massa1+uc(0,j,k)
-            end do
-        end do
 
-        massa2=0.
-        do k=kparasta,kparaend
-            do j=1,jy
-                massa2=massa2-uc(jx,j,k)
-            end do
-        end do
+        call mass_balance()
 
-        ! check mass on sides 3 and 4
-        massa3=0.
-        do k=kparasta,kparaend
-            do i=1,jx
-                massa3=massa3+vc(i,0,k)
-            end do
-        end do
-
-        massa4=0.
-        do k=kparasta,kparaend
-            do i=1,jx
-                massa4=massa4-vc(i,jy,k)
-            end do
-        end do
-
-        ! check mass on sides 5 and 6
-        massa5=0.
-        if (myid==0) then
-            do j=1,jy
-                do i=1,jx
-                    massa5=massa5+wc(i,j,0)
-                end do
-            end do
-        end if
-
-        massa6=0.
-        if (myid==nproc-1) then
-            do j=1,jy
-                do i=1,jx
-                    massa6=massa6-wc(i,j,jz)
-                end do
-            end do
-        end if
-
-        ! from local to total quantities
-        call MPI_ALLREDUCE(massa1,massa1tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa2,massa2tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa3,massa3tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa4,massa4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa5,massa5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa6,massa6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
-        if (myid==0) then
-            bilancio = massa1tot + massa2tot + massa3tot + massa4tot + massa5tot + massa6tot
-            write(*,*)'mass balance: ',bilancio
-        end if
-
-        !-----------------------------------------------------------------------
-        ! check cs
-
-        ! check mass on sides 1 and 2
-        massa1=0.
-        do k=kparasta,kparaend
-            do j=1,jy
-                massa1=massa1+cs1(j,k)
-            end do
-        end do
-
-        massa2=0.
-        do k=kparasta,kparaend
-            do j=1,jy
-                massa2=massa2-cs2(j,k)
-            end do
-        end do
-
-        ! check mass on sides 3 and 4
-        massa3=0.
-        do k=kparasta,kparaend
-            do i=1,jx
-                massa3=massa3+cs3(i,k)
-            end do
-        end do
-
-        massa4=0.
-        do k=kparasta,kparaend
-            do i=1,jx
-                massa4=massa4-cs4(i,k)
-            end do
-        end do
-
-        ! check mass on sides 5 and 6
-        massa5=0.
-        if (myid==0) then
-            do j=1,jy
-                do i=1,jx
-                    massa5=massa5+cs5(i,j)
-                end do
-            end do
-        end if
-
-        massa6=0.
-        if (myid==nproc-1) then
-            do j=1,jy
-                do i=1,jx
-                    massa6=massa6-cs6(i,j)
-                end do
-            end do
-        end if
-
-        ! from local to total quantities
-        call MPI_ALLREDUCE(massa1,massa1tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa2,massa2tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa3,massa3tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa4,massa4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa5,massa5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLREDUCE(massa6,massa6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
-        if (myid==0) then
-            bilancio = massa1tot + massa2tot + massa3tot + massa4tot + massa5tot + massa6tot
-            write(*,*)'cs balance: ',bilancio
-        end if
-
-        !
         !-----------------------------------------------------------------------
         ! COMPUTE INTERMEDIATE DIVERGENCE
         !
@@ -1665,25 +1407,8 @@ contains
         !
         startmultitime=MPI_WTIME()
 
-        if (jpos==0) then
-        !            call poiss(omega,eps,myid,nproc,kparasta,kparaend, &
-        !                tagls,taglr,tagrs,tagrr,leftpe,rightpe)
-        else
-            if (ipress_cart==0) then
-                call multi(eps,ficycle,nlevel,jxc,jyc,jzc, &
-                    kparasta,kparaend,myid,nproc,rightpe,leftpe, &
-                    tagls,taglr,tagrs,tagrr,islor, &
-                    bodyforce,bodypressure,tipo,deepl,deepr, &
-                    ktime,freesurface,ti)
-            else
-                ! call multi_cart(nlevmultimax,eps,omega,ficycle,nlevel, &
-            !                    jxc,jyc,jzc, &
-            !                    kparasta,kparaend,myid,nproc, &
-            !                    rightpe,leftpe, &
-            !                    tagls,taglr,tagrs,tagrr,islor, &
-            !                    bodyforce,bodypressure,tipo,deepl,deepr)
-            end if
-        end if
+        ! there used to be also more possibilities: all removed except multi
+        call multi(eps,ficycle,nlevel,jxc,jyc,jzc,islor,tipo,ktime,freesurface)
 
         call communication_pressure()
                                                                                      
@@ -1696,11 +1421,11 @@ contains
         !-----------------------------------------------------------------------
         ! compute pressure gradient
         startgrad=MPI_WTIME()
-        call gradie(kparasta,kparaend)
+        call gradie()
 
         !-----------------------------------------------------------------------
         ! compute cartesian velocity and controvariant
-        call vel_up(kparasta,kparaend,rightpe,leftpe,bodyforce,freesurface)
+        call vel_up(bodyforce,freesurface)
 
         !-----------------------------------------------------------------------
         ! correction on IBM
@@ -1793,7 +1518,7 @@ contains
         enditertime=MPI_WTIME()
 
         if (myid == 0) then
-            print '(i2,a,e15.8)',myid,'itr ',(enditertime-startitertime)/ticks
+            print '(I2,A,E15.8)',myid,'itr ',(enditertime-startitertime)/ticks
             write(*,*)'                   '
         end if
 
@@ -1817,13 +1542,11 @@ contains
 
         endtime=MPI_WTIME()
         resolution=MPI_WTICK()
-        do iproc=0,nproc-1
-            if (myid==iproc) then
-                print*,'^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
-                print*,myid,'elapsed=',endtime-starttime,'resolution=',resolution
-                print*,'------------------------------'
-            end if
-        end do
+        if (myid==0) then
+            print*,'^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
+            print*,myid,'elapsed=',endtime-starttime,'resolution=',resolution
+            print*,'------------------------------'
+        end if
 
         deallocate(u,v,w,uc,vc,wc,fi,rhov)
         deallocate(annit,annitV,akapt,akaptV)
@@ -2133,7 +1856,7 @@ contains
         real,allocatable :: xx1(:,:,:),yy1(:,:,:),zz1(:,:,:)
         real,allocatable :: xx2(:,:,:),yy2(:,:,:),zz2(:,:,:)
 
-
+        integer :: i,j,k
 
         !-----------------------------------------------------------------------
         ! read the grid
@@ -2227,7 +1950,7 @@ contains
 
         ! compute centroid position
         if(myid==0)write(*,*)'Compute centroids'
-        call compute_centroids(jx,jy,jz,myid,nproc,kparasta,kparaend)
+        call compute_centroids() !jx,jy,jz,myid,nproc,kparasta,kparaend
 
         ! periodic cells
         call cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
@@ -2271,5 +1994,145 @@ contains
         end if
 
     end subroutine les_domain_size
+
+    subroutine mass_balance()
+
+        implicit none
+
+        real :: massa1,massa2,massa3,massa4,massa5,massa6
+        real :: massa1tot,massa2tot,massa3tot,massa4tot,massa5tot,massa6tot
+        real :: bilancio
+
+        integer :: i,j,k
+
+            !-----------------------------------------------------------------------
+        ! check mass on sides 1 and 2
+        massa1=0.
+        do k=kparasta,kparaend
+            do j=1,jy
+                massa1=massa1+uc(0,j,k)
+            end do
+        end do
+
+        massa2=0.
+        do k=kparasta,kparaend
+            do j=1,jy
+                massa2=massa2-uc(jx,j,k)
+            end do
+        end do
+
+        ! check mass on sides 3 and 4
+        massa3=0.
+        do k=kparasta,kparaend
+            do i=1,jx
+                massa3=massa3+vc(i,0,k)
+            end do
+        end do
+
+        massa4=0.
+        do k=kparasta,kparaend
+            do i=1,jx
+                massa4=massa4-vc(i,jy,k)
+            end do
+        end do
+
+        ! check mass on sides 5 and 6
+        massa5=0.
+        if (myid==0) then
+            do j=1,jy
+                do i=1,jx
+                    massa5=massa5+wc(i,j,0)
+                end do
+            end do
+        end if
+
+        massa6=0.
+        if (myid==nproc-1) then
+            do j=1,jy
+                do i=1,jx
+                    massa6=massa6-wc(i,j,jz)
+                end do
+            end do
+        end if
+
+        ! from local to total quantities
+        call MPI_ALLREDUCE(massa1,massa1tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa2,massa2tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa3,massa3tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa4,massa4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa5,massa5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa6,massa6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+
+        if (myid==0) then
+            bilancio = massa1tot + massa2tot + massa3tot + massa4tot + massa5tot + massa6tot
+            write(*,*)'mass balance: ',bilancio
+        end if
+
+        !-----------------------------------------------------------------------
+        ! check cs
+
+        ! check mass on sides 1 and 2
+        massa1=0.
+        do k=kparasta,kparaend
+            do j=1,jy
+                massa1=massa1+cs1(j,k)
+            end do
+        end do
+
+        massa2=0.
+        do k=kparasta,kparaend
+            do j=1,jy
+                massa2=massa2-cs2(j,k)
+            end do
+        end do
+
+        ! check mass on sides 3 and 4
+        massa3=0.
+        do k=kparasta,kparaend
+            do i=1,jx
+                massa3=massa3+cs3(i,k)
+            end do
+        end do
+
+        massa4=0.
+        do k=kparasta,kparaend
+            do i=1,jx
+                massa4=massa4-cs4(i,k)
+            end do
+        end do
+
+        ! check mass on sides 5 and 6
+        massa5=0.
+        if (myid==0) then
+            do j=1,jy
+                do i=1,jx
+                    massa5=massa5+cs5(i,j)
+                end do
+            end do
+        end if
+
+        massa6=0.
+        if (myid==nproc-1) then
+            do j=1,jy
+                do i=1,jx
+                    massa6=massa6-cs6(i,j)
+                end do
+            end do
+        end if
+
+        ! from local to total quantities
+        call MPI_ALLREDUCE(massa1,massa1tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa2,massa2tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa3,massa3tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa4,massa4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa5,massa5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(massa6,massa6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+
+        if (myid==0) then
+            bilancio = massa1tot + massa2tot + massa3tot + massa4tot + massa5tot + massa6tot
+            write(*,*)'cs balance: ',bilancio
+        end if
+
+    end subroutine mass_balance
 
 end module strati

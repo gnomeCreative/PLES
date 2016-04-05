@@ -23,7 +23,7 @@ module mysettings
 
     ! pressure (poisson eq.)
     real(kind=c_double),bind(C) :: bbx,bby,bbz,eps
-    integer(kind=c_int),bind(C) :: ficycle,bodypressure,ipress_cart,freesurface
+    integer(kind=c_int),bind(C) :: ficycle,freesurface
 
     ! boundary condition
     integer(kind=c_int),bind(C) :: lett,ibb,coef_wall,integrale

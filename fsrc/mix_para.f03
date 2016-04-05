@@ -1,7 +1,5 @@
 !***********************************************************************
-subroutine mix_para(inmod,iq,kparasta,kparaend,&
-   rightpe,leftpe,tagls,taglr,tagrs,tagrr, &
-   nproc,myid,rightpem,leftpem,ktime,i_print,lagr)
+subroutine mix_para(inmod,iq,ktime,i_print,lagr)
    !***********************************************************************
    ! compute scale similar part for momentum eq.
    !
@@ -9,11 +7,11 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
    use turbo_module
    use myarrays_velo3
    use myarrays_metri3
+   use mysending
    !
    use scala3
    use subgrid
    use period
-   use tipologia
    !
    use mpi
 
@@ -21,14 +19,9 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
 
    !-----------------------------------------------------------------------
    !     array declaration
-   integer ierr,myid,nproc
-   integer ncolperproc,kparasta,kparaend
+   integer ierr
    integer kparastam,kparaendm
-   integer tagls,taglr,tagrs,tagrr
    integer status(MPI_STATUS_SIZE)
-   integer rightpe,leftpe,rightpem,leftpem
-   integer req1,req2,req3,req4,req5,req6
-   integer istatus(MPI_STATUS_SIZE)
    !
    real sbuff((n1+2)*(n2+2)*40)
    real rbuff((n1+2)*(n2+2)*40)
@@ -36,7 +29,7 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
    integer i,j,k,kparastal,iq,inmod,m,lll
    integer kparastan
    integer ii,jj,kk
-   integer debugg
+   integer,parameter :: debugg = 0
    integer ktime,i_print,lagr
    real somma
    !
@@ -44,7 +37,7 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
    real,allocatable :: sus_loc21(:),sus_loc22(:),sus_loc23(:)
    real,allocatable :: sus_loc31(:),sus_loc32(:),sus_loc33(:)
    !-----------------------------------------------------------------------
-   debugg = 0
+
 
    do k=kparasta,kparaend
       do j=1,jy
@@ -575,13 +568,6 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
                MPI_COMM_WORLD,status,ierr)
          endif
 
-         if(leftpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req1,istatus,ierr)
-         endif
-         if(rightpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req2,istatus,ierr)
-         endif
-
       endif
       !
       call buffer2(rbuff1,m21,1,kparaend+1,myid,nproc,kparasta,kparaend)
@@ -656,14 +642,6 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
                MPI_COMM_WORLD,status,ierr)
          endif
 
-         if(rightpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req1,istatus,ierr)
-         endif
-         if(leftpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req2,istatus,ierr)
-         endif
-
-      
       endif
 
       call buffer2(rbuff1,m21,1,kparasta-1,myid,nproc,kparasta,kparaend)
@@ -1021,13 +999,6 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
                MPI_COMM_WORLD,status,ierr)
          endif
 
-         if(leftpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req1,istatus,ierr)
-         endif
-         if(rightpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req2,istatus,ierr)
-         endif
-
       else if(iq.eq.2)then
 
          if(leftpem /= MPI_PROC_NULL) then
@@ -1041,13 +1012,6 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
                MPI_COMM_WORLD,status,ierr)
          endif
 
-         if(leftpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req3,istatus,ierr)
-         endif
-         if(rightpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req4,istatus,ierr)
-         endif
-
       else if(iq.eq.3)then
  
          if(leftpem /= MPI_PROC_NULL) then
@@ -1059,13 +1023,6 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
             call MPI_RECV(ass33(1,1,kparaend+1),(jx+2)*(jy+2), &
                MPI_REAL_SD,rightpem,tagrr, &
                MPI_COMM_WORLD,status,ierr)
-         endif
-
-         if(leftpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req5,istatus,ierr)
-         endif
-         if(rightpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req6,istatus,ierr)
          endif
 
       endif
@@ -1371,4 +1328,4 @@ subroutine mix_para(inmod,iq,kparasta,kparaend,&
    endif
    !
    return
-end
+end subroutine mix_para

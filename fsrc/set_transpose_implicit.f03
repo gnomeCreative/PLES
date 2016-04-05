@@ -5,7 +5,6 @@ subroutine set_transpose_implicit(g33_tr,giac_tr)
     use myarrays_metri3
     !
     use scala3
-    use tipologia
     !
     use mpi
 

@@ -15,11 +15,12 @@ FMOD = $(FS)/modules
 
 # Flag for FORTRAN compiler
 FIXED   =  -extend_source 
-FFLAGS	=  -O3 -fdefault-real-8 -fcheck=all -fbounds-check -fbacktrace -finit-real=zero -J $(FMOD) -I $(FMOD) 
+FFLAGS	=  -O3 -fdefault-real-8 -fcheck=all -fbounds-check -fbacktrace -finit-real=zero -J $(FMOD) -I $(FMOD)
 #FFLAGS	=  -fdefault-real-8 -fcheck=all -fbounds-check -fbacktrace -finit-real=zero -J $(FMOD) -I $(FMOD) -Wall
 
 # -Wunused
 #FFLAGS  = $(FIXED) -align -O2  -ftz 
+
 #FFLAGS = -O0 -g -traceback -check bounds  -check bounds -fpe0 -i_dynamic -r8
 
 # Flag for PROFILING: -g -pg
@@ -43,21 +44,20 @@ LDFLAGS	= $(FFLAGS) $(CFLAGS)
 
 # List of Fortran code files 
 FOBJS   =  \
- scala3.o period.o tipologia.o subgrid.o velpar.o mysettings.o mysending.o \
+ scala3.o mysending.o period.o mysettings.o myarrays_density.o subgrid.o velpar.o \
  \
- myarrays_metri3.o myarrays_density.o myarrays_WB.o myarrays_LC.o \
+ myarrays_WB.o myarrays_LC.o myarrays_metri3.o  \
  myarrays_ibm.o myarrays_velo3.o myarrays_wallmodel.o \
- particle_module.o turbo_module.o multigrid_module.o ricercaGeomRoutines.o trilinear.o ricerca.o orlansky_module.o \
+ tridag_module.o particle_module.o turbo_module.o  ricercaGeomRoutines.o trilinear.o ricerca.o multigrid_module.o orlansky_module.o \
  output_module.o contour_module.o inflow_module.o nesting_module.o jord_module.o buffer_bodyforce_module.o\
  filtro_module.o filter_module.o flu_module.o \
  \
- ada_rho.o adams.o carico_immb.o cellep.o check_divergence.o coed1.o coed2.o coed3_tr.o\
- coef1_par.o coef2_par.o contra.o contrin.o correggi_ib.o courant.o diver.o drift.o \
- fmassa.o gauss_random.o gradie.o indy.o iniz.o iniz_metrica.o inverse_para2.o interp3.o \
- langmuir2.o leggivento.o metrica.o mix_para.o mixrho_para.o passo_ibm.o periodic.o prolong.o \
- restart.o rhs1_rho.o set_transpose_implicit.o tridag.o \
- tridiag_trasp_para.o tridiag_trasp_para_rho.o triper.o turbo_lagrangian.o update.o \
- vel_up.o vorticitag.o wall_function_bodyfitted.o turbo_dinamico.o turbo_statico.o wernerwengle.o\
+ ada_rho.o adams.o carico_immb.o cellep.o check_divergence.o \
+ contra.o contrin.o correggi_ib.o courant.o diver.o drift.o \
+ fmassa.o gauss_random.o gradie.o indy.o iniz.o inverse_para2.o interp3.o \
+ langmuir2.o leggivento.o metrica.o mix_para.o mixrho_para.o passo_ibm.o periodic.o \
+ restart.o rhs1_rho.o turbo_lagrdin.o update.o set_transpose_implicit.o \
+ vel_up.o vorticitag.o wall_function_bodyfitted.o turbo_statico.o wernerwengle.o\
  \
  stratiParticle.o
 

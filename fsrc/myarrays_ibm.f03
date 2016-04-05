@@ -7,8 +7,8 @@ module myarrays_ibm
 
     use,intrinsic :: iso_c_binding
 
-    integer,bind(C) :: num_iter
-    logical,bind(C) :: particles,bodyforce
+    integer(kind=c_int),bind(C) :: num_iter
+    logical(kind=c_bool),bind(C) :: particles,bodyforce,bodypressure
     !MN,MP matrix dimension to store mesh: points and triangle
     integer :: MN,MP
     integer :: numero_celle_IB,numero_celle_bloccate,numero_celle_bloccate_real

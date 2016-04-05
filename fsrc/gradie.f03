@@ -1,13 +1,14 @@
 !***********************************************************************
-subroutine gradie(kparasta,kparaend)
+subroutine gradie()
    !***********************************************************************
    ! compute pressure gradient at cell centroid *dt/J(-1) and computation
    ! of controvariant gradient on faces
    !
    use myarrays_metri3
-   use myarrays_velo3
+   use myarrays_velo3, only: cgra1,cgra2,cgra3,fi,gra1,gra2,gra3
+   use mysending, only: kparasta,kparaend,myid
    !
-   use scala3
+   use scala3, only: dt,jx,jy
    !
    use mpi
 
@@ -15,14 +16,10 @@ subroutine gradie(kparasta,kparaend)
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,k
-   integer ierr,myid,nproc
-   integer ncolperproc,kparasta,kparaend,m
    integer kparastal,kparaendl
       
-   real coef, coef_dt
+   real coef,coef_dt
    !-----------------------------------------------------------------------
-   CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
-   CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
    !-----------------------------------------------------------------------
    !
    coef_dt = -0.5 * dt
@@ -117,4 +114,4 @@ subroutine gradie(kparasta,kparaend)
    enddo
    !
    return
-end
+end subroutine gradie

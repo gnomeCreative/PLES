@@ -12,7 +12,6 @@ subroutine passo_ibm()
     !
     use scala3
     use period
-    use tipologia
     !
     use mpi
 

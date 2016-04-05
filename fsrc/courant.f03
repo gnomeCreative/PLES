@@ -6,11 +6,10 @@ subroutine courant(ktime)
     !
     use myarrays_metri3, only: annit, g11, g22, g33, giac
     use myarrays_velo3, only: uc, vc, wc
-    use mysending, only: kparasta,kparaend,nproc,myid
+    use mysending, only: kparasta,kparaend,nproc,myid,MPI_REAL_SD
     use mysettings, only: ind_cou,cou,espl,i_rest
     !
     use scala3
-    use tipologia
     !
     use mpi
 

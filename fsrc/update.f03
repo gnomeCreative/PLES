@@ -9,7 +9,6 @@ subroutine update()
     !
     use scala3
     use period
-    use tipologia
     !
     use mpi
 

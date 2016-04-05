@@ -7,6 +7,7 @@ subroutine iniz_metrica(nlevel)
     use scala3
 
     implicit none
+
     !-----------------------------------------------------------------------
     !     arrays declaration
     integer i,j,k
@@ -14,6 +15,7 @@ subroutine iniz_metrica(nlevel)
     integer,intent(inout) :: nlevel
     !integer nlevmultimax
     integer var_piani,livello
+
     !-----------------------------------------------------------------------
     ! griglia
 

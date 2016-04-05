@@ -1,6 +1,9 @@
 module particle_module
 
     use,intrinsic :: iso_c_binding
+    use mysending
+    !
+    use mpi
 
     implicit none
 
@@ -26,10 +29,6 @@ contains
     subroutine compute_sphere_forces()
 
         use myarrays_ibm
-        use mysending
-
-        use tipologia
-        use mpi
 
         implicit none
 
@@ -126,7 +125,6 @@ contains
     subroutine compute_sphere_force_fields()
 
         use myarrays_ibm
-        use mysending
         use scala3
 
         implicit none
@@ -164,8 +162,6 @@ contains
 end subroutine compute_sphere_force_fields
 
     subroutine pass_geometry(totpart,pposx,pposy,pposz,prad,pmoves) bind (C, name="pass_geometry")
-
-        use mysending
 
         implicit none
 
@@ -223,8 +219,6 @@ end subroutine compute_sphere_force_fields
     end subroutine pass_geometry
 
     subroutine pass_forces(sforx,sfory,sforz,pforx,pfory,pforz) bind (C, name="pass_forces")
-
-        use mysending
 
         implicit none
 

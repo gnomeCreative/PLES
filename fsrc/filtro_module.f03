@@ -4,7 +4,6 @@ module filtro_module
     !
     use scala3
     use period
-    use tipologia
     !
     use mpi
 

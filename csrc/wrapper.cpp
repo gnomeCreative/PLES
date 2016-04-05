@@ -281,8 +281,6 @@ void parseLesConfigFile(GetPot& command_line,GetPot& lesCfgFile) {
 	// Pressure condition,pressure solver
 	PARSE_EXTERNAL(lesCfgFile,double,omega,"om_pre",-1.0);
 	ASSERT(omega>=0.0);
-	PARSE_EXTERNAL(lesCfgFile,int,jpos,"jpos",-1);
-	ASSERT(jpos>=0);
 	PARSE_EXTERNAL(lesCfgFile,int,islor,"islor",-1);
 	ASSERT(islor>=0);
 	PARSE_EXTERNAL(lesCfgFile,int,nlevmultimax,"nlevmultimax",-1);
@@ -297,10 +295,6 @@ void parseLesConfigFile(GetPot& command_line,GetPot& lesCfgFile) {
 	ASSERT(eps>=0.0);
 	PARSE_EXTERNAL(lesCfgFile,int,ficycle,"ficycle",-1);
 	ASSERT(ficycle>=0);
-	PARSE_EXTERNAL(lesCfgFile,int,bodypressure,"bodypressure",-1);
-	ASSERT(bodypressure>=0);
-	PARSE_EXTERNAL(lesCfgFile,int,ipress_cart,"ipress_cart",-1);
-	ASSERT(ipress_cart>=0);
 	PARSE_EXTERNAL(lesCfgFile,int,freesurface,"freesurface",-1);
 	ASSERT(freesurface>=0);
 
@@ -310,6 +304,10 @@ void parseLesConfigFile(GetPot& command_line,GetPot& lesCfgFile) {
 	PARSE_EXTERNAL(lesCfgFile,int,ibb,"ibb",-1);
 	ASSERT(ibb>=0);
 	PARSE_EXTERNAL(lesCfgFile,bool,bodyforce,"bodyforce",-1);
+	PARSE_EXTERNAL(lesCfgFile,int,bodypressure,"bodypressure",false);
+	if (bodypressure) {
+		ASSERT(bodyforce);
+	}
 	PARSE_EXTERNAL(lesCfgFile,bool,particles,"particles",false);
 	PARSE_EXTERNAL(lesCfgFile,int,num_iter,"num_iter",-1);
 	ASSERT(num_iter>=0);
@@ -331,6 +329,10 @@ void parseLesConfigFile(GetPot& command_line,GetPot& lesCfgFile) {
 	ASSERT(inmod>=0);
 	PARSE_EXTERNAL(lesCfgFile,int,inmodrho,"inmodrho",-1);
 	ASSERT(inmodrho>=0);
+	if (nsgs==0) {
+		ASSERT(nsgs==0 && inmodrho==0);
+		ASSERT(nsgs==0 && inmod==0);
+	}
 	PARSE_EXTERNAL(lesCfgFile,int,isotropo,"isotropo",-1);
 	ASSERT(isotropo>=0);
 	PARSE_EXTERNAL(lesCfgFile,double,cost,"cost",-1.0);

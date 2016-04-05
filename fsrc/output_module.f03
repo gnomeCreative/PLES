@@ -5,10 +5,9 @@ module output_module
 
     use iso_c_binding
 
-    use mysending, only: kparaend,kparasta,myid,nproc,deepl,deepr
+    use mysending, only: kparaend,kparasta,myid,nproc,deepl,deepr,MPI_REAL_SD
     !
     use scala3, only: jx,jy,jz,nscal,re,n1,n2,n3,dt,re
-    use tipologia
 
     use mpi
 

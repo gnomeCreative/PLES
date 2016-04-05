@@ -9,13 +9,13 @@ subroutine indy(nlevel,jxc,jyc,jzc)
        
    implicit none
 
-   integer,intent(out) :: nlevel
-   integer,intent(out) :: jxc(0:4),jyc(0:4),jzc(0:4)
-   !
    !-----------------------------------------------------------------------
    !      variables declaration
    integer i,j,k,kx,ky,kz
    integer mezx,mezy,mez1,mez2,mez3
+   integer,intent(out) :: nlevel
+   integer,intent(out) :: jxc(0:4),jyc(0:4),jzc(0:4)
+
    !-----------------------------------------------------------------------
    ! find number of level in x
    !
@@ -76,7 +76,7 @@ subroutine indy(nlevel,jxc,jyc,jzc)
    !
    nlevel=min(kx,ky,kz)
 
-   if(myid==0)write(*,*)'NL:',nlevel,kx,ky,kz
+   if(myid==0)write(*,*)'NLEVEL:',nlevel,kx,ky,kz
    !
    ! find number of cells for each level
    !
@@ -99,5 +99,7 @@ subroutine indy(nlevel,jxc,jyc,jzc)
       jxc(i)=jxc(i-1)/2
    end do
    !
+   if(myid==0)write(*,*)'check1:'
    return
+
 end

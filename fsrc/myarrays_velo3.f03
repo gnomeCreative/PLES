@@ -1,6 +1,7 @@
 module myarrays_velo3
 
     ! contains arrays like velocity etc
+
     implicit none
     !-----------------------------------------------------------------------
     real,allocatable :: u(:,:,:),v(:,:,:),w(:,:,:),rhov(:,:,:,:)
@@ -35,10 +36,9 @@ contains
 
     subroutine communication_velocity()
 
-        use mysending
         use mysettings, only: insc
-        use scala3, only: jx,jy
-        use tipologia
+        use mysending
+        use scala3, only: jx,jy,jz
 
         use mpi
 
@@ -116,8 +116,7 @@ contains
     subroutine communication_pressure()
 
         use mysending
-        use scala3, only: jx,jy
-        use tipologia
+        use scala3, only: jx,jy,jz
 
         use mpi
 
@@ -145,14 +144,12 @@ contains
 
         use mysending
         use scala3, only: jx,jy,jz
-        use tipologia
 
         use mpi
 
         implicit none
 
-        integer :: ierr
-        integer :: status(MPI_STATUS_SIZE)
+        integer :: ierr,status(MPI_STATUS_SIZE)
 
         if (myid==nproc-1) then
             call MPI_SSEND(u(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
@@ -192,6 +189,60 @@ contains
 
     end subroutine communication_velpiano
 
+    subroutine average_periodicfluxes()
+
+        use mysending
+        use scala3, only: jx,jy,jz
+        use period
+
+        use mpi
+
+        implicit none
+
+        integer i,j,k,ii,jj,kk
+        integer :: ierr,status(MPI_STATUS_SIZE)
+
+
+        ! average on fluxes in periodicity direction
+        do ii=1,1-ip
+            do k=kparasta,kparaend
+                do j=1,jy
+                    uc(0,j,k)=.5*(uc(0,j,k)+uc(jx,j,k))
+                    uc(jx,j,k)=uc(0,j,k)
+                end do
+            end do
+        end do
+
+        do jj=1,1-jp
+            do k=kparasta,kparaend
+                do i=1,jx
+                    vc(i,0,k)=.5*(vc(i,0,k)+vc(i,jy,k))
+                    vc(i,jy,k)=vc(i,0,k)
+                end do
+            end do
+        end do
+
+        ! send wc(i,j,jz) to P0 in wc_piano of myid=0
+        do kk=1,1-kp
+            if (myid==nproc-1) then
+                call MPI_SSEND(wc(1,1,jz),jx*jy,MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
+            else if (myid==0) then
+                call MPI_RECV(wc_piano(1,1,jz),jx*jy,MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
+            end if
+            if (myid==0) then
+                do i=1,jx
+                    do j=1,jy
+                        wc(i,j,0)=.5*(wc(i,j,0)+wc_piano(i,j,jz))
+                    end do
+                end do
+                call MPI_SSEND(wc(1,1,0),jx*jy,MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
+            end if
+            if (myid==nproc-1) then
+                call MPI_RECV(wc(1,1,jz),jx*jy,MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
+            end if
+        end do
+
+    end subroutine average_periodicfluxes
 end module myarrays_velo3
 
 

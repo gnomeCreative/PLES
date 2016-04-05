@@ -6,7 +6,6 @@ module contour_module
     !
     use scala3
     use period
-    use tipologia
     !
     use mpi
 
@@ -2888,7 +2887,7 @@ contains
 
     end subroutine initialize_contour
 
-    subroutine condi1()
+    subroutine condi()
         !************************************************************************
         ! set boundary conditions on du dv dw
         ! at faces 1 and 2 "sinistra" and "destra"
@@ -2897,7 +2896,7 @@ contains
         implicit none
         !-----------------------------------------------------------------------
         ! array declaration
-        integer j,k
+        integer i,j,k,ierr
         !-----------------------------------------------------------------------
         !
         do k=kparasta,kparaend
@@ -2928,23 +2927,14 @@ contains
                     .375*gra3(jx-2,j,k)-1.25*gra3(jx-1,j,k)+1.875*gra3(jx,j,k)
                 delw(jx+1,j,k)=-delw(jx+1,j,k)
             !
-            enddo
-        enddo
+            end do
+        end do
         !
-        return
-
-    end subroutine condi1
-
-    subroutine condi2()
         !***********************************************************************
         ! set boundary conditions on du dv dw
         ! at faces 3 and 4 "sotto" and "sopra"
         ! as in Kim and Moin
         !
-        implicit none
-        !-----------------------------------------------------------------------
-        ! array declaration
-        integer i,k
         !-----------------------------------------------------------------------
         do k=kparasta,kparaend
             do i=1,jx
@@ -2974,23 +2964,14 @@ contains
                     .375*gra3(i,jy-2,k)-1.25*gra3(i,jy-1,k)+1.875*gra3(i,jy,k)
                 delw(i,jy+1,k)=-delw(i,jy+1,k)
             !
-            enddo
-        enddo
+            end do
+        end do
         !
-        return
-    end
-
-    subroutine condi3()
         !***********************************************************************
         ! set boundary conditions on du dv dw
         ! at faces 5 and 6 "avanti" and "indietro"
         ! as in Kim and Moin
         !
-        implicit none
-        !-----------------------------------------------------------------------
-        ! array declaration
-        integer ierr
-        integer i,j
         !-----------------------------------------------------------------------
         !
         !     face 5 avanti
@@ -3011,10 +2992,10 @@ contains
                         1.875*gra3(i,j,1)-1.25*gra3(i,j,2)+.375*gra3(i,j,3)
                     delw(i,j,0)=-delw(i,j,0)
                 !
-                enddo
-            enddo
+                end do
+            end do
 
-        endif
+        end if
         !
         !     face 6 indietro
         if (myid.eq.nproc-1) then
@@ -3034,12 +3015,13 @@ contains
                         .375*gra3(i,j,jz-2)-1.25*gra3(i,j,jz-1)+1.875*gra3(i,j,jz)
                     delw(i,j,jz+1)=-delw(i,j,jz+1)
                 !
-                enddo
-            enddo
+                end do
+            end do
         !
-        endif
+        end if
 
         return
-    end subroutine condi3
+
+    end subroutine condi
 
 end module contour_module

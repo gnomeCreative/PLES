@@ -7,7 +7,6 @@ subroutine wall_function_bodyfitted(ktime,niter,tipo,i_rest)
     use myarrays_wallmodel
     !
     use scala3
-    use tipologia
     !
     use mpi
 

@@ -1,13 +1,13 @@
 !***********************************************************************
-subroutine vel_up(kparasta,kparaend,rightpe,leftpe,bodyforce,freesurface)
+subroutine vel_up(bodyforce,freesurface)
     !***********************************************************************
     ! compute the cartesian and controvariant velocity at step n+1
     !
     use myarrays_velo3
+    use mysending
     !
     use scala3
     use period
-    use tipologia
     !
     use mpi
 
@@ -15,10 +15,8 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe,bodyforce,freesurface)
 
     !-----------------------------------------------------------------------
     !     array declaration
-    integer ierr,myid,nproc
-    integer ncolperproc,kparasta,kparaend,m
+    integer ierr,m
     integer status(MPI_STATUS_SIZE)
-    integer rightpe,leftpe,rightpem,leftpem
     integer kparastal,kparaendl
     integer plantype
 
@@ -29,6 +27,7 @@ subroutine vel_up(kparasta,kparaend,rightpe,leftpe,bodyforce,freesurface)
     !      integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
     integer ibodyforce,itipo
     integer freesurface
+
     !-----------------------------------------------------------------------
     CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
     CALL MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)

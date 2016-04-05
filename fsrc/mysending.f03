@@ -6,6 +6,8 @@
 
       use,intrinsic :: iso_c_binding
 
+        integer :: MPI_REAL_SD
+
       integer :: tagls,taglr,tagrs,tagrr
       integer :: leftpe,rightpe
       integer :: leftpem,rightpem
