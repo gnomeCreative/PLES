@@ -20,7 +20,7 @@ module myarrays_metri3
     real,allocatable :: g21(:,:,:),g22(:,:,:),g23(:,:,:)
     real,allocatable :: g31(:,:,:),g32(:,:,:),g33(:,:,:)
       
-    real,allocatable :: giac(:,:,:)
+    real,allocatable :: giac(:,:,:),ref_length(:,:,:),ref_area(:,:,:)
 
     real,allocatable :: f1(:,:,:),f2(:,:,:),f3(:,:,:)
     real,allocatable :: annit(:,:,:),annitV(:,:,:)
@@ -34,191 +34,193 @@ module myarrays_metri3
 
 contains
 
-subroutine init_metrica(nlevmultimax,nlevel)
-    ! initialize metrica
+    subroutine init_metrica(nlevmultimax,nlevel)
+        ! initialize metrica
 
-    use mysending
-    use scala3
+        use mysending
+        use scala3
 
-    implicit none
+        implicit none
 
-    !-----------------------------------------------------------------------
-    !     arrays declaration
+        !-----------------------------------------------------------------------
+        !     arrays declaration
 
-    integer,intent(inout) :: nlevel
-    integer,intent(out) :: nlevmultimax
+        integer,intent(inout) :: nlevel
+        integer,intent(out) :: nlevmultimax
 
-    integer i,j,k
-    integer var_piani,livello
+        integer i,j,k
+        integer var_piani,livello
 
-    !-----------------------------------------------------------------------
-    ! griglia
+        !-----------------------------------------------------------------------
+        ! griglia
 
-    !    qui decido la profondita' di allocazione della griglia
-    !    per ogni processore in funzione della subroutine mul_met
-    !    questo perche' in relazione al nlevel di multigrid la
-    !    allocazione locale di griglia deve essere maggiore
-    var_piani=ncolperproc
-    livello=1
-    do while(var_piani.ne.1.and.livello.ne.5)
-        var_piani=int(var_piani/2)
-        livello=livello+1
-    end do
-    livello=livello-1
-    !      write(*,*)myid,'multigrid level for each proc',livello
-    if(livello.ne.1)then
-        deep_mul=2*2**(livello-2) ! allocation deep
-    !        write(*,*)'grid allocation deep',deep_mul
-    else
-        if(myid==0)then
-            write(*,*)'PROBLEM on multigrid level for proc'
+        !    qui decido la profondita' di allocazione della griglia
+        !    per ogni processore in funzione della subroutine mul_met
+        !    questo perche' in relazione al nlevel di multigrid la
+        !    allocazione locale di griglia deve essere maggiore
+        var_piani=ncolperproc
+        livello=1
+        do while(var_piani.ne.1.and.livello.ne.5)
+            var_piani=int(var_piani/2)
+            livello=livello+1
+        end do
+        livello=livello-1
+        !      write(*,*)myid,'multigrid level for each proc',livello
+        if (livello.ne.1) then
+            deep_mul=2*2**(livello-2) ! allocation deep
+        !        write(*,*)'grid allocation deep',deep_mul
+        else
+            if (myid==0) then
+                write(*,*)'PROBLEM on multigrid level for proc'
+            end if
+            stop
         end if
-        stop
-    end if
 
-    if(livello .lt. nlevel)then
-        if(myid==0)then
-            write(*,*)'PROBLEM on multigrid level for proc'
-            write(*,*)'level reduced from ',nlevel,' to ',livello
+        if (livello .lt. nlevel) then
+            if (myid==0) then
+                write(*,*)'PROBLEM on multigrid level for proc'
+                write(*,*)'level reduced from ',nlevel,' to ',livello
+            end if
+            nlevel = livello
+            nlevmultimax = nlevel
         end if
-        nlevel = livello
-        nlevmultimax = nlevel
-    end if
 
-    !-----------------------------------------------------------------------
-    !     coordinates allocation
-    if(myid .eq. 0)then
-        allocate (x(-8:n1+8,-8:n2+8,-8:kparaend+deep_mul+1))
-        allocate (y(-8:n1+8,-8:n2+8,-8:kparaend+deep_mul+1))
-        allocate (z(-8:n1+8,-8:n2+8,-8:kparaend+deep_mul+1))
-    elseif(myid.eq.nproc-1)then
-        allocate (x(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+8))
-        allocate (y(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+8))
-        allocate (z(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+8))
-    else
-        allocate(x(-8:n1+8,-8:n2+8, &
-            kparasta-deep_mul-1:kparaend+deep_mul+1))
-        allocate(y(-8:n1+8,-8:n2+8, &
-            kparasta-deep_mul-1:kparaend+deep_mul+1))
-        allocate(z(-8:n1+8,-8:n2+8, &
-            kparasta-deep_mul-1:kparaend+deep_mul+1))
-    end if
+        !-----------------------------------------------------------------------
+        !     coordinates allocation
+        if (myid == 0) then
+            allocate (x(-8:n1+8,-8:n2+8,-8:kparaend+deep_mul+1))
+            allocate (y(-8:n1+8,-8:n2+8,-8:kparaend+deep_mul+1))
+            allocate (z(-8:n1+8,-8:n2+8,-8:kparaend+deep_mul+1))
+        elseif (myid==nproc-1) then
+            allocate (x(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+8))
+            allocate (y(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+8))
+            allocate (z(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+8))
+        else
+            allocate(x(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+deep_mul+1))
+            allocate(y(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+deep_mul+1))
+            allocate(z(-8:n1+8,-8:n2+8,kparasta-deep_mul-1:kparaend+deep_mul+1))
+        end if
 
-    x = 0.
-    y = 0.
-    z = 0.
+        x(:,:,:)=0.0
+        y(:,:,:)=0.0
+        z(:,:,:)=0.0
 
-    if(myid.eq.0)write(*,*)myid,'coordinates allocation done'
-    !-----------------------------------------------------------------------
-    !     metric terms allocation
+        if (myid==0)write(*,*)myid,'coordinates allocation done'
+        !-----------------------------------------------------------------------
+        !     metric terms allocation
 
 
-    allocate (csx(0:n1,1:n2,kparasta:kparaend))
-    allocate (csy(0:n1,1:n2,kparasta:kparaend))
-    allocate (csz(0:n1,1:n2,kparasta:kparaend))
-    allocate (g11(0:n1,1:n2,kparasta:kparaend))
-    allocate (g12(0:n1,1:n2,kparasta:kparaend))
-    allocate (g13(0:n1,1:n2,kparasta:kparaend))
+        allocate (csx(0:n1,1:n2,kparasta:kparaend))
+        allocate (csy(0:n1,1:n2,kparasta:kparaend))
+        allocate (csz(0:n1,1:n2,kparasta:kparaend))
+        allocate (g11(0:n1,1:n2,kparasta:kparaend))
+        allocate (g12(0:n1,1:n2,kparasta:kparaend))
+        allocate (g13(0:n1,1:n2,kparasta:kparaend))
 
-    allocate (etx(1:n1,0:n2,kparasta:kparaend))
-    allocate (ety(1:n1,0:n2,kparasta:kparaend))
-    allocate (etz(1:n1,0:n2,kparasta:kparaend))
-    allocate (g21(1:n1,0:n2,kparasta:kparaend))
-    allocate (g22(1:n1,0:n2,kparasta:kparaend))
-    allocate (g23(1:n1,0:n2,kparasta:kparaend))
+        allocate (etx(1:n1,0:n2,kparasta:kparaend))
+        allocate (ety(1:n1,0:n2,kparasta:kparaend))
+        allocate (etz(1:n1,0:n2,kparasta:kparaend))
+        allocate (g21(1:n1,0:n2,kparasta:kparaend))
+        allocate (g22(1:n1,0:n2,kparasta:kparaend))
+        allocate (g23(1:n1,0:n2,kparasta:kparaend))
 
-    allocate (ztx(1:n1,1:n2,kparasta-1:kparaend)) !NOTA: ksta per myid=0 vale 0
-    allocate (zty(1:n1,1:n2,kparasta-1:kparaend))
-    allocate (ztz(1:n1,1:n2,kparasta-1:kparaend))
-    allocate (g31(1:n1,1:n2,kparasta-1:kparaend))
-    allocate (g32(1:n1,1:n2,kparasta-1:kparaend))
-    allocate (g33(1:n1,1:n2,kparasta-1:kparaend))
+        allocate (ztx(1:n1,1:n2,kparasta-1:kparaend)) !NOTA: ksta per myid=0 vale 0
+        allocate (zty(1:n1,1:n2,kparasta-1:kparaend))
+        allocate (ztz(1:n1,1:n2,kparasta-1:kparaend))
+        allocate (g31(1:n1,1:n2,kparasta-1:kparaend))
+        allocate (g32(1:n1,1:n2,kparasta-1:kparaend))
+        allocate (g33(1:n1,1:n2,kparasta-1:kparaend))
 
-    allocate (giac(1:n1,1:n2,kparasta:kparaend))
+        allocate (giac(1:n1,1:n2,kparasta:kparaend))
+        allocate (ref_length(1:n1,1:n2,kparasta:kparaend))
+        allocate (ref_area(1:n1,1:n2,kparasta:kparaend))
 
-    csx = 0.
-    csy = 0.
-    csz = 0.
+        csx(:,:,:)=0.0
+        csy(:,:,:)=0.0
+        csz(:,:,:)=0.0
 
-    etx = 0.
-    ety = 0.
-    etz = 0.
+        etx(:,:,:)=0.0
+        ety(:,:,:)=0.0
+        etz(:,:,:)=0.0
 
-    ztx = 0.
-    zty = 0.
-    ztz = 0.
+        ztx(:,:,:)=0.0
+        zty(:,:,:)=0.0
+        ztz(:,:,:)=0.0
 
-    g11 = 0.
-    g12 = 0.
-    g13 = 0.
+        g11(:,:,:)=0.0
+        g12(:,:,:)=0.0
+        g13(:,:,:)=0.0
 
-    g21 = 0.
-    g22 = 0.
-    g23 = 0.
+        g21(:,:,:)=0.0
+        g22(:,:,:)=0.0
+        g23(:,:,:)=0.0
 
-    g31 = 0.
-    g32 = 0.
-    g33 = 0.
+        g31(:,:,:)=0.0
+        g32(:,:,:)=0.0
+        g33(:,:,:)=0.0
 
-    giac = 0.
+        giac(:,:,:)=0.0
 
-    !CORIOLISOIL
-    allocate (g_co11(0:n1,kparasta:kparaend))
-    allocate (g_co12(0:n1,kparasta:kparaend))
-    allocate (g_co13(0:n1,kparasta:kparaend))
+        ref_length(:,:,:)=0.0
+        ref_area(:,:,:)=0.0
 
-    allocate (g_co31(1:n1,kparasta-1:kparaend))
-    allocate (g_co32(1:n1,kparasta-1:kparaend))
-    allocate (g_co33(1:n1,kparasta-1:kparaend))
+        !CORIOLISOIL
+        allocate (g_co11(0:n1,kparasta:kparaend))
+        allocate (g_co12(0:n1,kparasta:kparaend))
+        allocate (g_co13(0:n1,kparasta:kparaend))
 
-    g_co11 = 0.
-    g_co12 = 0.
-    g_co13 = 0.
+        allocate (g_co31(1:n1,kparasta-1:kparaend))
+        allocate (g_co32(1:n1,kparasta-1:kparaend))
+        allocate (g_co33(1:n1,kparasta-1:kparaend))
 
-    g_co31 = 0.
-    g_co32 = 0.
-    g_co33 = 0.
+        g_co11(:,:)=0.0
+        g_co12(:,:)=0.0
+        g_co13(:,:)=0.0
 
-    if(myid.eq.0)write(*,*)myid,'metric allocation done'
-    !-----------------------------------------------------------------------
-    !     fluxes allocation
+        g_co31(:,:)=0.0
+        g_co32(:,:)=0.0
+        g_co33(:,:)=0.0
 
-    allocate (f1(0:n1,1:n2,kparasta  :kparaend))
-    allocate (f2(1:n1,0:n2,kparasta  :kparaend))
-    allocate (f3(1:n1,1:n2,kparasta-1:kparaend))
+        if (myid==0)write(*,*)myid,'metric allocation done'
+        !-----------------------------------------------------------------------
+        !     fluxes allocation
 
-    f1 = 0.
-    f2 = 0.
-    f3 = 0.
+        allocate (f1(0:n1,1:n2,kparasta  :kparaend))
+        allocate (f2(1:n1,0:n2,kparasta  :kparaend))
+        allocate (f3(1:n1,1:n2,kparasta-1:kparaend))
 
-    if(myid.eq.0)write(*,*)myid,'fluxes allocation done'
-    !-----------------------------------------------------------------------
+        f1(:,:,:)=0.0
+        f2(:,:,:)=0.0
+        f3(:,:,:)=0.0
 
-    ! viscosita' turbolenta
+        if (myid==0)write(*,*)myid,'fluxes allocation done'
+        !-----------------------------------------------------------------------
 
-    allocate ( annit(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
-    allocate (annitV(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+        ! viscosita' turbolenta
 
-    annit  = 0.
-    annitV = 0.
+        allocate ( annit(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+        allocate (annitV(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
 
-    if(myid.eq.0)then
-        allocate( annit_piano(0:n1+1,0:n2+1,n3:n3))
-        allocate(annitV_piano(0:n1+1,0:n2+1,n3:n3))
-        annit_piano  = 0.
-        annitV_piano = 0.
-    elseif(myid.eq. nproc-1)then
-        allocate( annit_piano(0:n1+1,0:n2+1,1:1))
-        allocate(annitV_piano(0:n1+1,0:n2+1,1:1))
-        annit_piano  = 0.
-        annitV_piano = 0.
-    end if
+        annit (:,:,:)=0.0
+        annitV(:,:,:)=0.0
 
-    if(myid.eq.0)write(*,*)myid,'eddy viscosity allocation done'
+        if (myid==0) then
+            allocate( annit_piano(0:n1+1,0:n2+1,n3:n3))
+            allocate(annitV_piano(0:n1+1,0:n2+1,n3:n3))
+            annit_piano (:,:,:)=0.0
+            annitV_piano(:,:,:)=0.0
+        elseif (myid== nproc-1) then
+            allocate( annit_piano(0:n1+1,0:n2+1,1:1))
+            allocate(annitV_piano(0:n1+1,0:n2+1,1:1))
+            annit_piano (:,:,:)=0.0
+            annitV_piano(:,:,:)=0.0
+        end if
 
-    return
+        if (myid==0)write(*,*)myid,'eddy viscosity allocation done'
 
-end subroutine init_metrica
+        return
+
+    end subroutine init_metrica
 
     subroutine communication_viscosity()
 
@@ -233,14 +235,14 @@ end subroutine init_metrica
 
         ! send to left
         if (myid/=0) then
-            call MPI_SSEND(annit(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
+            call MPI_SEND(annit(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
         end if
         if (myid/=nproc-1) then
             call MPI_RECV(annit(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
         end if
         ! send to right
         if (myid/=nproc-1) then
-            call MPI_SSEND(annit(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
+            call MPI_SEND(annit(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
         end if
         if (myid/=0) then
             call MPI_RECV(annit(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
@@ -248,14 +250,14 @@ end subroutine init_metrica
         !-----------------------------------------------------------------------
         ! send to left
         if (myid/=0) then
-            call MPI_SSEND(annitV(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
+            call MPI_SEND(annitV(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
         end if
         if (myid/=nproc-1) then
             call MPI_RECV(annitV(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
         end if
         ! send to right
         if (myid/=nproc-1) then
-            call MPI_SSEND(annitV(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
+            call MPI_SEND(annitV(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
         end if
         if (myid/=0) then
             call MPI_RECV(annitV(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
@@ -265,9 +267,9 @@ end subroutine init_metrica
 
     subroutine compute_centroids() !jx,jy,jz,myid,nproc,kparasta,kparaend
 
-            use mysending
-    use scala3
-    use mpi
+        use mysending
+        use scala3
+        use mpi
         implicit none
 
         !integer,intent(in) :: jx,jy,jz
@@ -283,10 +285,10 @@ end subroutine init_metrica
         iprintgrid =1
         ighost = 1
 
-        if(myid==0)then
+        if (myid==0) then
             ksta = kparasta
             kend = kparaend + 1
-        elseif(myid==nproc-1)then
+        elseif (myid==nproc-1) then
             ksta = kparasta - 1
             kend = kparaend
         else
@@ -516,7 +518,7 @@ end subroutine init_metrica
         zcd(i+1,j+1,k)=z(i,j,k)
 
 
-        !     if(iprintgrid == 1)then
+        !     if (iprintgrid == 1) then
         !         write(450+myid,*)'zone f=point i=', &
         !             jx+2,' j=',jy+2,'k=',kend-ksta+3
         !         do k=ksta-1,kend+1
@@ -531,7 +533,7 @@ end subroutine init_metrica
         !-----------------------------------------------------------------------
         !     construct ghost cells
 
-        if(ighost==1)then
+        if (ighost==1) then
             do k=ksta-1,kend+1
                 do j=0,jy+1
                     !        side 1
@@ -560,7 +562,7 @@ end subroutine init_metrica
                 end do
             end do
 
-            if(myid==0)then
+            if (myid==0) then
                 do j=0,jy+1
                     do i=0,jx+1
                         !        side 5
@@ -571,7 +573,7 @@ end subroutine init_metrica
                 end do
             end if
 
-            if(myid==nproc-1)then
+            if (myid==nproc-1) then
                 do j=0,jy+1
                     do i=0,jx+1
                         !        side 6
@@ -583,7 +585,7 @@ end subroutine init_metrica
             end if
 
 
-        !         if(iprintgrid == 1)then
+        !         if (iprintgrid == 1) then
         !             write(550+myid,*)'zone f=point i=', &
         !                 jx+2,' j=',jy+2,'k=',kend-ksta+3
         !             do k=ksta-1,kend+1
@@ -598,29 +600,29 @@ end subroutine init_metrica
         end if
         !-----------------------------------------------------------------------
         !     for periodicity I need to know the grid length in z
-        !     if(myid==0 .or. myid==nproc-1)then
+        !     if (myid==0 .or. myid==nproc-1) then
         !         allocate(x_bound(0:jx,0:jy))
         !         allocate(y_bound(0:jx,0:jy))
         !         allocate(z_bound(0:jx,0:jy))
-        !         x_bound = 0.
-        !         y_bound = 0.
-        !         z_bound = 0.
+        !         x_bound(:,:,:)=0.0
+        !         y_bound(:,:,:)=0.0
+        !         z_bound(:,:,:)=0.0
         !     end if
         !     ibound = 1
-        !     if(ibound == 1)then
-        !         if(myid.eq.nproc-1)then
-        !             call MPI_SSEND(x(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
+        !     if (ibound == 1) then
+        !         if (myid==nproc-1) then
+        !             call MPI_SEND(x(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
         !                 0,1001,MPI_COMM_WORLD,ierr)
         !             !         call MPI_WAIT(req1,istatus,ierr)
         !
-        !             call MPI_SSEND(y(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
+        !             call MPI_SEND(y(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
         !                 0,1002,MPI_COMM_WORLD,ierr)
         !             !         call MPI_WAIT(req2,istatus,ierr)
         !
-        !             call MPI_SSEND(z(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
+        !             call MPI_SEND(z(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
         !                 0,1003,MPI_COMM_WORLD,ierr)
         !         !         call MPI_WAIT(req3,istatus,ierr)
-        !         elseif(myid.eq.0)then
+        !         elseif (myid==0) then
         !             call MPI_RECV(x_bound(0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
         !                 nproc-1,1001,MPI_COMM_WORLD,status,ierr)
         !             !         call MPI_WAIT(req4,istatus,ierr)
@@ -636,20 +638,20 @@ end subroutine init_metrica
         !
         !
         !
-        !         if(myid.eq.0)then
-        !             call MPI_SSEND(x(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
+        !         if (myid==0) then
+        !             call MPI_SEND(x(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
         !                 nproc-1,2001,MPI_COMM_WORLD,ierr)
         !             !         call MPI_WAIT(req1,istatus,ierr)
         !
-        !             call MPI_SSEND(y(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
+        !             call MPI_SEND(y(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
         !                 nproc-1,2002,MPI_COMM_WORLD,ierr)
         !             !         call MPI_WAIT(req2,istatus,ierr)
         !
-        !             call MPI_SSEND(z(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
+        !             call MPI_SEND(z(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
         !                 nproc-1,2003,MPI_COMM_WORLD,ierr)
         !         !         call MPI_WAIT(req3,istatus,ierr)
         !         endif
-        !         if(myid.eq.nproc-1)then
+        !         if (myid==nproc-1) then
         !             call MPI_RECV(x_bound(0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
         !                 0,2001,MPI_COMM_WORLD,status,ierr)
         !             !         call MPI_WAIT(req4,istatus,ierr)
@@ -669,13 +671,12 @@ end subroutine init_metrica
                        
     subroutine compute_volume(tipo) !n1,n2,deepl,deepr,myid,kparasta,kparaend
 
-    use mysending
-    use scala3
-    use mpi
+        use mysending
+        use scala3
+        use mpi
 
         implicit none
 
-        !integer,intent(in) :: n1,n2,deepl,deepr,myid,kparasta,kparaend
         integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
 
         ! for volume coputation
@@ -686,7 +687,7 @@ end subroutine init_metrica
 
             !-----------------------------------------------------------------------
         !     compute the volume once
-        vol_loc=0.
+        vol_loc=0.0
         do k=kparasta,kparaend
             do j=1,n2
                 do i=1,n1

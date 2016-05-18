@@ -26,8 +26,8 @@ extern double alx,aly,alz;
 
 // stuff from Fortran
 extern "C" {
-void pass_geometry(int*,double*,double*,double*,double*,bool*);
-void pass_forces(double*,double*,double*,double*,double*,double*);
+void pass_geometry(int*,double*,double*,double*,double*,double*,double*,double*,double*,double*,double*,bool*);
+void pass_forces(double*,double*,double*,double*,double*,double*,double*,double*,double*);
 }
 extern int myid;
 
@@ -83,8 +83,6 @@ public:
 	ghostList ghosts;
 	// true if indices for the LB need to be regenerated
 	bool newNeighborList;
-	// stuff for drum
-	double drumSpeed;
 public:
 	DEM(){
 		newNeighborList=false;
@@ -114,8 +112,6 @@ public:
 		cellWidth[0]=cellWidth[0]=cellWidth[0]=0.0;
 		nCells[0]=nCells[0]=nCells[0]=0;
 		prototypes.clear();
-		// problem-related variables
-		drumSpeed=0.0;
 		//
 		numVisc=0.0;
 	}

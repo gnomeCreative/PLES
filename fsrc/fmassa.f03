@@ -29,8 +29,8 @@ subroutine fmassa(bcsi,beta,bzet,ktime)
     real,parameter :: pi = acos(-1.)
 
     !-----------------------------------------------------------------------
-    ang = LATITUDE*pi/180.0
-    if (abs(LATITUDE)<1.0e-10) then
+    ang = latitude*pi/180.0
+    if (abs(latitude)<1.0e-10) then
         omega1 = 0.0
         omega2 = 0.0
         omega3 = 0.0

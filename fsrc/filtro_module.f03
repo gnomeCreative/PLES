@@ -9,11 +9,13 @@ module filtro_module
 
     implicit none
 
-    integer,bind(C) :: ifiltro,nfiltro
+    logical(kind=c_bool),bind(C) :: ifiltro
 
-    integer,bind(C) :: filtrou,filtrov,filtrow,filtrorho,filtrofi
+    integer(kind=c_int),bind(C) :: nfiltro
 
-    integer,bind(C) :: xstart,xend,ystart,yend,zstart,zend
+    logical(kind=c_bool),bind(C) :: filtrou,filtrov,filtrow,filtrorho,filtrofi
+
+    integer(kind=c_int),bind(C) :: xstart,xend,ystart,yend,zstart,zend
 
 contains
 
@@ -21,7 +23,7 @@ contains
 
         use output_module, only: info_run_file
 
-        if (ifiltro==1) then
+        if (ifiltro) then
 
             if (myid==0) then
                 write(*,*)'PAY ATTENTION YOU ARE FILTERING THE FLOW FIELD'
@@ -91,16 +93,16 @@ contains
 
         ! --------------------------------------------
 
-        if (ifiltro == 1 .and. ktime==nfiltro*(ktime/nfiltro)) then
+        if (ifiltro .and. ktime==nfiltro*(ktime/nfiltro)) then
 
-            if (filtrou==1) then
+            if (filtrou) then
                 call filtro(u)
                 if (myid==0) then
                     write(*,*)'call filtering for u'
                 end if
             end if
 
-            if (filtrov==1) then
+            if (filtrov) then
                 call filtro(v)
                 if (myid==0) then
                     write(*,*)'call filtering for v'
@@ -108,7 +110,7 @@ contains
             end if
 
 
-            if (filtrow==1) then
+            if (filtrow) then
                 call filtro(w)
                 if (myid==0) then
                     write(*,*)'call filtering for w'
@@ -116,7 +118,7 @@ contains
             end if
 
 
-            if (filtrorho==1) then
+            if (filtrorho) then
                 allocate(rho(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)) !0:n3+1))
                 do isc=1,nscal
                     do k=kparasta-1,kparaend+1
@@ -143,7 +145,7 @@ contains
                 deallocate(rho)
             end if
 
-            if (filtrofi==1) then
+            if (filtrofi) then
                 call filtro(fi)
                 if (myid==0) then
                     write(*,*)'call filtering for fi'
@@ -289,7 +291,7 @@ contains
         !-----------------------------------------------------------------------
 
         if (myid.ne.0) then
-            call MPI_SSEND(r(0,0,kparasta),(jx+2)*(jy+2), &
+            call MPI_SEND(r(0,0,kparasta),(jx+2)*(jy+2), &
                 MPI_REAL_SD,leftpem,tagls, &
                 MPI_COMM_WORLD,ierr)
         !         call MPI_WAIT(req1,istatus,ierr)
@@ -303,7 +305,7 @@ contains
         endif
 
         if (myid.ne.nproc-1) then
-            call MPI_SSEND(r(0,0,kparaend),(jx+2)*(jy+2), &
+            call MPI_SEND(r(0,0,kparaend),(jx+2)*(jy+2), &
                 MPI_REAL_SD,rightpem,tagrs, &
                 MPI_COMM_WORLD,ierr)
         !         call MPI_WAIT(req3,istatus,ierr)

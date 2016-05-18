@@ -1,5 +1,5 @@
 !***********************************************************************
-subroutine mixrho_para(inmod,rho)
+subroutine mixrho_para(rho)
    !***********************************************************************
    ! compute scale similar part for scalar equation
    !
@@ -8,6 +8,7 @@ subroutine mixrho_para(inmod,rho)
    use turbo_module
    use myarrays_velo3
    use myarrays_metri3
+   use mysettings, only: inmodrho
    !
    use scala3
    use period
@@ -30,7 +31,7 @@ subroutine mixrho_para(inmod,rho)
    real rbuff((n1+2)*(n2+2)*40)
    real rho(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr) !0:n3+1)
    !
-   integer i,j,k,kparastal,inmod,m,lll
+   integer i,j,k,kparastal,m
    integer ii,jj,kk
    integer debugg
    real aden
@@ -74,7 +75,7 @@ subroutine mixrho_para(inmod,rho)
    ! compute controvariant term for product rho*velocity
    ! only if scale similar
    !
-   if (inmod.eq.1) then
+   if (inmodrho) then
 
       do k=kparasta,kparaend
          do j=1,jy
@@ -581,7 +582,7 @@ subroutine mixrho_para(inmod,rho)
       else if (kp.eq.1) then
 
          if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),7*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),7*(jx+2)*(jy+2), &
                MPI_REAL_SD,leftpem,tagls, &
                MPI_COMM_WORLD,ierr)
          endif
@@ -642,7 +643,7 @@ subroutine mixrho_para(inmod,rho)
       else if (kp.eq.1) then
 
          if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),7*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),7*(jx+2)*(jy+2), &
                MPI_REAL_SD,rightpem,tagrs, &
                MPI_COMM_WORLD,ierr)
          endif
@@ -785,8 +786,7 @@ subroutine mixrho_para(inmod,rho)
       !
       ! periodicity for term Arhoik
       !
-      call periodic(ass11,ass22,ass33,myid,nproc, &
-         kparasta,kparaend)
+      call periodic(ass11,ass22,ass33)
 
       if (debugg.eq.1) then
          do k=kparasta,kparaend
@@ -887,7 +887,7 @@ subroutine mixrho_para(inmod,rho)
       !
 
       if(leftpem /= MPI_PROC_NULL) then
-         call MPI_SSEND(ass33(1,1,kparasta),(jx+2)*(jy+2), &
+         call MPI_SEND(ass33(1,1,kparasta),(jx+2)*(jy+2), &
             MPI_REAL_SD,leftpem,tagls, &
             MPI_COMM_WORLD,ierr)
       endif

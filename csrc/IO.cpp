@@ -190,6 +190,10 @@ void IO::exportParaviewParticles(const elmtList& elmts, const particleList& part
 	for (int i=0; i<Pnumber; ++i){
 		elmts[particles[i].clusterIndex].FHydroPressure.printLine(paraviewParticleFile);
 	}
+	paraviewParticleFile<<"    <DataArray type=\"Float64\" Name=\"FHydroMomentum\" NumberOfComponents=\"3\"/>\n";
+	for (int i=0; i<Pnumber; ++i){
+		elmts[particles[i].clusterIndex].FHydroMomentum.printLine(paraviewParticleFile);
+	}
 	paraviewParticleFile<<"    <DataArray type=\"Float64\" Name=\"FHydroShear\" NumberOfComponents=\"3\"/>\n";
 	for (int i=0; i<Pnumber; ++i){
 		elmts[particles[i].clusterIndex].FHydroShear.printLine(paraviewParticleFile);
@@ -280,6 +284,10 @@ void IO::exportParaviewObjects(const objectList& objects, const string& objectFi
 	paraviewObjectFile<<"    <DataArray type=\"Float64\" Name=\"FHydroPressure\" NumberOfComponents=\"3\"/>\n";
 	for (int i=0; i<Onumber; ++i){
 		objects[i].FHydroPressure.printLine(paraviewObjectFile);
+	}
+	paraviewObjectFile<<"    <DataArray type=\"Float64\" Name=\"FHydroMomentum\" NumberOfComponents=\"3\"/>\n";
+	for (int i=0; i<Onumber; ++i){
+		objects[i].FHydroMomentum.printLine(paraviewObjectFile);
 	}
 	paraviewObjectFile<<"    <DataArray type=\"Float64\" Name=\"FHydroShear\" NumberOfComponents=\"3\"/>\n";
 	for (int i=0; i<Onumber; ++i){
@@ -536,7 +544,7 @@ tVect IO::totForceObject(const objectList& objects) const {
 	tVect totForce(0.0,0.0,0.0);
 
 	for (int o=0; o<objects.size(); ++o){
-		totForce+=objects[o].FParticle+objects[o].FHydroPressure+objects[o].FHydroShear;
+		totForce+=objects[o].FParticle+objects[o].FHydroPressure+objects[o].FHydroMomentum+objects[o].FHydroShear;
 	}
 
 	return totForce;

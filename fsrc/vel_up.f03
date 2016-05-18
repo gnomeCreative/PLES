@@ -1,10 +1,11 @@
 !***********************************************************************
-subroutine vel_up(bodyforce,freesurface)
+subroutine vel_up()
     !***********************************************************************
     ! compute the cartesian and controvariant velocity at step n+1
     !
     use myarrays_velo3
     use mysending
+    use mysettings, only: freesurface
     !
     use scala3
     use period
@@ -23,10 +24,7 @@ subroutine vel_up(bodyforce,freesurface)
     integer i,j,k,lll
       
     !     for immersed boundary
-    integer bodyforce
     !      integer tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
-    integer ibodyforce,itipo
-    integer freesurface
 
     !-----------------------------------------------------------------------
     CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
@@ -34,8 +32,8 @@ subroutine vel_up(bodyforce,freesurface)
     !-----------------------------------------------------------------------
     ! velocity  at step n+1 into the field
     !
-    if (freesurface.eq.0) then !no free surface <<<<<<<<<<<<<<<
-        if (potenziale == 0) then
+    if (.not.freesurface) then !no free surface <<<<<<<<<<<<<<<
+        if (.not.potenziale) then
       
             do k=kparasta,kparaend
                 do j=1,jy
@@ -49,7 +47,7 @@ subroutine vel_up(bodyforce,freesurface)
                 end do
             end do
 
-        else if (potenziale == 1) then
+        else if (potenziale) then
 
             do k=kparasta,kparaend
                 do j=1,jy
@@ -65,7 +63,7 @@ subroutine vel_up(bodyforce,freesurface)
 
         end if
 
-    else if (freesurface.eq.1) then !free surface on<<<<<<<<<<<<<<<<
+    else if (freesurface) then !free surface on<<<<<<<<<<<<<<<<
         !
         do k=kparasta,kparaend
             do j=1,jy
@@ -138,44 +136,16 @@ subroutine vel_up(bodyforce,freesurface)
 
 
         if (myid.eq.nproc-1) then
-            call MPI_SENDRECV(u(1,0,jz),1, &
-                plantype,0,11, &
-                u(1,0,jz+1),1, &
-                plantype,0,12, &
-                MPI_COMM_WORLD,status,ierr)
-
-            call MPI_SENDRECV(v(1,0,jz),1, &
-                plantype,0,13, &
-                v(1,0,jz+1),1, &
-                plantype,0,14, &
-                MPI_COMM_WORLD,status,ierr)
-
-            call MPI_SENDRECV(w(1,0,jz),1, &
-                plantype,0,15, &
-                w(1,0,jz+1),1, &
-                plantype,0,16, &
-                MPI_COMM_WORLD,status,ierr)
+            call MPI_SENDRECV(u(1,0,jz),1,plantype,0,11,u(1,0,jz+1),1,plantype,0,12,MPI_COMM_WORLD,status,ierr)
+            call MPI_SENDRECV(v(1,0,jz),1,plantype,0,13,v(1,0,jz+1),1,plantype,0,14,MPI_COMM_WORLD,status,ierr)
+            call MPI_SENDRECV(w(1,0,jz),1,plantype,0,15,w(1,0,jz+1),1,plantype,0,16,MPI_COMM_WORLD,status,ierr)
 
         endif
 
         if (myid.eq.0) then
-            call MPI_SENDRECV(u(1,0,1),1, &
-                plantype,nproc-1,12, &
-                u(1,0,0),1, &
-                plantype,nproc-1,11, &
-                MPI_COMM_WORLD,status,ierr)
-
-            call MPI_SENDRECV(v(1,0,1),1, &
-                plantype,nproc-1,14, &
-                v(1,0,0),1, &
-                plantype,nproc-1,13, &
-                MPI_COMM_WORLD,status,ierr)
-
-            call MPI_SENDRECV(w(1,0,1),1, &
-                plantype,nproc-1,16, &
-                w(1,0,0),1, &
-                plantype,nproc-1,15, &
-                MPI_COMM_WORLD,status,ierr)
+            call MPI_SENDRECV(u(1,0,1),1,plantype,nproc-1,12,u(1,0,0),1,plantype,nproc-1,11,MPI_COMM_WORLD,status,ierr)
+            call MPI_SENDRECV(v(1,0,1),1,plantype,nproc-1,14,v(1,0,0),1,plantype,nproc-1,13,MPI_COMM_WORLD,status,ierr)
+            call MPI_SENDRECV(w(1,0,1),1,plantype,nproc-1,16,w(1,0,0),1,plantype,nproc-1,15,MPI_COMM_WORLD,status,ierr)
 
         endif
 
@@ -186,8 +156,8 @@ subroutine vel_up(bodyforce,freesurface)
     ! compute controvariant velocity: cycle 0,jx for Uc
     !                                 cycle 0,jz for Wc
     !
-    if (freesurface.eq.0) then !no free surface <<<<<<<<<<<<<<<
-        if (potenziale == 0) then
+    if (.not.freesurface) then !no free surface <<<<<<<<<<<<<<<
+        if (.not.potenziale) then
             do k=kparasta,kparaend
                 do j=1,jy
                     do i=ip,jx-ip
@@ -204,7 +174,7 @@ subroutine vel_up(bodyforce,freesurface)
                 end do
             end do
       
-        else if (potenziale==1) then
+        else if (potenziale) then
       
             do k=kparasta,kparaend
                 do j=1,jy
@@ -222,7 +192,7 @@ subroutine vel_up(bodyforce,freesurface)
                 end do
             end do
         end if
-    else if (freesurface.eq.1) then !free surface on<<<<<<<<<<<<<<<<
+    else if (freesurface) then !free surface on<<<<<<<<<<<<<<<<
         do k=kparasta,kparaend
             do j=1,jy
                 do i=ip,jx-ip
@@ -255,8 +225,8 @@ subroutine vel_up(bodyforce,freesurface)
         kparaendl=kparaend
     endif
 
-    if (freesurface.eq.0) then !no free surface <<<<<<<<<<<<<<<
-        if (potenziale==0) then
+    if (.not.freesurface) then !no free surface <<<<<<<<<<<<<<<
+        if (.not.potenziale) then
             do k=kparastal,kparaendl
                 do j=1,jy
                     do i=1,jx
@@ -265,7 +235,7 @@ subroutine vel_up(bodyforce,freesurface)
                 end do
             end do
 
-        else if (potenziale==1) then
+        else if (potenziale) then
 
             do k=kparastal,kparaendl
                 do j=1,jy
@@ -276,7 +246,7 @@ subroutine vel_up(bodyforce,freesurface)
             end do
         end if
 
-    else if (freesurface.eq.1) then !free surface on<<<<<<<<<<<<<<<<
+    else if (freesurface) then !free surface on<<<<<<<<<<<<<<<<
         do k=kparastal,kparaendl
             do j=1,jy
                 do i=1,jx

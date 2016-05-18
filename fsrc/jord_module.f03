@@ -110,9 +110,9 @@ contains
         ! make gra1, gra2 and gra3 at the border known between the procs
         !
         if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(gra1(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
-            call MPI_SSEND(gra2(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
-            call MPI_SSEND(gra3(1,1,kparasta),jx*jy,MPI_REAL_SD, leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra1(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra2(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra3(1,1,kparasta),jx*jy,MPI_REAL_SD, leftpem ,tagls,MPI_COMM_WORLD,ierr)
         endif
         if(rightpem /= MPI_PROC_NULL) then
             call MPI_RECV(gra1(1,1,kparaend+1),jx*jy,MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
@@ -247,9 +247,9 @@ contains
         !
 
         if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(gra1(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
-            call MPI_SSEND(gra2(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
-            call MPI_SSEND(gra3(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra1(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra2(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra3(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
         endif
         if(rightpem /= MPI_PROC_NULL) then
             call MPI_RECV(gra1(1,1,kparaend+1),jx*jy,MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
@@ -384,9 +384,9 @@ contains
         !
 
         if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(gra1(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
-            call MPI_SSEND(gra2(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
-            call MPI_SSEND(gra3(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra1(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra2(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(gra3(1,1,kparasta),jx*jy,MPI_REAL_SD,leftpem ,tagls,MPI_COMM_WORLD,ierr)
         endif
         if(rightpem /= MPI_PROC_NULL) then
             call MPI_RECV(gra1(1,1,kparaend+1),jx*jy,MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)

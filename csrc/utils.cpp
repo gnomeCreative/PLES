@@ -17,7 +17,7 @@ double wall::dist(tVect pt) const{ // ACHTUNG!! This assume vector n is unitary
 }
 
 void wall::wallShow() const {
-    cout<<"Wall number "<<index<<"\n";
+    cout<<" Wall number "<<index<<" ";
     cout<<"with base point:";
     p.show();
     cout<<" and normal vector:";

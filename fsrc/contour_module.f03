@@ -11,13 +11,14 @@ module contour_module
 
     implicit none
 
-    integer,bind(C) :: iboun1,iboun2
-    integer,bind(C) :: iboun3,iboun4
-    integer,bind(C) :: iboun5,iboun6
+    integer(kind=c_int),bind(C) :: iboun1,iboun2
+    integer(kind=c_int),bind(C) :: iboun3,iboun4
+    integer(kind=c_int),bind(C) :: iboun5,iboun6
 
-    integer,bind(C) :: ibodybuffer1,ibodybuffer2
-    integer,bind(C) :: ibodybuffer3,ibodybuffer4
-    integer,bind(C) :: ibodybuffer5,ibodybuffer6
+
+    logical(kind=c_bool),bind(C) :: ibodybuffer1,ibodybuffer2
+    logical(kind=c_bool),bind(C) :: ibodybuffer3,ibodybuffer4
+    logical(kind=c_bool),bind(C) :: ibodybuffer5,ibodybuffer6
 
     ! arrays for inflow
     real,allocatable :: up1(:,:),vp1(:,:),wp1(:,:),rhovp1(:,:,:)
@@ -27,31 +28,100 @@ module contour_module
     real,allocatable :: up5(:,:),vp5(:,:),wp5(:,:),rhovp5(:,:,:)
     real,allocatable :: up6(:,:),vp6(:,:),wp6(:,:),rhovp6(:,:,:)
 
-    real,allocatable,dimension(:,:,:)::rhovo1,rhovo2,rhovo5,rhovo6
-    real,allocatable,dimension(:,:,:)::rhovn1,rhovn2,rhovn5,rhovn6
+    real,allocatable,dimension(:,:,:) :: rhovo1,rhovo2,rhovo5,rhovo6
+    real,allocatable,dimension(:,:,:) :: rhovn1,rhovn2,rhovn5,rhovn6
 
     real,allocatable,dimension(:,:) :: ucp1
     real,allocatable,dimension(:,:) :: ucp2
     real,allocatable,dimension(:,:) :: wcp5
     real,allocatable,dimension(:,:) :: wcp6
 
-    real, allocatable :: tke1(:,:),tke2(:,:)
-    real, allocatable :: tke5(:,:),tke6(:,:)
-    real, allocatable :: tkepom1(:,:,:),tkepom2(:,:,:)
-    real, allocatable :: tkepom5(:,:,:),tkepom6(:,:,:)
+    real,allocatable :: tke1(:,:),tke2(:,:)
+    real,allocatable :: tke5(:,:),tke6(:,:)
+    real,allocatable :: tkepom1(:,:,:),tkepom2(:,:,:)
+    real,allocatable :: tkepom5(:,:,:),tkepom6(:,:,:)
 
 contains
 
+    subroutine initialize_contour()
+
+        ! face 1
+        allocate(up1(0:jy+1,0:jz+1))
+        allocate(vp1(0:jy+1,0:jz+1))
+        allocate(wp1(0:jy+1,0:jz+1))
+        allocate(rhovp1(nscal,0:jy+1,0:jz+1))
+        allocate(tke1(0:jy+1,kparasta-1:kparaend+1)) !face 1
+        tke1=0.0
+        up1=0.0
+        vp1=0.0
+        wp1=0.0
+        rhovp1=0.0
+
+        ! face 2
+        allocate(up2(0:jy+1,0:jz+1))
+        allocate(vp2(0:jy+1,0:jz+1))
+        allocate(wp2(0:jy+1,0:jz+1))
+        allocate(rhovp2(nscal,0:jy+1,0:jz+1))
+        allocate(tke2(0:jy+1,kparasta-1:kparaend+1)) !face 2
+        tke2=0.0
+        up2=0.0
+        vp2=0.0
+        wp2=0.0
+        rhovp2=0.0
+
+        ! face 3
+        allocate(up3(0:jx+1,0:jz+1))
+        allocate(vp3(0:jx+1,0:jz+1))
+        allocate(wp3(0:jx+1,0:jz+1))
+        allocate(rhovp3(nscal,0:jx+1,0:jz+1))
+        up3=0.0
+        vp3=0.0
+        wp3=0.0
+        rhovp3=0.0
+
+        ! face 4
+        allocate(up4(0:jx+1,0:jz+1))
+        allocate(vp4(0:jx+1,0:jz+1))
+        allocate(wp4(0:jx+1,0:jz+1))
+        allocate(rhovp4(nscal,0:jx+1,0:jz+1))
+        up4=0.0
+        vp4=0.0
+        wp4=0.0
+        rhovp4=0.0
+
+        ! face 5
+        allocate(up5(0:jx+1,0:jy+1))
+        allocate(vp5(0:jx+1,0:jy+1))
+        allocate(wp5(0:jx+1,0:jy+1))
+        allocate(rhovp5(nscal,0:jx+1,0:jy+1))
+        allocate(tke5(0:jx+1,0:jy+1))
+        tke5=0.0
+        up5=0.0
+        vp5=0.0
+        wp5=0.0
+        rhovp5=0.0
+
+        ! face 6
+        allocate(up6(0:jx+1,0:jy+1))
+        allocate(vp6(0:jx+1,0:jy+1))
+        allocate(wp6(0:jx+1,0:jy+1))
+        allocate(rhovp6(nscal,0:jx+1,0:jy+1))
+        allocate(tke6(0:jx+1,0:jy+1))
+        tke6=0.0
+        up6=0.0
+        vp6=0.0
+        wp6=0.0
+        rhovp6=0.0
+
+    end subroutine initialize_contour
+
     subroutine contourp_se()
-        !***********************************************************************
+
         ! compute cartesian velocity and controvarian fluxes in periodic cells
         ! at time n+1
         ! at the corner the computation is made at the end
         !
-        !
         !-----------------------------------------------------------------------
-        ! arrays declaration
-
         integer i,j,k,kk,isc,err
         integer kpsta,kpend
         integer status(MPI_STATUS_SIZE),ierr, siz,MPI_UVW_TYPE
@@ -461,7 +531,7 @@ contains
                             uc(0,j,k)=ucp1(j,k)
 
                             do isc=1,nscal
-                                if (potenziale==0) then
+                                if (.not.potenziale) then
                                     rhov(isc,0,j,k)=rhovp1(isc,j,k)
                                 else
                                     rhov(isc,0,j,k)=rhovo1(isc,j,k)
@@ -541,7 +611,7 @@ contains
                             uc(jx,j,k)=ucp2(j,k)
 
                             do isc=1,nscal
-                                if (potenziale==0) then
+                                if (.not.potenziale) then
                                     rhov(isc,jx+1,j,k)=rhovp2(isc,j,k)
                                 else
                                     rhov(isc,jx+1,j,k)=rhovo2(isc,j,k)
@@ -763,7 +833,7 @@ contains
                                 wc(i,j,0)=wcp5(i,j)
 
                                 do isc=1,nscal
-                                    if (potenziale==0) then
+                                    if (.not.potenziale) then
                                         rhov(isc,i,j,0)=rhovp5(isc,i,j)
                                     else
                                         rhov(isc,i,j,0)=rhovo5(isc,i,j)
@@ -846,7 +916,7 @@ contains
                                 wc(i,j,jz)=wcp6(i,j)
 
                                 do isc=1,nscal
-                                    if (potenziale==0) then
+                                    if (.not.potenziale) then
                                         rhov(isc,i,j,jz+1)=rhovp6(isc,i,j)
                                     else
                                         rhov(isc,i,j,jz+1)=rhovo6(isc,i,j)
@@ -1251,7 +1321,6 @@ contains
         !
         use mysettings, only: bby,freesurface,i_rest,windyes
         use myarrays_metri3
-        use myarrays_WB
 
         implicit none
 
@@ -1378,7 +1447,7 @@ contains
                             uc(0,j,k)=ucp1(j,k)
 
                             do isc=1,nscal
-                                if (potenziale==0) then
+                                if (.not.potenziale) then
                                     rhov(isc,0,j,k)=rhovp1(isc,j,k)
                                     if (ucp1(j,k).lt.0.) rhov(isc,0,j,k)=rhov(isc,1,j,k)
 
@@ -1487,7 +1556,7 @@ contains
                             end if
 
                             do isc=1,nscal
-                                if (potenziale==0) then
+                                if (.not.potenziale) then
                                     rhov(isc,jx+1,j,k)=rhovp2(isc,j,k)
                                     if ( ucp2(j,k) .gt. 0.) then
                                         rhov(isc,jx+1,j,k)=rhov(isc,jx,j,k)
@@ -1583,7 +1652,7 @@ contains
             end if
             !
             !     upper side
-            if (freesurface==0) then !no freesurface<<<<<<<<<<<<<<<<<<<<<<<<<<
+            if (.not.freesurface) then !no freesurface<<<<<<<<<<<<<<<<<<<<<<<<<<
 
                 if (infout4==0) then             !inflow
                     do k=kparasta,kparaend
@@ -1678,7 +1747,7 @@ contains
                     end do
                 end if
 
-            else if (freesurface==1) then !free surface ON.<<<<<<<<<
+            else if (freesurface) then !free surface ON.<<<<<<<<<
                 if (windyes==0) then
                     do k=kparasta,kparaend
                         do i=1,jx
@@ -1815,7 +1884,7 @@ contains
                                 end if
 
                                 do isc=1,nscal
-                                    if (potenziale==0) then
+                                    if (.not.potenziale) then
                                         rhov(isc,i,j,0)=rhovp5(isc,i,j)
                                         if (wcp5(i,j).lt.0.) then
                                             rhov(isc,i,j,0)=rhov(isc,i,j,1)
@@ -1932,7 +2001,7 @@ contains
                                 end if
 
                                 do isc=1,nscal
-                                    if (potenziale==0) then
+                                    if (.not.potenziale) then
                                         rhov(isc,i,j,jz+1)=rhovp6(isc,i,j)
 
                                         if (wcp6(i,j).gt.0.) then
@@ -2797,7 +2866,7 @@ contains
             kparaendl=kparaend
         end if
 
-        if (freesurface==1) then !free surface ON.<<<<<<<<<
+        if (freesurface) then !free surface ON.<<<<<<<<<
             if (myid==0) then
                 write(*,*)'Free Surface ON'
             end if
@@ -2814,78 +2883,7 @@ contains
 
         return
     end subroutine contourp
-
-    subroutine initialize_contour()
-
-            ! face 1
-        allocate(up1(0:jy+1,0:jz+1))
-        allocate(vp1(0:jy+1,0:jz+1))
-        allocate(wp1(0:jy+1,0:jz+1))
-        allocate(rhovp1(nscal,0:jy+1,0:jz+1))
-        allocate(tke1(0:jy+1,kparasta-1:kparaend+1)) !face 1
-        tke1 = 0.
-        up1=0.
-        vp1=0.
-        wp1=0.
-        rhovp1=0.
-
-        ! face 2
-        allocate(up2(0:jy+1,0:jz+1))
-        allocate(vp2(0:jy+1,0:jz+1))
-        allocate(wp2(0:jy+1,0:jz+1))
-        allocate(rhovp2(nscal,0:jy+1,0:jz+1))
-        allocate(tke2(0:jy+1,kparasta-1:kparaend+1)) !face 2
-        tke2 = 0.
-        up2=0.
-        vp2=0.
-        wp2=0.
-        rhovp2=0.
-
-        ! face 3
-        allocate(up3(0:jx+1,0:jz+1))
-        allocate(vp3(0:jx+1,0:jz+1))
-        allocate(wp3(0:jx+1,0:jz+1))
-        allocate(rhovp3(nscal,0:jx+1,0:jz+1))
-        up3   = 0.
-        vp3   = 0.
-        wp3   = 0.
-        rhovp3 = 0.
-
-        ! face 4
-        allocate(up4(0:jx+1,0:jz+1))
-        allocate(vp4(0:jx+1,0:jz+1))
-        allocate(wp4(0:jx+1,0:jz+1))
-        allocate(rhovp4(nscal,0:jx+1,0:jz+1))
-        up4   = 0.
-        vp4   = 0.
-        wp4   = 0.
-        rhovp4 = 0.
-
-        ! face 5
-        allocate(up5(0:jx+1,0:jy+1))
-        allocate(vp5(0:jx+1,0:jy+1))
-        allocate(wp5(0:jx+1,0:jy+1))
-        allocate(rhovp5(nscal,0:jx+1,0:jy+1))
-        allocate(tke5(0:jx+1,0:jy+1))
-        tke5 = 0.
-        up5=0.
-        vp5=0.
-        wp5=0.
-        rhovp5=0.
-
-        ! face 6
-        allocate(up6(0:jx+1,0:jy+1))
-        allocate(vp6(0:jx+1,0:jy+1))
-        allocate(wp6(0:jx+1,0:jy+1))
-        allocate(rhovp6(nscal,0:jx+1,0:jy+1))
-        allocate(tke6(0:jx+1,0:jy+1))
-        tke6 = 0.
-        up6=0.
-        vp6=0.
-        wp6=0.
-        rhovp6=0.
-
-    end subroutine initialize_contour
+!
 
     subroutine condi()
         !************************************************************************
@@ -3023,5 +3021,336 @@ contains
         return
 
     end subroutine condi
+
+!    subroutine condi()
+!
+!        ! set boundary conditions on du dv dw
+!        ! at faces 1 and 2 "sinistra" and "destra"
+!        ! as in Kim and Moin
+!        !
+!        implicit none
+!        !-----------------------------------------------------------------------
+!        ! array declaration
+!        integer i,j,k
+!        !-----------------------------------------------------------------------
+!
+!        ! face 1 sinistra
+!        call extrap_from_centroids(delu,-1.0*gra1,1)
+!        call extrap_from_centroids(delv,-1.0*gra2,1)
+!        call extrap_from_centroids(delw,-1.0*gra3,1)
+!
+!        ! face 2 destra
+!        call extrap_from_centroids(delu,-1.0*gra1,2)
+!        call extrap_from_centroids(delv,-1.0*gra2,2)
+!        call extrap_from_centroids(delw,-1.0*gra3,2)
+!
+!        ! face 3 sotto
+!        call extrap_from_centroids(delu,-1.0*gra1,3)
+!        call extrap_from_centroids(delv,-1.0*gra2,3)
+!        call extrap_from_centroids(delw,-1.0*gra3,3)
+!
+!        ! face 4 indietro
+!        call extrap_from_centroids(delu,-1.0*gra1,4)
+!        call extrap_from_centroids(delv,-1.0*gra2,4)
+!        call extrap_from_centroids(delw,-1.0*gra3,4)
+!
+!        ! face 5 avanti
+!        call extrap_from_centroids(delu,-1.0*gra1,5)
+!        call extrap_from_centroids(delv,-1.0*gra2,5)
+!        call extrap_from_centroids(delw,-1.0*gra3,5)
+!
+!        ! face 6 indietro
+!        call extrap_from_centroids(delu,-1.0*gra1,6)
+!        call extrap_from_centroids(delv,-1.0*gra2,6)
+!        call extrap_from_centroids(delw,-1.0*gra3,6)
+!
+!        return
+!
+!    end subroutine condi
+
+    subroutine update()
+
+        ! update for intermediate velocity into the flow field
+        ! at the walls parabolic extrapolation
+
+        use myarrays_velo3, only: u,v,w
+        use mysending
+        !
+        use scala3
+        use period
+        !
+        use mpi
+
+        implicit none
+
+        !-----------------------------------------------------------------------
+        integer :: ierr,status(MPI_STATUS_SIZE)
+        integer :: plantypee
+        integer :: i,j,k
+        !-----------------------------------------------------------------------
+
+        !     into the field
+        do k=kparasta,kparaend
+            do j=1,jy
+                do i=1,jx
+                    u(i,j,k)=u(i,j,k)+delu(i,j,k)
+                    v(i,j,k)=v(i,j,k)+delv(i,j,k)
+                    w(i,j,k)=w(i,j,k)+delw(i,j,k)
+                end do
+            end do
+        end do
+
+        ! extrapolation left and right sides (1 and 2)
+        !
+        if (ip==1) then
+            call extrap_from_nodes(u,u,1)
+            call extrap_from_nodes(v,v,1)
+            call extrap_from_nodes(w,w,1)
+            call extrap_from_nodes(u,u,2)
+            call extrap_from_nodes(v,v,2)
+            call extrap_from_nodes(w,w,2)
+        else
+            do k=kparasta,kparaend
+                do j=1,jy
+                    u(0   ,j,k)=u(jx,j,k)
+                    v(0   ,j,k)=v(jx,j,k)
+                    w(0   ,j,k)=w(jx,j,k)
+                    u(jx+1,j,k)=u(1 ,j,k)
+                    v(jx+1,j,k)=v(1 ,j,k)
+                    w(jx+1,j,k)=w(1 ,j,k)
+                end do
+            end do
+        end if
+
+        !     extrapolation on bottom and upper sides (3 and 4)
+        if (jp==1) then
+            call extrap_from_nodes(u,u,3)
+            call extrap_from_nodes(v,v,3)
+            call extrap_from_nodes(w,w,3)
+            call extrap_from_nodes(u,u,4)
+            call extrap_from_nodes(v,v,4)
+            call extrap_from_nodes(w,w,4)
+        else
+            do k=kparasta,kparaend
+                do i=1,jx
+                    u(i,   0,k)=u(i,jy,k)
+                    v(i,   0,k)=v(i,jy,k)
+                    w(i,   0,k)=w(i,jy,k)
+                    u(i,jy+1,k)=u(i, 1,k)
+                    v(i,jy+1,k)=v(i, 1,k)
+                    w(i,jy+1,k)=w(i, 1,k)
+                end do
+            end do
+        end if
+
+        ! extrapolation on front and back sides (5 and 6)
+        if (kp==1) then
+            call extrap_from_nodes(u,u,5)
+            call extrap_from_nodes(v,v,5)
+            call extrap_from_nodes(w,w,5)
+            call extrap_from_nodes(u,u,6)
+            call extrap_from_nodes(v,v,6)
+            call extrap_from_nodes(w,w,6)
+        else
+
+            call MPI_TYPE_VECTOR(jy,jx,jx+2,MPI_REAL_SD,plantypee,ierr)
+            call MPI_TYPE_COMMIT(plantypee,ierr)
+
+            if (myid.eq.nproc-1) then
+
+                call MPI_SENDRECV(u(1,1,jz),1,plantypee,0,11,u(1,1,jz+1),1,plantypee,0,12,MPI_COMM_WORLD,status,ierr)
+                call MPI_SENDRECV(v(1,1,jz),1,plantypee,0,13,v(1,1,jz+1),1,plantypee,0,14,MPI_COMM_WORLD,status,ierr)
+                call MPI_SENDRECV(w(1,1,jz),1,plantypee,0,15,w(1,1,jz+1),1,plantypee,0,16,MPI_COMM_WORLD,status,ierr)
+
+            else if (myid.eq.0) then
+
+                call MPI_SENDRECV(u(1,1,1),1,plantypee,nproc-1,12,u(1,1,0),1,plantypee,nproc-1,11,MPI_COMM_WORLD,status,ierr)
+                call MPI_SENDRECV(v(1,1,1),1,plantypee,nproc-1,14,v(1,1,0),1,plantypee,nproc-1,13,MPI_COMM_WORLD,status,ierr)
+                call MPI_SENDRECV(w(1,1,1),1,plantypee,nproc-1,16,w(1,1,0),1,plantypee,nproc-1,15,MPI_COMM_WORLD,status,ierr)
+
+            end if
+
+
+            call MPI_TYPE_FREE(plantypee,ierr)
+
+        end if
+        !
+        ! every proc needs to know values in kparaend+1 to compute
+        ! controvariant velocity in contra
+
+        if (myid.eq.0) then
+            leftpem=MPI_PROC_NULL
+            rightpem=rightpe
+        else if (myid.eq.nproc-1) then
+            leftpem=leftpe
+            rightpem=MPI_PROC_NULL
+        else
+            leftpem=leftpe
+            rightpem=rightpe
+        end if
+
+
+        if(leftpem /= MPI_PROC_NULL) then
+            call MPI_SEND(u(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(v(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(w(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+        endif
+        if(rightpem /= MPI_PROC_NULL) then
+            call MPI_RECV(u(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(v(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(w(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
+        endif
+
+        return
+
+    end subroutine update
+
+    subroutine extrap_from_nodes(var_out,var_in,direc)
+
+    ! performs parabolic interpoliation o a variable on the wall
+    ! the direction of interpolation is given by the variable direc, which means:
+    ! 1: positive x direction
+    ! 2: negative x direction
+    ! 3: positive y direction
+    ! 4: negative y direction
+    ! 5: positive z direction
+    ! 6: negative z direction
+    ! walls are assumed to be located at i=0 and i=jx+1 (same for other directions)
+
+    use scala3, only: jx,jy,n1,n2
+    use mysending, only: kparasta,kparaend,deepl,deepr
+
+    implicit none
+
+    !-----------------------------------------------------------------------
+    real,intent(inout) :: var_out(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+    integer,intent(in) :: direc
+    real,intent(in) :: var_in(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+    !-----------------------------------------------------------------------
+    real,parameter :: c1=1.875
+    real,parameter :: c2=-1.250
+    real,parameter :: c3=0.375
+    integer :: i,j,k
+    !-----------------------------------------------------------------------
+
+    select case (direc)
+    case (1)
+        do k=kparasta,kparaend
+            do j=1,jy
+                var_out(0,j,k)=c1*var_in(1,j,k)+c2*var_in(2,j,k)+c3*var_in(3,j,k)
+            end do
+        end do
+    case (2)
+        do k=kparasta,kparaend
+            do j=1,jy
+                var_out(jx+1,j,k)=c3*var_in(jx-2,j,k)+c2*var_in(jx-1,j,k)+c1*var_in(jx,j,k)
+            end do
+        end do
+    case (3)
+        do k=kparasta,kparaend
+            do i=1,jx
+                var_out(i,0,k)=c1*var_in(i,1,k)+c2*var_in(i,2,k)+c3*var_in(i,3,k)
+            end do
+        end do
+    case (4)
+        do k=kparasta,kparaend
+            do i=1,jx
+                var_out(i,jy+1,k)=c3*var_in(i,jy-2,k)+c2*var_in(i,jy-1,k)+c1*var_in(i,jy,k)
+            end do
+        end do
+    case (5)
+        if (myid==0) then
+            do j=1,jy
+                do i=1,jx
+                    var_out(i,j,0)=c1*var_in(i,j,1)+c2*var_in(i,j,2)+c3*var_in(i,j,3)
+                end do
+            end do
+        end if
+    case (6)
+        if (myid==nproc-1) then
+            do j=1,jy
+                do i=1,jx
+                    var_out(i,j,jz+1)=c3*var_in(i,j,jz-2)+c2*var_in(i,j,jz-1)+c1*var_in(i,j,jz)
+                end do
+            end do
+        end if
+    end select
+    return
+
+end subroutine extrap_from_nodes
+
+    subroutine extrap_from_centroids(var_out,var_in,direc)
+
+    ! performs parabolic interpoliation o a variable on the wall
+    ! the direction of interpolation is given by the variable direc, which means:
+    ! 1: positive x direction
+    ! 2: negative x direction
+    ! 3: positive y direction
+    ! 4: negative y direction
+    ! 5: positive z direction
+    ! 6: negative z direction
+    ! walls are assumed to be located at i=0 and i=jx+1 (same for other directions)
+
+    !use scala3, only: jx,jy,n1,n2
+    !use mysending, only: kparasta,kparaend,deepl,deepr
+
+    implicit none
+
+    !-----------------------------------------------------------------------
+    real,intent(inout) :: var_out(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+    integer,intent(in) :: direc
+    real,intent(in) :: var_in(n1,n2,kparasta-1:kparaend+1)
+    !-----------------------------------------------------------------------
+    real,parameter :: c1=1.875
+    real,parameter :: c2=-1.250
+    real,parameter :: c3=0.375
+    integer :: i,j,k
+    !-----------------------------------------------------------------------
+
+    select case (direc)
+    case (1)
+        do k=kparasta,kparaend
+            do j=1,jy
+                var_out(0,j,k)=c1*var_in(1,j,k)+c2*var_in(2,j,k)+c3*var_in(3,j,k)
+            end do
+        end do
+    case (2)
+        do k=kparasta,kparaend
+            do j=1,jy
+                var_out(jx+1,j,k)=c3*var_in(jx-2,j,k)+c2*var_in(jx-1,j,k)+c1*var_in(jx,j,k)
+            end do
+        end do
+    case (3)
+        do k=kparasta,kparaend
+            do i=1,jx
+                var_out(i,0,k)=c1*var_in(i,1,k)+c2*var_in(i,2,k)+c3*var_in(i,3,k)
+            end do
+        end do
+    case (4)
+        do k=kparasta,kparaend
+            do i=1,jx
+                var_out(i,jy+1,k)=c3*var_in(i,jy-2,k)+c2*var_in(i,jy-1,k)+c1*var_in(i,jy,k)
+            end do
+        end do
+    case (5)
+        if (myid==0) then
+            do j=1,jy
+                do i=1,jx
+                    var_out(i,j,0)=c1*var_in(i,j,1)+c2*var_in(i,j,2)+c3*var_in(i,j,3)
+                end do
+            end do
+        end if
+    case (6)
+        if (myid==nproc-1) then
+            do j=1,jy
+                do i=1,jx
+                    var_out(i,j,jz+1)=c3*var_in(i,j,jz-2)+c2*var_in(i,j,jz-1)+c1*var_in(i,j,jz)
+                end do
+            end do
+        end if
+    end select
+    return
+
+end subroutine extrap_from_centroids
 
 end module contour_module

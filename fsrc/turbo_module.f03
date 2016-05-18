@@ -218,7 +218,7 @@ contains
 
         if (myid==0) write(*,*) myid,'start allocation for turbo_statico'
 
-        if (inmod==1 .or. inmodrho==1 .or. nsgs>=2) then
+        if (inmod .or. inmodrho .or. nsgs>=2) then
 
             allocate (m21(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (m22(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
@@ -288,7 +288,7 @@ contains
             allocate (wwco(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
         end if
 
-        if (inmod==1 .or. nsgs >=2) then
+        if (inmod .or. nsgs >=2) then
 
             allocate (lmf11(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (lmf12(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
@@ -323,7 +323,7 @@ contains
 
         end if
 
-        if (inmodrho==1 .or. nsgs>=2) then
+        if (inmodrho .or. nsgs>=2) then
             allocate (rhof(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (rhofl(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
         end if
@@ -495,7 +495,7 @@ contains
             allocate(alammrho(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
 
 
-            if (inmod==1) then
+            if (inmod) then
 
                 allocate (assrho11(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
                 allocate (assrho22(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
@@ -604,17 +604,17 @@ contains
 
     end subroutine initialize_turbo
 
-    subroutine execute_turbo(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
+    subroutine execute_turbo(ktime,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
 
-        use mysettings, only: nsgs
+        use mysettings, only: nsgs,pran,prsc
         use scala3, only: re,jx,jy,n1,n2,nscal
         use mysending, only: kparasta,kparaend,myid,nproc
         use myarrays_metri3, only: annit,annitV,annit_piano,annitV_piano
-        use myarrays_density
+        use myarrays_velo3, only: akapt,akaptV,akapt_piano,akaptV_piano
 
         implicit none
 
-        integer,intent(in) :: ktime,i_rest,i_print
+        integer,intent(in) :: ktime,i_rest
         integer,intent(in) :: kpstamg(0:4),kpendmg(0:4)
         integer,intent(in) :: in_dx1(n1,n2,kpstamg(1):kpendmg(1))
         integer,intent(in) :: in_sn1(n1,n2,kpstamg(1):kpendmg(1))
@@ -633,12 +633,12 @@ contains
         if (nsgs==1) then
             ! compute the eddy viscosity and diffusivity with smagorinksy
             ! model with fixed constant
-            call turbo_statico(ktime,i_print,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
+            call turbo_statico(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
 
         else if (nsgs==2 .or. nsgs==3) then
             !   compute the eddy viscosity and diffusivity with smagorinksy
             !   model with dynamic procedure for the constant
-            call turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
+            call turbo_lagrdin(ktime,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
 
         else if (nsgs==0) then
             ! if DNS:
@@ -672,6 +672,63 @@ contains
 
     end subroutine execute_turbo
 
+subroutine periodic(r1,r2,r3)
+    !***********************************************************************
+    ! set periodic boundary condition on model matrix
+    !
+    use scala3
+    use period
+    use mysending, only: kparasta,kparaend
+    !
+    use mpi
+
+    implicit none
+    !
+    !-----------------------------------------------------------------------
+    !     array declaration
+    integer i,j,k
+
+    real r1(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+    real r2(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+    real r3(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+    !-----------------------------------------------------------------------
+    !
+    !      periodicity on csi
+    !
+    if (ip==0) then
+        do k=kparasta,kparaend
+            do j=1,jy
+                r1(0,j,k)=r1(jx,j,k)
+                r2(0,j,k)=r2(jx,j,k)
+                r3(0,j,k)=r3(jx,j,k)
+                !
+                r1(jx+1,j,k)=r1(1,j,k)
+                r2(jx+1,j,k)=r2(1,j,k)
+                r3(jx+1,j,k)=r3(1,j,k)
+            end do
+        end do
+    end if
+    !
+    !      periodicity on eta
+    !
+    if (jp==0) then
+        do k=kparasta,kparaend
+            do i=1,jx
+                r1(i,0,k)=r1(i,jy,k)
+                r2(i,0,k)=r2(i,jy,k)
+                r3(i,0,k)=r3(i,jy,k)
+                !
+                r1(i,jy+1,k)=r1(i,1,k)
+                r2(i,jy+1,k)=r2(i,1,k)
+                r3(i,jy+1,k)=r3(i,1,k)
+            end do
+        end do
+    end if
+    !
+    !      periodicity on zeta made in a next step
+    !
+    return
+end
 
 !***********************************************************************
 end module turbo_module

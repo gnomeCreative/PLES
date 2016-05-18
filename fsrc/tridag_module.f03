@@ -1,11 +1,357 @@
 module tridag_module
 
+    use mysending
+    use scala3
+    use period
+
+    use mpi
+
+    implicit none
+
+    private
+
+    ! for transposed tridiag and approximate factorization
+    real,allocatable :: g33_tr(:,:,:), giac_tr(:,:,:)
+    real,allocatable :: aaa(:,:),rh(:)
+    real,allocatable :: aa(:),bb(:),cc(:)
+
+    public :: initialize_tridiag,factorization,tridag
+
 contains
 
-    !***********************************************************************
+    subroutine initialize_tridiag()
+
+        implicit none
+
+        !-----------------------------------------------------------------------
+        ! no idea about what these are used for...
+        allocate(aaa(3,n1+n2+n3),rh(n1+n2+n3))
+        allocate(aa(n1+n2+n3),bb(n1+n2+n3),cc(n1+n2+n3))
+
+        !-----------------------------------------------------------------------
+        ! if semimplict allocation for tridiag of g33 and giac
+
+        iparasta=(myid* int(n1/nproc)  +1)
+        iparaend=((myid+1)* int(n1/nproc))
+
+        allocate(giac_tr(n3,n2,iparasta:iparaend))
+        giac_tr(:,:,:) = 0.0
+        allocate(g33_tr(0:n3,n2,iparasta:iparaend))
+        g33_tr(:,:,:) = 0.0
+
+        call set_transpose_implicit(g33_tr,giac_tr)
+
+    end subroutine initialize_tridiag
+
+    subroutine factorization(scalar,ktime,delx,isc)
+        !  approximate factorization
+
+        use mysettings, only: pran
+        use myarrays_metri3, only: annit
+        use myarrays_velo3, only: akapt,akapt_piano
+
+        implicit none
+
+        integer,intent(in) :: ktime
+        logical,intent(in) :: scalar
+        integer,intent(in) :: isc
+        real,intent(inout) :: delx(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+
+        integer :: i,j,k,ii,jj
+
+        !  upload csi
+        do k=kparasta,kparaend
+            do j=1,jy
+                ! coefficent construction
+                if (scalar) then
+                    call coed1(j,k,delx,aaa,rh,isc)
+                else
+                    call coef1_par(j,k,delx,aaa,rh)
+                end if
+                do ii=1,jx
+                    aa(ii)=aaa(1,ii)
+                    bb(ii)=aaa(2,ii)
+                    cc(ii)=aaa(3,ii)
+                end do
+                do ii=1,1-ip
+                    call triper(aa,bb,cc,rh,jx-1)
+                end do
+                do ii=1,ip
+                    call tridag(aa,bb,cc,rh,jx)
+                end do
+                ! put out in delu
+                do i=1,jx
+                    delx(i,j,k)=rh(i)
+                end do
+            end do
+        end do
+
+        !  upload eta
+        do k=kparasta,kparaend
+            do i=1,jx
+                !coefficent construction upload eta
+                if (scalar) then
+                    call coed2(i,k,delx,aaa,rh,isc)
+                else
+                    call coef2_par(i,k,delx,aaa,rh)
+                end if
+                do ii=1,jy
+                    aa(ii)=aaa(1,ii)
+                    bb(ii)=aaa(2,ii)
+                    cc(ii)=aaa(3,ii)
+                end do
+                do jj=1,1-jp
+                    call triper(aa,bb,cc,rh,jy-1)
+                end do
+                do jj=1,jp
+                    call tridag(aa,bb,cc,rh,jy)
+                end do
+                do j=1,jy
+                    delx(i,j,k)=rh(j)          ! put out in delu
+                end do
+            end do
+        end do
+
+        if (scalar) then
+            call tridiag_trasp_para_rho(akapt,g33_tr,giac_tr,delx,akapt_piano,pran,isc)
+        else
+            call tridiag_trasp_para(annit,g33_tr,giac_tr,delx,ktime)!annit_piano,
+        end if
+
+        return
+
+    end subroutine factorization
+
+    subroutine set_transpose_implicit(g33_tr,giac_tr)
+
+        use myarrays_metri3, only: annit,g11,g22,g33,giac
+
+        implicit none
+
+        !-----------------------------------------------------------------------
+        !     array declaration
+        real giac_tr(n3,n2,iparasta:iparaend)
+        real g33_tr(0:n3,n2,iparasta:iparaend)
+        real, allocatable :: buffer(:),buffer_tot(:)
+        real, allocatable :: buffer_plane(:),buffer_plane_loc(:)
+
+        integer count,count_plane
+        integer iparasta_tmp,iparaend_tmp
+        integer n,m
+        integer i,j,k
+        integer ierr,status(MPI_STATUS_SIZE)
+        !
+        !-----------------------------------------------------------------------
+        !     TRANSPOSE GIAC
+        !-----------------------------------------------------------------------
+        do n=0,nproc-1
+
+            iparasta_tmp= (n* int(n1/nproc)  +1)
+            iparaend_tmp= ((n+1)* int(n1/nproc))
+
+            count = jy*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
+
+            if(n==0)then
+                allocate(buffer(count))
+                buffer = 0.
+                allocate(buffer_tot(nproc*count))
+                buffer_tot=0.
+            else
+                buffer     = 0.
+                buffer_tot = 0.
+            end if
+
+            m = 0
+            do k=kparasta,kparaend
+                do j=1,jy
+                    do i=iparasta_tmp,iparaend_tmp
+                        m = m + 1
+                        buffer(m) = giac(i,j,k)
+                    end do
+                end do
+            end do
+
+            call MPI_GATHER(buffer(1)    ,count,MPI_REAL_SD,  &
+                buffer_tot(1),count,MPI_REAL_SD,  &
+                n,MPI_COMM_WORLD,ierr)
+
+            if(myid == n)then
+
+                m = 0
+                do k=1,jz
+                    do j=1,jy
+                        do i=iparasta,iparaend
+                            m = m +1
+                            giac_tr(k,j,i)=buffer_tot(m)
+                        end do
+                    end do
+                end do
+
+            end if
+
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+        end do
+
+        deallocate(buffer,buffer_tot)
+        !-----------------------------------------------------------------------
+        !     TRANSPOSE G33
+        !-----------------------------------------------------------------------
+        do n=0,nproc-1
+
+            iparasta_tmp= (n* int(n1/nproc)  +1)
+            iparaend_tmp= ((n+1)* int(n1/nproc))
+
+            count = jy*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
+
+            if(n==0)then
+                allocate(buffer(count))
+                buffer = 0.
+                allocate(buffer_tot(nproc*count))
+                buffer_tot=0.
+            else
+                buffer     = 0.
+                buffer_tot = 0.
+            end if
+
+            m = 0
+            do k=kparasta,kparaend
+                do j=1,jy
+                    do i=iparasta_tmp,iparaend_tmp
+                        m = m + 1
+                        buffer(m) = g33(i,j,k)
+                    end do
+                end do
+            end do
+
+            call MPI_GATHER(buffer(1)    ,count,MPI_REAL_SD,  &
+                buffer_tot(1),count,MPI_REAL_SD,  &
+                n,MPI_COMM_WORLD,ierr)
+
+            if(myid == n)then
+
+                m = 0
+                do k=1,jz
+                    do j=1,jy
+                        do i=iparasta,iparaend
+                            m = m +1
+                            g33_tr(k,j,i)=buffer_tot(m)
+                        end do
+                    end do
+                end do
+
+            end if
+
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+        end do
+
+        deallocate(buffer,buffer_tot)
+
+        !.......................................................................
+        !     proc 0 send the data
+        !      count_plane = jy*jx
+
+        !      allocate(buffer_plane(count_plane))
+        !      allocate(buffer_plane_loc(count_plane/nproc))
+        !      buffer_plane = 0
+        !      buffer_plane_loc = 0
+
+        !      if(myid==0)then
+        !      m=0
+        !      do i=1,jx
+        !      do j=1,jy
+        !         m = m + 1
+        !         buffer_plane(m) = g33(i,j,0)
+        !      end do
+        !      end do
+        !      end if
+
+        !      call MPI_SCATTER(buffer_plane(1),count_plane/nproc,MPI_REAL_SD,
+        !     >        buffer_plane_loc(1),count_plane/nproc,MPI_REAL_SD,
+        !     >                 0,MPI_COMM_WORLD,ierr)
+
+        !      m=0
+        !      do i=iparasta,iparaend
+        !      do j=1,jy
+        !         m = m + 1
+        !         g33_tr(0,j,i)=buffer_plane_loc(m)
+        !      end do
+        !      end do
+
+        !      deallocate(buffer_plane,buffer_plane_loc)
+        !.......................................................................
+        !     proc 0 send the data
+        !      g33_tr = 0.
+
+        if(myid==0)then
+            do j=1,jy
+                do i=1,iparasta,iparaend !jx
+                    m = m + 1
+                    g33_tr(0,j,i) = g33(i,j,0)
+                end do
+            end do
+        end if
+
+        count_plane = jy*(iparaend-iparasta+1)
+
+        allocate(buffer_plane(count_plane))
+        allocate(buffer_plane_loc(count_plane))
+        buffer_plane = 0
+        buffer_plane_loc = 0
+
+        do n=1,nproc-1
+            iparasta_tmp= (n* int(n1/nproc)  +1)
+            iparaend_tmp= ((n+1)* int(n1/nproc))
+
+            buffer_plane = 0
+            buffer_plane_loc = 0
+
+            if(myid==0)then
+                m=0
+                do j=1,jy
+                    do i=1,iparasta_tmp,iparaend_tmp !jx
+                        m = m + 1
+                        buffer_plane(m) = g33(i,j,0)
+                    end do
+                end do
+            end if
+
+
+            if(myid == 0)then
+                call MPI_SEND(buffer_plane(1),count_plane,MPI_REAL_SD, &
+                    n,1001,MPI_COMM_WORLD,ierr)
+
+            elseif(myid==n)then
+                call MPI_RECV(buffer_plane_loc(1),count_plane,MPI_REAL_SD, &
+                    0,1001,MPI_COMM_WORLD,status,ierr)
+            endif
+
+
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+
+            if(myid==n)then
+                m=0
+                do j=1,jy
+                    do i=iparasta_tmp,iparaend_tmp
+                        m = m + 1
+                        g33_tr(0,j,i)=buffer_plane_loc(m)
+                    end do
+                end do
+            end if
+
+        end do
+
+        deallocate(buffer_plane,buffer_plane_loc)
+
+        return
+    end subroutine set_transpose_implicit
+
     subroutine tridag(aa,bb,cc,ff,n)
-        !***********************************************************************
+
         ! solution for a tridiagonal system
+
         implicit none
         !-----------------------------------------------------------------------
         !     array declaration
@@ -35,9 +381,7 @@ contains
         return
     end subroutine tridag
 
-    !*************************************************************************
-    subroutine tridiag_trasp_para_rho(akapt,g33_tr,giac_tr,del, &
-        akapt_piano,pran,isc)
+    subroutine tridiag_trasp_para_rho(akapt,g33_tr,giac_tr,del,akapt_piano,pran,isc)
         !*************************************************************************
         ! transpose operation for matrix.
         ! each plane XZ it is seen as two dimensional matrix and it is transposed,
@@ -45,13 +389,6 @@ contains
         ! i instead of k, then it will be necesseary to transpose again the result
         ! (it is necessary to transpose the matrix used in "coed3", so g33, akapt,
         ! giac)
-
-        use mysending
-        !
-        use scala3
-        use period
-        !
-        use mpi
 
         implicit none
         !
@@ -381,7 +718,6 @@ contains
         return
     end subroutine tridiag_trasp_para_rho
 
-    !***********************************************************************
     subroutine tridiag_trasp_para(akapt,g33_tr,giac_tr,del,ktime)
         !***********************************************************************
         ! transpose operation for matrix.
@@ -391,13 +727,6 @@ contains
         ! (it is necessary to transpose the matrix used in "coed3", so g33, akapt,
         ! giac)
         !
-        use mysending
-        !
-        use scala3
-        use period
-        !
-        use mpi
-
         implicit none
 
 
@@ -737,11 +1066,9 @@ contains
         return
     end subroutine tridiag_trasp_para
 
-
-    !***********************************************************************
     subroutine triper(aa,bb,cc,ff,n)
         !***********************************************************************
-        ! subeoutine from book ...
+        ! subroutine from book ...
         !
         ! aa,bb,cc coefficent vectors: aa(i)=a(1,i)
         !                              bb(i)=a(2,i)
@@ -752,8 +1079,6 @@ contains
         ! aa,bb,cc,ff,gam2 are vectors with dimension N+2 to be specified in the
         ! calling program
         !
-        use scala3
-
         implicit none
         !-----------------------------------------------------------------------
         !     array declaration
@@ -800,23 +1125,18 @@ contains
         return
     end subroutine triper
 
-    !***********************************************************************
-    subroutine coed1(j,k,del,aa,rh,kparasta,kparaend,isc)
+    subroutine coed1(j,k,del,aa,rh,isc)
         !***********************************************************************
         ! compute the coefficents for band tridiagonal matrix for the solution
         ! along csi of the scalar eq.
         !
-        use myarrays_metri3
-        use myarrays_velo3
-        use myarrays_density
-        use scala3
-        use period
+        use myarrays_metri3, only: annit,g11,g22,g33,giac
+        use myarrays_velo3, only: akapt,akapt_piano,rhs
 
         implicit none
         !-----------------------------------------------------------------------
         !     array declaration
         integer i,j,k,ii,isc
-        integer kparasta,kparaend
         real aa(3,*),rh(*)
         real del(0:n1+1,0:n2+1,kparasta-1:kparaend+1) !0:n3+1)
         !-----------------------------------------------------------------------
@@ -873,22 +1193,18 @@ contains
         return
     end subroutine coed1
 
-    !***********************************************************************
-    subroutine coed2(i,k,del,aa,rh,kparasta,kparaend,isc)
+    subroutine coed2(i,k,del,aa,rh,isc)
         !***********************************************************************
         ! compute the coefficents for band tridiagonal matrix for the solution
         ! along eta of the scalar eq.
         !
-        use myarrays_metri3
-        use myarrays_density
-        use scala3
-        use period
+        use myarrays_metri3, only: annit,g11,g22,g33,giac
+        use myarrays_velo3, only: akapt,akaptV
 
         implicit none
         !-----------------------------------------------------------------------
         !     array declaration
         integer i,j,k,jj,isc
-        integer kparasta,kparaend
         real aa(3,*),rh(*)
         real del(0:n1+1,0:n2+1,kparasta-1:kparaend+1) !0:n3+1)
         !-----------------------------------------------------------------------
@@ -945,13 +1261,10 @@ contains
         return
     end subroutine coed2
 
-          !***********************************************************************
-    subroutine coed3_tr(j,k,aka_tr,del,aa,rh,myid,g33_tr,giac_tr, &
-        iparasta,iparaend )
+    subroutine coed3_tr(j,k,aka_tr,del,aa,rh,myid,g33_tr,giac_tr,iparasta,iparaend)
         !***********************************************************************
         ! compute the coefficent for the banded tridiagonal matrix
         ! for solution in zita
-        use scala3
 
         implicit none
         !
@@ -985,22 +1298,18 @@ contains
         return
     end subroutine coed3_tr
 
-          !***********************************************************************
-    subroutine coef1_par(j,k,del,aa,rh,kparasta,kparaend)
+    subroutine coef1_par(j,k,del,aa,rh)
         !***********************************************************************
         ! compute the coefficent of the band tridiagonal matrix for solution
         ! along csi for equation u,v,  w
         !
-        use myarrays_metri3
-        use myarrays_velo3
-        use scala3
-        use period
+        use myarrays_metri3, only: annit,g11,g22,g33,giac
+        use myarrays_velo3, only: akapt,akapt_piano,rhs
 
         implicit none
         !-----------------------------------------------------------------------
         !     array declaration
         integer i,j,k,ii
-        integer kparasta,kparaend
         real del(0:n1+1,0:n2+1,kparasta-1:kparaend+1),aa(3,*),rh(*)
         !-----------------------------------------------------------------------
         !
@@ -1059,21 +1368,17 @@ contains
         return
     end subroutine coef1_par
 
-    !***********************************************************************
-    subroutine coef2_par(i,k,del,aa,rh,kparasta,kparaend)
+    subroutine coef2_par(i,k,del,aa,rh)
         !***********************************************************************
         ! compute the coefficent of the band tridiagonal matrix for solution
         ! along eta for equations in u,v,w
         !
-        use myarrays_metri3
-        use myarrays_velo3
-        use scala3
-        use period
+        use myarrays_metri3, only: annitV,g11,g22,g33,giac
+        use myarrays_velo3, only: akapt,akapt_piano,rhs
 
         implicit none
         !-----------------------------------------------------------------------
         !     array declaration
-        integer kparasta,kparaend
         integer i,j,k,jj
         real del(0:n1+1,0:n2+1,kparasta-1:kparaend+1),aa(3,*),rh(*)
         !-----------------------------------------------------------------------
@@ -1135,7 +1440,6 @@ contains
         !
         return
     end subroutine coef2_par
-
 
 end module tridag_module
 

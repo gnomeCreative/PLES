@@ -1,5 +1,5 @@
 !***********************************************************************
-subroutine mix_para(inmod,iq,ktime,i_print,lagr)
+subroutine mix_para(iq)
    !***********************************************************************
    ! compute scale similar part for momentum eq.
    !
@@ -8,6 +8,7 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
    use myarrays_velo3
    use myarrays_metri3
    use mysending
+   use mysettings, only: inmod
    !
    use scala3
    use subgrid
@@ -26,16 +27,12 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
    real sbuff((n1+2)*(n2+2)*40)
    real rbuff((n1+2)*(n2+2)*40)
    !
-   integer i,j,k,kparastal,iq,inmod,m,lll
+   integer i,j,k,kparastal,iq,m
    integer kparastan
    integer ii,jj,kk
    integer,parameter :: debugg = 0
-   integer ktime,i_print,lagr
    real somma
    !
-   real,allocatable :: sus_loc11(:),sus_loc12(:),sus_loc13(:)
-   real,allocatable :: sus_loc21(:),sus_loc22(:),sus_loc23(:)
-   real,allocatable :: sus_loc31(:),sus_loc32(:),sus_loc33(:)
    !-----------------------------------------------------------------------
 
 
@@ -73,7 +70,7 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
    ! compute controvariant term for velocity and for mixed product only
    ! for scale similar
    !
-   if(inmod.eq.1)then
+   if(inmod)then
 
       do k=kparasta,kparaend
          do j=1,jy
@@ -558,7 +555,7 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
       else if (kp.eq.1) then
 
          if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),21*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),21*(jx+2)*(jy+2), &
                MPI_REAL_SD,leftpem,tagls, &
                MPI_COMM_WORLD,ierr)
          endif
@@ -632,7 +629,7 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
       else if (kp.eq.1) then
 
          if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),21*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),21*(jx+2)*(jy+2), &
                MPI_REAL_SD,rightpem,tagrs, &
                MPI_COMM_WORLD,ierr)
          endif
@@ -856,9 +853,9 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
       !
       ! periodicity Aik term
       !
-      call periodic(ass11,ass12,ass13,myid,nproc,kparasta,kparaend)
-      call periodic(ass21,ass22,ass23,myid,nproc,kparasta,kparaend)
-      call periodic(ass31,ass32,ass33,myid,nproc,kparasta,kparaend)
+      call periodic(ass11,ass12,ass13)
+      call periodic(ass21,ass22,ass23)
+      call periodic(ass31,ass32,ass33)
       !
       ! periodicity in zita
       !
@@ -989,7 +986,7 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
       if(iq.eq.1)then
 
          if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(ass31(1,1,kparasta),(jx+2)*(jy+2), &
+            call MPI_SEND(ass31(1,1,kparasta),(jx+2)*(jy+2), &
                MPI_REAL_SD,leftpem,tagls, &
                MPI_COMM_WORLD,ierr)
          endif
@@ -1002,7 +999,7 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
       else if(iq.eq.2)then
 
          if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(ass32(1,1,kparasta),(jx+2)*(jy+2), &
+            call MPI_SEND(ass32(1,1,kparasta),(jx+2)*(jy+2), &
                MPI_REAL_SD,leftpem,tagls, &
                MPI_COMM_WORLD,ierr)
          endif
@@ -1015,7 +1012,7 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
       else if(iq.eq.3)then
  
          if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(ass33(1,1,kparasta),(jx+2)*(jy+2), &
+            call MPI_SEND(ass33(1,1,kparasta),(jx+2)*(jy+2), &
                MPI_REAL_SD,leftpem,tagls, &
                MPI_COMM_WORLD,ierr)
          endif
@@ -1026,204 +1023,6 @@ subroutine mix_para(inmod,iq,ktime,i_print,lagr)
          endif
 
       endif
-      !-----------------------------------------------------------------------
-      ! compute sgs stress for scale similar part of momentum
-      ! accumulation to compute sgs stress
-
-      stampa: if(ktime.eq. i_print*(ktime/i_print) .and. iq.eq.1 .and. lagr.eq.0) then
-
-         somma=float(jx)*float(jz)
-
-         allocate(fil11(0:n1+1,0:n2+1,0:n3+1))
-         allocate(fil12(0:n1+1,0:n2+1,0:n3+1))
-         allocate(fil13(0:n1+1,0:n2+1,0:n3+1))
-         allocate(fil21(0:n1+1,0:n2+1,0:n3+1))
-         allocate(fil22(0:n1+1,0:n2+1,0:n3+1))
-         allocate(fil23(0:n1+1,0:n2+1,0:n3+1))
-         allocate(fil31(0:n1+1,0:n2+1,0:n3+1))
-         allocate(fil32(0:n1+1,0:n2+1,0:n3+1))
-         allocate(fil33(0:n1+1,0:n2+1,0:n3+1))
-         allocate(sus_loc11(n2))
-         allocate(sus_loc12(n2))
-         allocate(sus_loc13(n2))
-         allocate(sus_loc21(n2))
-         allocate(sus_loc22(n2))
-         allocate(sus_loc23(n2))
-         allocate(sus_loc31(n2))
-         allocate(sus_loc32(n2))
-         allocate(sus_loc33(n2))
-         !
-         ! compute sgs (scale similar) cartesian stress momentum
-
-         do k=kparasta,kparaend
-            do j=1,n2
-               do i=1,n1
-                  pc1(i,j,k)  = ass11(i,j,k)
-                  pc2(i,j,k)  = ass12(i,j,k)
-                  pc3(i,j,k)  = ass13(i,j,k)
-                  ap11(i,j,k) = apcsx(i,j,k)
-                  ap12(i,j,k) = apcsy(i,j,k)
-                  ap13(i,j,k) = apcsz(i,j,k)
-                  ap21(i,j,k) = apetx(i,j,k)
-                  ap22(i,j,k) = apety(i,j,k)
-                  ap23(i,j,k) = apetz(i,j,k)
-                  ap31(i,j,k) = apztx(i,j,k)
-                  ap32(i,j,k) = apzty(i,j,k)
-                  ap33(i,j,k) = apztz(i,j,k)
-               end do
-            end do
-         end do
-
-         call inverse_para2(myid,nproc,kparasta,kparaend)
-         do k=kparasta,kparaend
-            do j=1,n2
-               do i=1,n1
-                  fil11(i,j,k) = pp1(i,j,k)
-                  fil12(i,j,k) = pp2(i,j,k)
-                  fil13(i,j,k) = pp3(i,j,k)
-               end do
-            end do
-         end do
-
-         do k=kparasta,kparaend
-            do j=1,n2
-               do i=1,n1
-                  pc1(i,j,k)  = ass21(i,j,k)
-                  pc2(i,j,k)  = ass22(i,j,k)
-                  pc3(i,j,k)  = ass23(i,j,k)
-                  ap11(i,j,k) = apcsx(i,j,k)
-                  ap12(i,j,k) = apcsy(i,j,k)
-                  ap13(i,j,k) = apcsz(i,j,k)
-                  ap21(i,j,k) = apetx(i,j,k)
-                  ap22(i,j,k) = apety(i,j,k)
-                  ap23(i,j,k) = apetz(i,j,k)
-                  ap31(i,j,k) = apztx(i,j,k)
-                  ap32(i,j,k) = apzty(i,j,k)
-                  ap33(i,j,k) = apztz(i,j,k)
-               end do
-            end do
-         end do
-
-         call inverse_para2(myid,nproc,kparasta,kparaend)
-  
-         do k=kparasta,kparaend
-            do j=1,n2
-               do i=1,n1
-                  fil21(i,j,k) = pp1(i,j,k)
-                  fil22(i,j,k) = pp2(i,j,k)
-                  fil23(i,j,k) = pp3(i,j,k)
-               end do
-            end do
-         end do
-
-         do k=kparasta,kparaend
-            do j=1,n2
-               do i=1,n1
-                  pc1(i,j,k)  = ass31(i,j,k)
-                  pc2(i,j,k)  = ass32(i,j,k)
-                  pc3(i,j,k)  = ass33(i,j,k)
-                  ap11(i,j,k) = apcsx(i,j,k)
-                  ap12(i,j,k) = apcsy(i,j,k)
-                  ap13(i,j,k) = apcsz(i,j,k)
-                  ap21(i,j,k) = apetx(i,j,k)
-                  ap22(i,j,k) = apety(i,j,k)
-                  ap23(i,j,k) = apetz(i,j,k)
-                  ap31(i,j,k) = apztx(i,j,k)
-                  ap32(i,j,k) = apzty(i,j,k)
-                  ap33(i,j,k) = apztz(i,j,k)
-               end do
-            end do
-         end do
-
-         call inverse_para2(myid,nproc,kparasta,kparaend)
-  
-         do k=kparasta,kparaend
-            do j=1,n2
-               do i=1,n1
-                  fil31(i,j,k) = pp1(i,j,k)
-                  fil32(i,j,k) = pp2(i,j,k)
-                  fil33(i,j,k) = pp3(i,j,k)
-               end do
-            end do
-         end do
-
-         ! average on homogeneus plane
-         !
-         do j=1,jy
-
-            sus_loc11(j)=0.
-            sus_loc12(j)=0.
-            sus_loc13(j)=0.
-            sus_loc22(j)=0.
-            sus_loc23(j)=0.
-            sus_loc33(j)=0.
-
-            do k=kparasta,kparaend
-               do i=1,jx
-                  sus_loc11(j)=sus_loc11(j)+fil11(i,j,k)
-                  sus_loc22(j)=sus_loc22(j)+fil22(i,j,k)
-                  sus_loc33(j)=sus_loc33(j)+fil33(i,j,k)
-                  sus_loc12(j)=sus_loc12(j)+.5*(fil12(i,j,k)+fil21(i,j,k))
-                  sus_loc13(j)=sus_loc13(j)+.5*(fil13(i,j,k)+fil31(i,j,k))
-                  sus_loc23(j)=sus_loc23(j)+.5*(fil23(i,j,k)+fil32(i,j,k))
-               enddo
-            enddo
-         enddo
-
-         ! now the sum of local sum and send to all procs for each plane
-         !
-         do m=1,40*(jx+2)*(jy+2)
-            sbuff(m)=0.
-            rbuff(m)=0.
-         enddo
-
-         call buffvect1d(sbuff,sus_loc11,1)
-         call buffvect1d(sbuff,sus_loc12,2)
-         call buffvect1d(sbuff,sus_loc13,3)
-         call buffvect1d(sbuff,sus_loc22,4)
-         call buffvect1d(sbuff,sus_loc23,5)
-         call buffvect1d(sbuff,sus_loc33,6)
-
-         call MPI_ALLREDUCE(sbuff(1),rbuff(1),6*jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-
-         call buffvect2d(rbuff,sus11,1)
-         call buffvect2d(rbuff,sus12,2)
-         call buffvect2d(rbuff,sus13,3)
-         call buffvect2d(rbuff,sus22,4)
-         call buffvect2d(rbuff,sus23,5)
-         call buffvect2d(rbuff,sus33,6)
-         !
-         ! finally the average value, therefore the sum divided by the number of points
-         ! on j-plane (known by all procs)
-         !
-         do j=1,jy
-            sus11(j)=sus11(j)/somma
-            sus22(j)=sus22(j)/somma
-            sus33(j)=sus33(j)/somma
-            sus12(j)=sus12(j)/somma
-            sus13(j)=sus13(j)/somma
-            sus23(j)=sus23(j)/somma
-         enddo
-
-         deallocate(fil11)
-         deallocate(fil12)
-         deallocate(fil13)
-         deallocate(fil21)
-         deallocate(fil22)
-         deallocate(fil23)
-         deallocate(fil31)
-         deallocate(fil32)
-         deallocate(fil33)
-         deallocate(sus_loc11)
-         deallocate(sus_loc12)
-         deallocate(sus_loc13)
-         deallocate(sus_loc21)
-         deallocate(sus_loc22)
-         deallocate(sus_loc23)
-         deallocate(sus_loc31)
-         deallocate(sus_loc32)
-         deallocate(sus_loc33)
-      end if stampa
 
       if (debugg.eq.1) then
          do k=kparasta,kparaend

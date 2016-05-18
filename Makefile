@@ -36,7 +36,7 @@ CFLAGS	=  -O0 -fmessage-length=0
 #CFLAGS	=  -O0 -fmessage-length=0
 
 # Used libraries
-LIBS	= -lmpi_mpifh -lgfortran -lm -lmpi -lmpi_usempi #-L/cineca/lib/mass -lmass -lmpi_mpifh
+LIBS	= -lmpi_mpifh -lgfortran -lm -lmpi -lquadmath #-lmpi_usempi #-L/cineca/lib/mass -lmass -lmpi_mpifh
 
 # Flag for linking
 LDFLAGS	= $(FFLAGS) $(CFLAGS) 
@@ -44,24 +44,25 @@ LDFLAGS	= $(FFLAGS) $(CFLAGS)
 
 # List of Fortran code files 
 FOBJS   =  \
- scala3.o mysending.o period.o mysettings.o myarrays_density.o subgrid.o velpar.o \
+ scala3.o mysending.o period.o mysettings.o subgrid.o velpar.o geometricRoutines.o\
  \
- myarrays_WB.o myarrays_LC.o myarrays_metri3.o  \
- myarrays_ibm.o myarrays_velo3.o myarrays_wallmodel.o \
- tridag_module.o particle_module.o turbo_module.o  ricercaGeomRoutines.o trilinear.o ricerca.o multigrid_module.o orlansky_module.o \
- output_module.o contour_module.o inflow_module.o nesting_module.o jord_module.o buffer_bodyforce_module.o\
- filtro_module.o filter_module.o flu_module.o \
+ myarrays_velo3.o myarrays_metri3.o wind_module.o \
+ orlansky_module.o turbo_module.o wallmodel_module.o trilinear.o\
+ ibm_module.o tridag_module.o particle_module.o  multigrid_module.o  \
+ contour_module.o ricerca_module.o output_module.o buffer_bodyforce_module.o inflow_module.o jord_module.o \
+ filtro_module.o filter_module.o flu_module.o nesting_module.o \
  \
- ada_rho.o adams.o carico_immb.o cellep.o check_divergence.o \
- contra.o contrin.o correggi_ib.o courant.o diver.o drift.o \
- fmassa.o gauss_random.o gradie.o indy.o iniz.o inverse_para2.o interp3.o \
- langmuir2.o leggivento.o metrica.o mix_para.o mixrho_para.o passo_ibm.o periodic.o \
- restart.o rhs1_rho.o turbo_lagrdin.o update.o set_transpose_implicit.o \
- vel_up.o vorticitag.o wall_function_bodyfitted.o turbo_statico.o wernerwengle.o\
+ ada_rho.o adams.o cellep.o check_divergence.o voronoi.o\
+ contra.o contrin.o correggi_ib.o courant.o diver.o \
+ fmassa.o gradie.o indy.o inverse_para2.o \
+ metrica.o mix_para.o mixrho_para.o \
+ restart.o rhs1_rho.o turbo_lagrdin.o \
+ vel_up.o turbo_statico.o \
  \
  stratiParticle.o
 
 # List of C++ code files 
+
 COBJS	= myvector.o utils.o elmt.o IO.o DEM.o wrapper.o
 
 OBJS	= $(FOBJS:%.o=$(FS)/%.o) $(COBJS:%.o=$(CS)/%.o)
@@ -85,9 +86,18 @@ clean:
 $(FS)/%.o: $(FCODE)/%.f03
 	$(FC) -c $(FFLAGS) $< -o $@
 	
+$(FS)/%.mod: $(FCODE)/%.f03 $(FS)/%.o
+	@true
+	
+$(FS)/%.o: $(FCODE)/%.f03 $(FS)/%.mod
+	$(FC) -c $(FFLAGS) $< -o $@
+	
 # Code in c++
 $(CS)/%.o: $(CCODE)/%.cpp
 	$(CC) -c $(CFLAGS) $< -o $@
 
+$(CS)/%.o: $(CCODE)/%.h
+	$(CC) -c $(CFLAGS) $< -o $@
+	
 
 

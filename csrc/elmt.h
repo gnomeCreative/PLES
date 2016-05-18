@@ -12,6 +12,8 @@
 
 #include "myvector.h"
 
+extern int myid;
+
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS  DEFINITIONS
 //////////////////////////////////////////////////////////////////////////////////////////////////////*/
@@ -92,7 +94,7 @@ public:
     // predicted angular velocities
     tVect wpGlobal,wpLocal;
     // force and moment
-    tVect FParticle,FWall,FGrav,FHydroShear,FHydroPressure;
+    tVect FParticle,FWall,FGrav,FHydroShear,FHydroPressure,FHydroMomentum;
     tVect MParticle,MWall;
 
     // default constructor
@@ -115,6 +117,7 @@ public:
         FWall=tVect(0.0,0.0,0.0);
         FHydroShear=tVect(0.0,0.0,0.0);
         FHydroPressure=tVect(0.0,0.0,0.0);
+        FHydroMomentum=tVect(0.0,0.0,0.0);
         FParticle=tVect(0.0,0.0,0.0);
         MParticle=tVect(0.0,0.0,0.0);
         MWall=tVect(0.0,0.0,0.0);
@@ -204,7 +207,7 @@ public:
     // velocity of the object
     tVect x1;
     // force on the object, from collisions
-    tVect FParticle,FHydroShear,FHydroPressure;
+    tVect FParticle,FHydroShear,FHydroPressure,FHydroMomentum;
     object() {
         index=0;
         radius=0.0;
@@ -213,6 +216,7 @@ public:
         FParticle=tVect(0.0,0.0,0.0);
         FHydroShear=tVect(0.0,0.0,0.0);
         FHydroPressure=tVect(0.0,0.0,0.0);
+        FHydroMomentum=tVect(0.0,0.0,0.0);
     }
 };
 

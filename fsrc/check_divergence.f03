@@ -1,10 +1,9 @@
 subroutine check_divergence(tipo)
 
    use mysending, only: deepl, deepr, kparaend, kparasta, myid, nproc, MPI_REAL_SD
-   use mysettings, only: lett
+   use mysettings, only: lett,bodyforce
    use myarrays_velo3, only: uc, uc1_orl, uc2_orl, vc, vc3_orl, vc4_orl, wc, wc5_orl, wc6_orl
    use myarrays_metri3, only: giac
-   use myarrays_ibm, only: bodyforce
    !
    use scala3, only: jx, jy, jz, n1, n2
    use orlansky_module, only: infout1, infout2, infout3, infout4, infout5, infout6
@@ -69,7 +68,7 @@ subroutine check_divergence(tipo)
    end do
       
       
-   if(lett==1)then
+   if(lett)then
       
       if(infout1 == 0)then
          do k=kparasta,kparaend
@@ -151,8 +150,8 @@ subroutine check_divergence(tipo)
       
       !     find the max between all procs
       call MPI_REDUCE(divmax_loc,divmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
-      !
       call MPI_REDUCE(divgmax_loc,divgmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
       !
       !     all procs know divmax
       !
@@ -183,8 +182,8 @@ subroutine check_divergence(tipo)
       !     find the max between all procs
       !
       call MPI_REDUCE(divmax_loc,divmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
-      !
       call MPI_REDUCE(divgmax_loc,divgmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
       !
 
 
@@ -230,8 +229,8 @@ subroutine check_divergence(tipo)
       
       !     find the max between all procs
       call MPI_REDUCE(divmax_loc,divmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
-      !
       call MPI_REDUCE(divgmax_loc,divgmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
       !
       !     all procs know divmax
       !
@@ -268,8 +267,8 @@ subroutine check_divergence(tipo)
       
       !     find the max between all procs
       call MPI_REDUCE(divmax_loc,divmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
-      !
       call MPI_REDUCE(divgmax_loc,divgmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
       !
       !     all procs know divmax
       !
@@ -302,8 +301,8 @@ subroutine check_divergence(tipo)
       
       !     find the max between all procs
       call MPI_REDUCE(divmax_loc,divmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
-      !
       call MPI_REDUCE(divgmax_loc,divgmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
       !
       !     all procs know divmax
       !

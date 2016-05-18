@@ -26,8 +26,9 @@ subroutine restart(restart_file,ti)
     real, allocatable :: val_rho(:)
     !-----------------------------------------------------------------------
 
-    kpsta_deep = kparasta - deepl
-    kpend_deep = kparaend + deepr
+    kpsta_deep=kparasta-deepl
+    kpend_deep=kparaend+deepr
+
     write(info_run_file,*)myid,'DEEP',deepl,deepr
 
     kpsta = kparasta
@@ -52,7 +53,7 @@ subroutine restart(restart_file,ti)
                 read(oldresfile_id,*)val_u,val_v,val_w,val_fi, &
                     (val_rho(isc),isc=1,nscal)
       
-                if(k.ge. kpsta_deep .and. k.le.kpend_deep)then
+                if(k.ge.kpsta_deep .and. k.le.kpend_deep)then
                     u(i,j,k)   = val_u
                     v(i,j,k)   = val_v
                     w(i,j,k)   = val_w

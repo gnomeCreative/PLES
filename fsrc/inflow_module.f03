@@ -59,7 +59,7 @@ contains
         integer :: i,j,k,isc
         integer :: pianoturbo
 
-        if (lett /= 0) then
+        if (lett) then
             !     side 1
             if (infout1==0) then
                 if (npn1 > 1 .and. ktime /= niter) then
@@ -212,8 +212,6 @@ contains
 
         use myarrays_velo3
 
-        use mysettings, only: lett
-
         implicit none
 
         !-----------------------------------------------------------------------
@@ -243,7 +241,7 @@ contains
         !     read the tke
 
         !     side 1
-        if(ibodybuffer1==1)then
+        if(ibodybuffer1)then
             open(121,file='tke1.dat',status='unknown')
             do k=1,jz
                 do j=1,jy
@@ -257,8 +255,8 @@ contains
         end if
 
         !     side 2
-        if(ibodybuffer2==1)then
-            open(121,file='tke1.dat',status='unknown')
+        if(ibodybuffer2)then
+            open(121,file='tke2.dat',status='unknown')
             do k=1,jz
                 do j=1,jy
                     read(122,*)val_tke2
@@ -272,7 +270,7 @@ contains
 
         !     side 5
         if(myid==0)then
-            if(ibodybuffer5==1)then
+            if(ibodybuffer5)then
                 open(125,file='tke5.dat',status='unknown')
                 do j=1,jy
                     do i=1,jx
@@ -286,7 +284,7 @@ contains
 
         !     side 6
         if(myid==nproc-1)then
-            if(ibodybuffer6==1)then
+            if(ibodybuffer6)then
                 open(126,file='tke6.dat',status='unknown')
                 do j=1,jy
                     do i=1,jx
@@ -661,6 +659,7 @@ contains
         !
         ! make the incoming mass known to all procs
         call MPI_ALLREDUCE(am_in_loc,am_in,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         !
         !-----------------------------------------------------------------------
         ! COMPUTE OUTFLOW MASS
@@ -800,6 +799,7 @@ contains
         !
         ! make outflow known to all procs
         call MPI_ALLREDUCE(am_out_loc,am_out,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         !
         !-----------------------------------------------------------------------
         ! COMPUTE MASS FRACTION
@@ -811,30 +811,22 @@ contains
         ! mass for each face
 
         call MPI_ALLREDUCE(am_out_loc1,am_out1,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc2,am_out2,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc3,am_out3,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc4,am_out4,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc5,am_out5,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc6,am_out6,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         ! mass for each face in modulus
 
         call MPI_ALLREDUCE(am1,am1t,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am2,am2t,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am3,am3t,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am4,am4t,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am5,am5t,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am6,am6t,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         amm = am1t + am2t + am3t + am4t + am5t + am6t
         !
@@ -921,7 +913,7 @@ contains
                         uc1_orl(j,k)=ucc
                         !          pressure b.c. = Uc* - Uc^n+1
                         cs1(j,k)=u(0,j,k)*csx(0,j,k)+v(0,j,k)*csy(0,j,k)+w(0,j,k)*csz(0,j,k)-ucc
-                        if(potenziale==1)then
+                        if(potenziale)then
                             cs1(j,k)=-ucc
                         end if
                         !       Uc*
@@ -939,7 +931,7 @@ contains
 
                         cs1(j,k)=u(0,j,k)*csx(0,j,k)+v(0,j,k)*csy(0,j,k)+w(0,j,k)*csz(0,j,k)-uc(0,j,k)
                         !          pressure b.c. = Uc* - Uc^n+1
-                        if(potenziale==1)then
+                        if(potenziale)then
                             cs1(j,k)= -uc(0,j,k)
                         end if
                         !       Uc*
@@ -976,7 +968,7 @@ contains
 
                         !          pressure b.c. = Uc* - Uc^n+1
                         cs2(j,k)=u(jx+1,j,k)*csx(jx,j,k)+v(jx+1,j,k)*csy(jx,j,k)+w(jx+1,j,k)*csz(jx,j,k)-ucc
-                        if(potenziale==1)then
+                        if(potenziale)then
                             cs2(j,k)=-ucc
                         end if
                         !       Uc*
@@ -994,7 +986,7 @@ contains
                         !          pressure b.c. = Uc* - Uc^n+1
                         cs2(j,k)=u(jx+1,j,k)*csx(jx,j,k)+v(jx+1,j,k)*csy(jx,j,k)+w(jx+1,j,k)*csz(jx,j,k)-uc(jx,j,k)
 
-                        if(potenziale==1)then
+                        if(potenziale)then
                             cs2(j,k)=-uc(jx,j,k)
                         end if
                         !       Uc*
@@ -1034,7 +1026,7 @@ contains
                         !          pressure b.c. = Vc* - Vc^n+1
                         cs3(i,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)-vcc
 
-                        if(potenziale==1)then
+                        if(potenziale)then
                             cs3(i,k)=-vcc
                         end if
                         !       Vc*
@@ -1052,7 +1044,7 @@ contains
                         !          pressure b.c. = Vc* - Vc^n+1
                         cs3(i,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)-vc(i,0,k)
 
-                        if(potenziale==1)then
+                        if(potenziale)then
                             cs3(i,k)=-vc(i,0,k)
                         end if
                         !       Vc*
@@ -1086,7 +1078,7 @@ contains
                         vc4_orl(i,k)=vcc
                         !          pressure b.c. = Vc* - Vc^n+1
                         cs4(i,k)=u(i,jy+1,k)*etx(i,jy,k)+v(i,jy+1,k)*ety(i,jy,k)+w(i,jy+1,k)*etz(i,jy,k)-vcc
-                        if(potenziale==1)then
+                        if(potenziale)then
                             cs4(i,k)=-vcc
                         end if
                         !       Vc*
@@ -1104,7 +1096,7 @@ contains
                         !          pressure b.c. = Vc* - Vc^n+1
                         cs4(i,k)=u(i,jy+1,k)*etx(i,jy,k)+v(i,jy+1,k)*ety(i,jy,k)+w(i,jy+1,k)*etz(i,jy,k)-vc(i,jy,k)
 
-                        if(potenziale==1)then
+                        if(potenziale)then
                             cs4(i,k)=-vc(i,jy,k)
                         end if
                         !       Vc*
@@ -1144,7 +1136,7 @@ contains
                             wc5_orl(i,j)=wcc
                             !          pressure b.c. = Wc* - Wc^n+1
                             cs5(i,j)=u(i,j,0)*ztx(i,j,0)+v(i,j,0)*zty(i,j,0)+w(i,j,0)*ztz(i,j,0)-wcc
-                            if(potenziale==1)then
+                            if(potenziale)then
                                 cs5(i,j)=-wcc
                             end if
                             !    Wc*
@@ -1162,7 +1154,7 @@ contains
                             !          pressure b.c. = Wc* - Wc^n+1
                             cs5(i,j)=u(i,j,0)*ztx(i,j,0)+v(i,j,0)*zty(i,j,0)+w(i,j,0)*ztz(i,j,0)-wc(i,j,0)
 
-                            if(potenziale==1)then
+                            if(potenziale)then
                                 cs5(i,j)=-wc(i,j,0)
                             end if
                             !    Wc*
@@ -1200,7 +1192,7 @@ contains
                             wc6_orl(i,j)=wcc
                             !          pressure b.c. = Wc* - Wc^n+1
                             cs6(i,j)=u(i,j,jz+1)*ztx(i,j,jz)+v(i,j,jz+1)*zty(i,j,jz)+w(i,j,jz+1)*ztz(i,j,jz)-wc(i,j,jz)
-                            if(potenziale==1)then
+                            if(potenziale)then
                                 cs6(i,j)=-wcc
                             end if
                             !    Wc*
@@ -1217,7 +1209,7 @@ contains
                             !          pressure b.c. = Wc* - Wc^n+1
                             cs6(i,j)=u(i,j,jz+1)*ztx(i,j,jz)+v(i,j,jz+1)*zty(i,j,jz)+w(i,j,jz+1)*ztz(i,j,jz)-wc(i,j,jz)
 
-                            if(potenziale==1)then
+                            if(potenziale)then
                                 cs6(i,j)=-wc(i,j,jz)
                             end if
                             !    Wc*
@@ -1235,6 +1227,7 @@ contains
         !
         !
         call MPI_ALLREDUCE(somma,sommat,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         !
         !
         if(myid.eq.0)then
@@ -1435,20 +1428,17 @@ contains
         !
         ! all procs know outflow
         call MPI_ALLREDUCE(am_out_loc,am_out,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         !
 
         ! outflow from each face
         call MPI_ALLREDUCE(am_out_loc1,am_out1,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc2,am_out2,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc3,am_out3,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc4,am_out4,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc5,am_out5,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
-
         call MPI_ALLREDUCE(am_out_loc6,am_out6,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         if(myid.eq.0)then
             !        write(*,*)'verifica massa entrante',am_in
@@ -1467,7 +1457,8 @@ contains
         !
         !use myarrays_nesting
         use myarrays_velo3
-        use myarrays_ibm, only: bodyforce
+        use mysettings, only: bodyforce
+
 
         implicit none
         !
@@ -1551,6 +1542,7 @@ contains
         call MPI_ALLREDUCE(massa4,massa4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(massa5,massa5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(massa6,massa6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         !     global mass at the faces
         call MPI_ALLREDUCE(ar1,ar1tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
@@ -1559,6 +1551,7 @@ contains
         call MPI_ALLREDUCE(ar4,ar4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(ar5,ar5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(ar6,ar6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         if(myid.eq.0)then
             bilancio = massa1tot + massa2tot + massa3tot + massa4tot + massa5tot + massa6tot
@@ -1691,6 +1684,7 @@ contains
         call MPI_ALLREDUCE(massa4,massa4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(massa5,massa5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(massa6,massa6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         if(myid.eq.0)then
             bilancio = massa1tot + massa2tot + massa3tot + massa4tot + massa5tot + massa6tot
@@ -2155,8 +2149,8 @@ contains
     subroutine aree_parziali()
         !***********************************************************************
         use myarrays_metri3
-        use mysettings, only: lett,i_rest
-        use myarrays_ibm
+        use ibm_module
+        use mysettings, only: lett,i_rest,bodyforce
 
         implicit none
 
@@ -2188,12 +2182,12 @@ contains
         inf6 = 0
 
         !case inflow outflow
-        if(lett==1 .and. infout1==1)inf1=1
-        if(lett==1 .and. infout2==1)inf2=1
-        if(lett==1 .and. infout3==1)inf3=1
-        if(lett==1 .and. infout4==1)inf4=1
-        if(lett==1 .and. infout5==1)inf5=1
-        if(lett==1 .and. infout6==1)inf6=1
+        if(lett .and. infout1==1)inf1=1
+        if(lett .and. infout2==1)inf2=1
+        if(lett .and. infout3==1)inf3=1
+        if(lett .and. infout4==1)inf4=1
+        if(lett .and. infout5==1)inf5=1
+        if(lett .and. infout6==1)inf6=1
 
         !case nesting
         if(i_rest==3 .and. infout1/=0)inf1=1
@@ -2259,7 +2253,7 @@ contains
 
         !-----------------------------------------------------------------------
         !     IBM settings for outflow condition
-        if( (lett==1 .or. i_rest==3) .and. bodyforce)then
+        if( (lett .or. i_rest==3) .and. bodyforce)then
             ! stop orlansky on solid cells
             if (.not.particles) then
                 open (22,file='Celle_Bloccate_Indici.inp',status='old')
@@ -2372,6 +2366,7 @@ contains
             end do
 
             call MPI_ALLREDUCE(parziale1,area_bagnata1,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         end if
         !
         if(inf2==1)then
@@ -2384,6 +2379,7 @@ contains
             end do
 
             call MPI_ALLREDUCE(parziale2,area_bagnata2,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         end if
         !
         !     faces 3 and 4
@@ -2397,6 +2393,7 @@ contains
             end do
 
             call MPI_ALLREDUCE(parziale3,area_bagnata3,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         end if
         !
         if(inf4==1)then
@@ -2409,6 +2406,7 @@ contains
             end do
 
             call MPI_ALLREDUCE(parziale4,area_bagnata4,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         end if
         !
         !     faces 5 and 6

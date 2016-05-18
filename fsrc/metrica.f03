@@ -75,6 +75,7 @@ subroutine metrica
    real y0,y1,y2
    real z0,z1,z2
    real giac_max,giac_min
+   real ref_length_max,ref_length_min
 
    integer kinizio,kfine
 
@@ -426,8 +427,10 @@ subroutine metrica
    ! compute giacobian at the centroid
 
    !     check on grid quality
-   giac_min=10000000000.
-   giac_max=0.
+   giac_min=10000000000.0
+   giac_max=0.0
+   ref_length_min=10000000000.0
+   ref_length_max=0.0
    !
    do i=1,jx
       do j=1,jy
@@ -481,9 +484,14 @@ subroutine metrica
             giac(i,j,k)=xcsi*(yeta*zzet-yzet*zeta)- &
                xeta*(ycsi*zzet-yzet*zcsi)+ &
                xzet*(ycsi*zeta-yeta*zcsi)
+
+            ref_length(i,j,k)=giac(i,j,k)**(1.0/3.0)
+            ref_area(i,j,k)=giac(i,j,k)**(2.0/3.0)
             !
             giac_min=min(giac_min,giac(i,j,k))
             giac_max=max(giac_max,giac(i,j,k))
+            ref_length_min=min(ref_length_min,ref_length(i,j,k))
+            ref_length_max=max(ref_length_max,ref_length(i,j,k))
 
             if(giac(i,j,k)<1.e-10) then
                write(*,*) 'METRICA: grid not good cell very small'
@@ -495,6 +503,7 @@ subroutine metrica
 
    if(myid.eq.0) then
       write(*,*)'giac min, giac max',giac_min,giac_max
+      write(*,*)'ref_length min, ref_length max',ref_length_min,ref_length_max
    end if
    !
    return

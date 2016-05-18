@@ -42,7 +42,7 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                w(0,j,k)*csz(0,j,k)-uc(0,j,k)
 
 
-            if(potenziale==1)then
+            if(potenziale)then
                cs1(j,k)=-uc(0,j,k)
             end if
             !
@@ -55,7 +55,7 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                v(jx+1,j,k)*csy(jx,j,k)+ &
                w(jx+1,j,k)*csz(jx,j,k)-uc(jx,j,k)
 
-            if(potenziale==1)then
+            if(potenziale)then
                cs2(j,k)=-uc(jx,j,k)
             end if
             !
@@ -101,7 +101,7 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                v(i,0,k)*ety(i,0,k)+ &
                w(i,0,k)*etz(i,0,k)-vc(i,0,k)
 
-            if(potenziale==1)then
+            if(potenziale)then
                cs3(i,k)=-vc(i,0,k)
             end if
 
@@ -114,7 +114,7 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                v(i,jy+1,k)*ety(i,jy,k)+ &
                w(i,jy+1,k)*etz(i,jy,k)-vc(i,jy,k)
 
-            if(potenziale==1)then
+            if(potenziale)then
                cs4(i,k)=-vc(i,jy,k)
             end if
 
@@ -159,7 +159,7 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                cs5(i,j)=u(i,j,0)*ztx(i,j,0)+ &
                   v(i,j,0)*zty(i,j,0)+ &
                   w(i,j,0)*ztz(i,j,0)-wc(i,j,0)
-               if(potenziale==1)then
+               if(potenziale)then
                   cs5(i,j)=-wc(i,j,0)
                end if
 
@@ -173,7 +173,7 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                   v(i,j,jz+1)*zty(i,j,jz)+ &
                   w(i,j,jz+1)*ztz(i,j,jz)-wc(i,j,jz)
 
-               if(potenziale==1)then
+               if(potenziale)then
                   cs6(i,j)=-wc(i,j,jz)
                end if
                !

@@ -26,8 +26,6 @@ module strati
         !              Aboundary.in
         !              Apianisonde.in
         !              Afiltraggio.in
-        ! depending on parameter settings: inflow plane "piano1.dat"
-        !
         !
         !              for IBM: Celle_IB_indici.inp
         !                       Celle_IB_distanze.inp
@@ -44,39 +42,34 @@ module strati
     use,intrinsic :: iso_c_binding
 
     ! MODULE AND COMMON AREA
-    use :: mysettings           ! simulation settings when not in the include
-    use :: turbo_module         ! module for turbulence model
-    use :: myarrays_WB          ! for wave breaking
-    use :: myarrays_LC          ! for langmuir circulation
-    use :: myarrays_ibm         ! for immersed boundary
-    use :: myarrays_velo3
-    use :: myarrays_metri3
-    use :: myarrays_density
-    use :: mysending
-    use :: myarrays_wallmodel
-
-    !-------------------------------------------------------------------------
-    ! EXTERN SUBROUTINES TO MODULES
-    !-------------------------------------------------------------------------
-    use :: multigrid_module
-    use :: contour_module
-    use :: flu_module
-    use :: jord_module
-    use :: output_module
-    use :: ricerca_module
-    use :: buffer_bodyforce_module
-    use :: inflow_module
-    use :: nesting_module
-    use :: filtro_module
-    use :: orlansky_module
-    use :: tridag_module
+    use mysettings           ! simulation settings when not in the include
+    use turbo_module         ! module for turbulence model
+    use wind_module          ! for wave breaking
+    use myarrays_velo3
+    use myarrays_metri3
+    use mysending
+    use wallmodel_module
+    use ibm_module
+    use multigrid_module
+    use contour_module
+    use flu_module
+    use jord_module
+    use output_module
+    use ricerca_module
+    use buffer_bodyforce_module
+    use inflow_module
+    use nesting_module
+    use filtro_module
+    use orlansky_module
+    use tridag_module
+    use particle_module
     !------------------------------------------------------------------------
-    use :: scala3 !domain dimension + re + dt
-    use :: subgrid
-    use :: period ! periodicity
-    use :: velpar
+    use scala3 !domain dimension + re + dt
+    use subgrid
+    use period ! periodicity
+    use velpar
     !------------------------------------------------------------------------
-    use :: mpi
+    use mpi
 
     implicit none
 
@@ -88,12 +81,10 @@ module strati
     integer :: kgridparasta,kgridparaend
     integer :: kpsta,kpend
 
-    ! pressure gradient rhs^n-1 etc
-    real,allocatable :: delrho(:,:,:)
-    real,allocatable :: delrhov(:,:,:,:)
     real,allocatable :: bcsi(:,:,:),beta(:,:,:),bzet(:,:,:)
     real,allocatable :: f1ve(:,:,:),f2ve(:,:,:),f3ve(:,:,:)
     real,allocatable :: rho(:,:,:)
+    real,allocatable :: rho_piano(:,:,:)
     real,allocatable :: fdve(:,:,:,:)
 
     ! for message passing
@@ -102,31 +93,23 @@ module strati
     ! coef species decay
     real,allocatable :: kdeg(:)
            
-    ! for transposed tridiag and approximate factorization
-    real,allocatable :: g33_tr(:,:,:), giac_tr(:,:,:)
-    real,allocatable :: aaa(:,:),rh(:)
-    real,allocatable :: aa(:),bb(:),cc(:)
-
     ! multigrid info
     integer  :: nlevel
     integer :: jxc(0:4),jyc(0:4),jzc(0:4)
 
     ! for timing to see code performance
-    integer startc, endc, ratc
-    real elapsed_time,start_cput,end_cput,elapsed_cput
     real :: starttime,endtime
     real :: ticks
 
-    real, allocatable :: rho_piano(:,:,:)
-
     public :: les_initialize,les_core,les_finalize,les_domain_size
-    private :: init_parallel,read_grid
 
 contains
 
     subroutine les_initialize() bind (C, name="les_initialize")
 
         implicit none
+
+        real :: ustar_prov,speed ! DELETE!!!
 
         ! for reading grid and restart
         real :: val_u,val_v,val_w
@@ -135,7 +118,7 @@ contains
         ! filename for wind, consider removing
         character*60 filename
 
-        integer :: i,j,k,kk,l,isc
+        integer :: i,j,k,kk,isc
 
         ! grid has beeen read outside
 
@@ -161,14 +144,6 @@ contains
         allocate(beta(n1,n2,kparasta:kparaend))
         allocate(bzet(n1,n2,kparasta:kparaend))
 
-        allocate(delu(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        allocate(delv(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        allocate(delw(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-
-        allocate(delrho(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        allocate(delrhov(nscal,0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-
-        !
         call iniz(f1ve,f2ve,f3ve,bcsi,beta,bzet)
         ti=0.
 
@@ -185,7 +160,7 @@ contains
 
         call read_grid(grid_file)
         !-----------------------------------------------------------------------
-        !  read IBM data
+        !  read/produce IBM data
         call set_ibm(ktime)
 
         !-----------------------------------------------------------------------
@@ -209,11 +184,6 @@ contains
 
         ! variables allocation for SUBGRID
         call initialize_subgrid()
-
-        !-----------------------------------------------------------------------
-        ! no idea about what these are used for...
-        allocate(aaa(3,n1+n2+n3),rh(n1+n2+n3))
-        allocate(aa(n1+n2+n3),bb(n1+n2+n3),cc(n1+n2+n3))
 
         !-----------------------------------------------------------------------
         ! Check the filtering (FILTRAGGIO) parameters
@@ -309,18 +279,8 @@ contains
         call mul_met(nlevel,jxc,jyc,jzc)
         call wall(nlevel,jxc,jyc,jzc)
 
-        !-----------------------------------------------------------------------
-        ! if semimplict allocation for tridiag of g33 and giac
-
-        iparasta=(myid* int(n1/nproc)  +1)
-        iparaend=((myid+1)* int(n1/nproc))
-
-        allocate(giac_tr(n3,n2,iparasta:iparaend))
-        giac_tr = 0.
-        allocate(g33_tr(0:n3,n2,iparasta:iparaend))
-        g33_tr = 0.
-
-        call set_transpose_implicit(g33_tr,giac_tr)
+        ! variables allocation and initialization for approximate factorization
+        call initialize_tridiag()
 
         !-----------------------------------------------------------------------
         ! compute initial contravariant flux if i_rest==2 dns-interpolation
@@ -328,16 +288,16 @@ contains
             call contrin()
         end if
         ! for nesting
-        if (i_rest==3.and.potenziale==1) then
+        if (i_rest==3.and.potenziale) then
             call contrin_pot()
-        else if (i_rest==3.and.potenziale==0) then
+        else if (i_rest==3.and.potenziale) then
             call contrin_lat()
         end if
 
 
         !-----------------------------------------------------------------------
         ! read inflow files and sett index for orlansky
-        if (lett/=0) then
+        if (lett) then
             call aree_parziali()
 
             call inflow()
@@ -348,16 +308,15 @@ contains
         ! to obtain a divergence free flow
         if (i_rest==3) then
             call aree_parziali()
-
-            if (freesurface==0) then !if freesurface off
+            if (freesurface) then !if freesurface is on
+                if (myid==0) then
+                    write(*,*)'free surface is on. redistribuzione skipped.'
+                end if
+            else !if freesurface off
                 if (myid==0) then
                     write(*,*)'freesurface is off and entering redistribuzione.'
                 end if
                 call redistribuzione()
-            else if (freesurface==1) then !if freesurface is on
-                if (myid==0) then
-                    write(*,*)'free surface is on. redistribuzione skipped.'
-                end if
             end if !if freesurface on/off
         end if
 
@@ -376,22 +335,11 @@ contains
         call update()
         !
 
-        !-----------------------------------------------------------------------
-        !
-        !if (myid==0 .and.lagr==0) then
-        !    write(29,*) niter/i_print
-        !end if
-        !
+
         !-----------------------------------------------------------------------
         !
         ! SPT (Single Processor Timing)
         ! to check code performance
-        !
-        !  call setrteopts('cpu_time_type=total_alltime')
-        call cpu_time(start_cput)
-        !  write (*,*)myid, 'start_cput= ',start_cput
-        call system_clock(startc,ratc)
-        !  write (*,*)myid, 'startc= ',startc,'ratc= ',ratc
         starttime=MPI_WTIME()
 
         ! variables allocation for turbulence model (turbo_statico)
@@ -403,18 +351,13 @@ contains
         !
         if (windyes==1) then
 
-            allocate(u_wind(0:n1+1,kparasta-1:kparaend+1))
-            allocate(w_wind(0:n1+1,kparasta-1:kparaend+1))
-            ! Giulia modificavento:  alloca tauu_att
             allocate(tauu_att(0:n1+1,kparasta-1:kparaend+1))
             allocate(tauw_att(0:n1+1,kparasta-1:kparaend+1))
-            ! Giulia modificavento:
-            allocate(u_att(0:n1+1,kparasta-1:kparaend+1))
-            allocate(v_att(0:n1+1,kparasta-1:kparaend+1))
-            allocate(w_att(0:n1+1,kparasta-1:kparaend+1))
             !-----------------------------------------------------------------------
             ! Andrea: alloco e leggo i cf
             allocate(cf(1:n1,kparasta:kparaend))
+            allocate(v_att(0:n1+1,kparasta-1:kparaend+1))
+
             INQUIRE(FILE="cf.dat", EXIST=cf_exists)
             if (cf_exists.eqv. .true.) then
                 filename='cf.dat'
@@ -445,42 +388,9 @@ contains
 
         end if
 
-        if ((windyes==1.or.wavebk==1)) then ! .or. imoist==1
-
-            allocate(Fx(0:n1+1,kparasta:kparaend))
-            allocate(Fz(0:n1+1,kparasta:kparaend))
-
-        end if
-
-        allocate(vortx(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        allocate(vorty(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        allocate(vortz(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        allocate(u_drift(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        allocate(w_drift(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-
-        allocate(ucs(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        allocate(wcs(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-
-        if (attiva_scal==1) then
+        if (attiva_scal) then
             allocate(fdve(nscal,n1,n2,kparasta:kparaend))
         end if
-
-
-        ! initialization
-
-        do k=kparasta-1,kparaend+1
-            do j=0,n2+1
-                do i=0,n1+1
-                    vortx(i,j,k)   = 0.
-                    vorty(i,j,k)   = 0.
-                    vortz(i,j,k)   = 0.
-                    u_drift(i,j,k) = 0.
-                    w_drift(i,j,k) = 0.
-                    ucs(i,j,k)     = 0.
-                    wcs(i,j,k)     = 0.
-                end do
-            end do
-        end do
 
 
         !-----------------------------------------------------------------------
@@ -534,12 +444,12 @@ contains
 
 
                 if (myid==nproc-1) then
-                    call MPI_SSEND(rho(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(rho(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
                 else if (myid==0) then
                     call MPI_RECV(rho_piano(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
                 end if
                 if (myid==0) then
-                    call MPI_SSEND(rho(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(rho(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
                 end if
                 if (myid==nproc-1) then
                     call MPI_RECV(rho_piano(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
@@ -583,6 +493,25 @@ contains
         ! compute volume
         call compute_volume(tipo) !n1,n2,deepl,deepr,myid,kparasta,kparaend
 
+        if (myid==0) then
+            write(*,*) '**********************************************************'
+            write(*,*) '**********************************************************'
+            write(*,*) '**********************************************************'
+            write(*,*) 'Wall function test:'
+            ustar_prov=ustar_lawofwall(0.01,1.e6)
+            write(*,*) 'log ustar=',ustar_prov
+            speed=speed_lawofwall(0.01,ustar_prov)
+            write(*,*) 'log speed=',speed
+            ustar_prov=ustar_wernerwengle(0.01,1.e6)
+            write(*,*) 'ww ustar=',ustar_prov
+            speed=speed_wernerwengle(0.01,ustar_prov)
+            write(*,*) 'ww speed=',speed
+
+            write(*,*) '**********************************************************'
+            write(*,*) '**********************************************************'
+            write(*,*) '**********************************************************'
+        end if
+
     end subroutine les_initialize
 
     subroutine les_core() bind ( C, name="les_core" )
@@ -594,11 +523,11 @@ contains
         real :: starteqstime,endeqstime
         real :: startitertime,enditertime
         real :: mpitimestart,mpitimeend
+        real :: starteq1a,endeq1a
+        real :: starteq2a,endeq2a
+        real :: starteq3a,endeq3a
         real :: startrhoghost,endrhoghost
-        real :: startrhoa,endrhoa,startrhob,endrhob
-        real :: starteq1a,endeq1a,starteq1b,endeq1b
-        real :: starteq2a,endeq2a,starteq2b,endeq2b
-        real :: starteq3a,endeq3a,starteq3b,endeq3b
+        !real :: startrhoa,endrhoa,startrhob,endrhob
         real :: startdiv,enddiv
         real :: startgrad,endgrad
 
@@ -607,22 +536,24 @@ contains
         real :: l_x,l_y,l_z,l_f,coef_annit
 
         ! iterators ad indices
-        integer :: i,j,k,ii,jj,kk,i0,j0,k0,l,isc
+        integer :: i,j,k,i0,j0,k0,l,isc
 
         ! for clipping, consider removing
-        real :: rhomin,rhomax
+        !real :: rhomin,rhomax
 
         integer :: iq1
+        logical :: scalar
 
-        !***********************************************************************
-        ! CYCLE
-        !***********************************************************************
+
+        !-----------------------------------------------------------------------
 
         startitertime=MPI_WTIME()
 
         !-----------------------------------------------------------------------
         ! update position of IBM nodes
-        call set_ibm(ktime)
+        if (particles) then
+            call set_ibm(ktime)
+        end if
 
         !-----------------------------------------------------------------------
         ! boundary conditions on du, dv, dw
@@ -634,20 +565,21 @@ contains
 
         ! average on fluxes in periodicity direction
         call average_periodicfluxes()
-
+!goto 1234
         !-----------------------------------------------------------------------
         ! compute the utau for wall model
-        if (coef_wall==1 .and. potenziale==0) then
-            call wall_function_bodyfitted(ktime,niter,tipo,i_rest)
+        if (coef_wall==1 .and. .not.potenziale) then
+            call correggi_walls(ktime,niter,tipo,i_rest)
+            !call wall_function_bodyfitted(ktime,niter,tipo,i_rest)
         end if
 
         !-----------------------------------------------------------------------
         ! computation of turbulent viscosity and diffusion
         startturbotime=MPI_WTIME()
-        call execute_turbo(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
+        call execute_turbo(ktime,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
         endturbotime=MPI_WTIME()
         if (myid==0 .and. nsgs/=0) then
-            print*,myid,'turbo procedure: ',endturbotime-startturbotime
+            write(*,*) myid,'turbo procedure: ',endturbotime-startturbotime
         end if
 
         !-----------------------------------------------------------------------
@@ -745,9 +677,9 @@ contains
         end if
 
         !-----------------------------------------------------------------------
-        if (i_rest==3 .and. potenziale==0) then
-            call nesting(ti,freesurface)
-        else if (i_rest==3 .and. potenziale==1) then
+        if (i_rest==3 .and. potenziale) then
+            call nesting(ti)
+        else if (i_rest==3 .and. potenziale) then
             call redistribuzione()
         end if
  
@@ -758,12 +690,7 @@ contains
         !-----------------------------------------------------------------------
         ! read wind file
         if (windyes==1) then
-            call leggivento(kparasta,kparaend,myid,nproc)
-            if (langyes==1) then
-                !      langmuir circulation
-                call vorticitag(myid,nproc,kparasta,kparaend)
-                call drift(myid,nproc,kparasta,kparaend)
-            end if
+            call leggivento()
         end if
 
         !-----------------------------------------------------------------------
@@ -774,7 +701,7 @@ contains
 
         !-----------------------------------------------------------------------
         ! nesting: generate disturbance on the inflow
-        if (ibb==1) then
+        if (ibb) then
             call buffer_bodyforce(ti,ktime,bcsi,beta,bzet)
         end if
 
@@ -783,15 +710,15 @@ contains
         !-----------------------------------------------------------------------
 
         ! if attiva_scal=0, scalar eq. solution is bypassed
-        if (attiva_scal==0. .or. potenziale==1) then
+        if (.not.attiva_scal .or. potenziale) then
       
             if (myid==0) then
-                print*,myid,'no density equation'
+                write(*,*) myid,'no density equation'
             end if
 
         else
 
-            startrhoa=MPI_WTIME()
+            !startrhoa=MPI_WTIME()
 
             allocate(rho(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
             ! cycle on n scalars
@@ -807,11 +734,11 @@ contains
 
                 ! call vislam(pran,akapt)         !coefficienti di diffusione laminare
 
-                call mixrho_para(inmodrho,rho) ! scale similar part for the model
+                call mixrho_para(rho) ! scale similar part for the model
 
-                call flud1(uc,cgra1,rho,akapt,insc,isc,tipo2)  ! expl. term in R11 !tipo2
-                call flud2(vc,cgra2,rho,akapt,insc,isc,tipo2)  ! expl. term in R22 !tipo2
-                call flud3(wc,cgra3,rho,akapt,insc,isc,tipo2)  ! expl. term in R33 !tipo2
+                call flud1(uc,cgra1,rho,insc,isc,tipo2)  ! expl. term in R11 !tipo2
+                call flud2(vc,cgra2,rho,insc,isc,tipo2)  ! expl. term in R22 !tipo2
+                call flud3(wc,cgra3,rho,insc,isc,tipo2)  ! expl. term in R33 !tipo2
 
                 if (espl==1) then
                     call flucrhoesp(rho,isc,tipo)  ! expl. term Crank-Nicolson
@@ -829,7 +756,7 @@ contains
 
                     call ada_rho(ktime,fdve,isc,rho,kdeg(isc))   ! Adams-Bashforth
 
-                    call flucrho(ti,rho,akaptV,akapt,isc,tipo)  ! expl. term Crank-Nicolson
+                    call flucrho(rho,isc,tipo)  ! expl. term Crank-Nicolson
 
                     call rhs1_rho(kparasta,kparaend)    ! right hand side scalar eq.
 
@@ -850,57 +777,8 @@ contains
 
                     !-----------------------------------------------------------------------
                     ! approximate factorization
-                    !
-                    ! upload csi
-                    do k=kparasta,kparaend
-                        do j=1,jy
-                            call coed1(j,k,delrho,aaa,rh,kparasta,kparaend,isc) !coefficent construction upload csi
-                            do ii=1,jx
-                                aa(ii)=aaa(1,ii)
-                                bb(ii)=aaa(2,ii)
-                                cc(ii)=aaa(3,ii)
-                            end do
-                            do ii=1,1-ip
-                                call triper(aa,bb,cc,rh,jx-1)
-                            end do
-                            do ii=1,ip
-                                call tridag(aa,bb,cc,rh,jx)
-                            end do
-                            do i=1,jx
-                                delrho(i,j,k)=rh(i)          ! put out in delrho
-                            end do
-                        end do
-                    end do
-
-                    ! upload eta
-                    do k=kparasta,kparaend
-                        do i=1,jx
-                            call coed2(i,k,delrho,aaa,rh,kparasta,kparaend,isc)! coefficent construction upload eta
-                            do ii=1,jy
-                                aa(ii)=aaa(1,ii)
-                                bb(ii)=aaa(2,ii)
-                                cc(ii)=aaa(3,ii)
-                            end do
-                            do jj=1,1-jp
-                                call triper(aa,bb,cc,rh,jy-1)
-                            end do
-                            do jj=1,jp
-                                call tridag(aa,bb,cc,rh,jy)
-                            end do
-                            do j=1,jy
-                                delrho(i,j,k)=rh(j)          ! put out in delrho
-                            end do
-                        end do
-                    end do
-
-                    endrhoa=MPI_WTIME()
-                    !
-                    ! new subroutine to solve the third part of approximate factorization
-                    ! with transposed method
-                    !
-                    startrhob=MPI_WTIME()
-
-                    call tridiag_trasp_para_rho(akapt,g33_tr,giac_tr,delrho,akapt_piano,pran,isc)
+                    scalar=.true.
+                    call factorization(scalar,ktime,delrho,isc)
      
                 end if
 
@@ -943,7 +821,7 @@ contains
                     end do
                 end do
 
-                endrhob=MPI_WTIME()
+                !endrhob=MPI_WTIME()
 
                 !
                 ! distribution of closer plane between procs
@@ -951,10 +829,10 @@ contains
                 startrhoghost=MPI_WTIME()
 
                 if (leftpem /= MPI_PROC_NULL) then
-                    call MPI_SSEND(rho(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(rho(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
                     !   quick
                     if (insc==1) then
-                        call MPI_SSEND(rho(0,0,kparasta+1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
+                        call MPI_SEND(rho(0,0,kparasta+1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
                     end if
                 end if
       
@@ -967,7 +845,7 @@ contains
                 end if
       
                 if (rightpem /= MPI_PROC_NULL) then
-                    call MPI_SSEND(rho(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(rho(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
                 end if
                 if (leftpem /= MPI_PROC_NULL) then
                     call MPI_RECV(rho(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
@@ -1006,24 +884,23 @@ contains
         !
         ! compute convective and diffusive explicit terms in first eq.
         iq1=1
-        call mix_para(inmod,iq1,ktime,i_print,lagr)
+        call mix_para(iq1)
 
         call jord1(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1)
         call flu_turbo()
-
-        if (langyes==1) then
-            call langmuir2(myid,nproc,kparasta,kparaend)
-        end if
 
         call flux1(uc,cgra1,u,insc,tipo)     ! explicit term in F21
         call flux2(vc,cgra2,u,insc,tipo)     ! explicit term in F12
         call flux3(wc,cgra3,u,insc,tipo)     ! explicit term in F13
 
+
         if (espl==1) then
             if (windyes==1) then
-                call flucnesp(u,visualizzo,tipo,tauu_att) ! expl. term Crank-Nicolson
+                !call flucnesp(u,tipo,tauu_att) ! expl. term Crank-Nicolson
+                call flucn(u,espl,coef_wall,tipo,tauu_att) ! expl. term Crank-Nicolson
             else
-                call flucnesp(u,visualizzo,tipo) ! expl. term Crank-Nicolson
+                !call flucnesp(u,tipo) ! expl. term Crank-Nicolson
+                call flucn(u,espl,coef_wall,tipo) ! expl. term Crank-Nicolson
             end if
             call adams(ktime,f1ve,bcsi,kparasta,kparaend)     ! Adams-Bashforth
 
@@ -1038,80 +915,29 @@ contains
         else
 
             call adams(ktime,f1ve,bcsi,kparasta,kparaend)     ! Adams-Bashforth
-            !
+
             !  wall model is on in flucn only if wfp3=1
             !    tauwz(i,j,k) = tauw(i,j,k)*u(i,j,k)/(u(i,j,k)+w(i,j,k))
             eseguo34=0
-            if (wfp3==1.or.wfp4==1) then
+            if (wfp3.or.wfp4) then
                 eseguo34 = 1
             end if
             if (windyes==1) then
-                call flucn(u,visualizzo,coef_wall,ti,tipo,tauu_att)
+                !call flucn(u,coef_wall,tipo,tauu_att)
+                call flucn(u,espl,coef_wall,tipo,tauu_att)
             else
-                call flucn(u,visualizzo,coef_wall,ti,tipo)
+                call flucn(u,espl,coef_wall,tipo)
+                !call flucn(u,coef_wall,tipo)
             end if
             eseguo34=0
             call rhs1_rho(kparasta,kparaend)   ! right hand side of momentum eq.
 
-            !
-            !-----------------------------------------------------------------------
-            !  approximate factorization
-            !
-            !  first eq., upload csi
-            do k=kparasta,kparaend
-                do j=1,jy
-                    call coef1_par(j,k,delu,aaa,rh,kparasta,kparaend)  !coefficent construction upload csi
-                    do ii=1,jx
-                        aa(ii)=aaa(1,ii)
-                        bb(ii)=aaa(2,ii)
-                        cc(ii)=aaa(3,ii)
-                    end do
-                    do ii=1,1-ip
-                        call triper(aa,bb,cc,rh,jx-1)
-                    end do
-                    do ii=1,ip
-                        call tridag(aa,bb,cc,rh,jx)
-                    end do
-                    do i=1,jx
-                        delu(i,j,k)=rh(i)        ! put out in delu
-                    end do
-                end do
-            end do
-
-            !
-            !  first eq., upload eta
-            do k=kparasta,kparaend
-                do i=1,jx
-                    call coef2_par(i,k,delu,aaa,rh,kparasta,kparaend)  !coefficent construction upload eta
-                    do ii=1,jy
-                        aa(ii)=aaa(1,ii)
-                        bb(ii)=aaa(2,ii)
-                        cc(ii)=aaa(3,ii)
-                    end do
-                    do jj=1,1-jp
-                        call triper(aa,bb,cc,rh,jy-1)
-                    end do
-                    do jj=1,jp
-                        call tridag(aa,bb,cc,rh,jy)
-                    end do
-                    do j=1,jy
-                        delu(i,j,k)=rh(j)          ! put out in delu
-                    end do
-                end do
-            end do
-
-            endeq1a=MPI_WTIME()
-
-            starteq1b=MPI_WTIME()
-
-            call tridiag_trasp_para(annit,g33_tr,giac_tr,delu,ktime)!annit_piano,
-
-
-            endeq1b=MPI_WTIME()
+            scalar=.false.
+            call factorization(scalar,ktime,delu,isc)
 
         end if
 
-
+        endeq1a=MPI_WTIME()
 
         !-----------------------------------------------------------------------
         !                         SECOND EQUATION
@@ -1121,25 +947,24 @@ contains
         ! compute convective and diffusive explicit terms in second eq.
         !
         iq1=2
-        call mix_para(inmod,iq1,ktime,i_print,lagr)
+        call mix_para(iq1)
 
         call jord2(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1)
 
         call flu_turbo()
-
-        if (langyes==1) then
-            call langmuir2(myid,nproc,kparasta,kparaend)
-        end if
 
         call flux1(uc,cgra1,v,insc,tipo)     ! explicit term in F21
         call flux2(vc,cgra2,v,insc,tipo)     ! explicit term in F22
         call flux3(wc,cgra3,v,insc,tipo)     ! explicit term in F23
 
         if (espl==1) then
+            ! expl. term in Crank-Nicolson
             if (windyes==1) then
-                call flucnesp(v,visualizzo,tipo,v_att)
+                !call flucnesp(v,tipo,v_att)
+                call flucn(v,espl,coef_wall,tipo,v_att)
             else
-                call flucnesp(v,visualizzo,tipo)
+                !call flucnesp(v,tipo)
+                call flucn(v,espl,coef_wall,tipo)
             end if
             call adams(ktime,f2ve,beta,kparasta,kparaend)    ! Adams-Bashforth
 
@@ -1154,69 +979,23 @@ contains
 
             call adams(ktime,f2ve,beta,kparasta,kparaend)    ! Adams-Bashforth
 
-            eseguo34 = 0
+            eseguo34=0
+            ! expl. term Crank-Nicolson
             if (windyes==1) then
-                call flucn(v,visualizzo,coef_wall,ti,tipo,v_att)  ! expl. term Crank-Nicolson
+                !call flucn(v,coef_wall,tipo,v_att)
+                call flucn(v,espl,coef_wall,tipo,v_att)
             else
-                call flucn(v,visualizzo,coef_wall,ti,tipo)  ! expl. term Crank-Nicolson
+                !call flucn(v,coef_wall,tipo)
+                call flucn(v,espl,coef_wall,tipo)
             end if
        
             call rhs1_rho(kparasta,kparaend)  ! right hand side of momentum eq.
-            !
-            !-----------------------------------------------------------------------
-            ! approximate factorization
-            !
-            ! second eq., upload csi
-            do k=kparasta,kparaend
-                do j=1,jy
-                    call coef1_par(j,k,delv,aaa,rh,kparasta,kparaend)  !coefficent construction upload csi
-                    do ii=1,jx
-                        aa(ii)=aaa(1,ii)
-                        bb(ii)=aaa(2,ii)
-                        cc(ii)=aaa(3,ii)
-                    end do
-                    do ii=1,1-ip
-                        call triper(aa,bb,cc,rh,jx-1)
-                    end do
-                    do ii=1,ip
-                        call tridag(aa,bb,cc,rh,jx)
-                    end do
-                    do i=1,jx
-                        delv(i,j,k)=rh(i)          !put out in delv
-                    end do
-                end do
-            end do
-            !
-            ! second eq., upload eta
-            do k=kparasta,kparaend
-                do i=1,jx
-                    call coef2_par(i,k,delv,aaa,rh,kparasta,kparaend)  !coefficent construction upload eta
-                    do ii=1,jy
-                        aa(ii)=aaa(1,ii)
-                        bb(ii)=aaa(2,ii)
-                        cc(ii)=aaa(3,ii)
-                    end do
-                    do jj=1,1-jp
-                        call triper(aa,bb,cc,rh,jy-1)
-                    end do
-                    do jj=1,jp
-                        call tridag(aa,bb,cc,rh,jy)
-                    end do
-                    do j=1,jy
-                        delv(i,j,k)=rh(j)          ! put out in delv
-                    end do
-                end do
-            end do
-            !
-            endeq2a=MPI_WTIME()
 
-            starteq2b=MPI_WTIME()
-
-            call tridiag_trasp_para(annit,g33_tr,giac_tr,delv,ktime)!annit_piano,
-
-            endeq2b=MPI_WTIME()
+            scalar=.false.
+            call factorization(scalar,ktime,delv,isc)
 
         end if
+        endeq2a=MPI_WTIME()
 
         !-----------------------------------------------------------------------
         !                         THIRD EQUATION
@@ -1226,25 +1005,24 @@ contains
         ! compute convective and diffusive explicit terms in third eq.
         !
         iq1=3
-        call mix_para(inmod,iq1,ktime,i_print,lagr)
+        call mix_para(iq1)
      
         call jord3(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1)
 
         call flu_turbo()
-
-        if (langyes==1) then
-            call langmuir2(myid,nproc,kparasta,kparaend)
-        end if
 
         call flux1(uc,cgra1,w,insc,tipo)     ! explicit term in F31
         call flux2(vc,cgra2,w,insc,tipo)     ! explicit term in F32
         call flux3(wc,cgra3,w,insc,tipo)     ! explicit term in F33
 
         if (espl==1) then
+            ! expl. term in Crank-Nicolson
             if (windyes==1) then
-                call flucnesp(w,visualizzo,tipo,tauw_att) ! expl. term in Crank-Nicolson
+                !call flucnesp(w,tipo,tauw_att)
+                call flucn(w,espl,coef_wall,tipo,tauw_att)
             else
-                call flucnesp(w,visualizzo,tipo) ! expl. term in Crank-Nicolson
+                !call flucnesp(w,tipo)
+                call flucn(w,espl,coef_wall,tipo)
             end if
 
             call adams(ktime,f3ve,bzet,kparasta,kparaend)    ! Adams-Bashforth
@@ -1263,80 +1041,36 @@ contains
             !  wall model is on in flucn only if wfp3=1
             !      tauwz(i,j,k) = tauw(i,j,k)*w(i,j,k)/(u(i,j,k)+w(i,j,k))
             eseguo34=0
-            if (wfp3==1.or.wfp4==1) then
-                eseguo34 = 2
+            if (wfp3.or.wfp4) then
+                eseguo34=2
             end if
+            ! expl. term in Crank-Nicolson
             if (windyes==1) then
-                call flucn(w,visualizzo,coef_wall,ti,tipo,tauw_att)
+                !call flucn(w,coef_wall,tipo,tauw_att)
+                call flucn(w,espl,coef_wall,tipo,tauw_att)
             else
-                call flucn(w,visualizzo,coef_wall,ti,tipo)
+                !call flucn(w,coef_wall,tipo)
+                call flucn(w,espl,coef_wall,tipo)
             end if
             eseguo34=0
 
             call rhs1_rho(kparasta,kparaend)  ! right hand side of momentum eq.
 
-            !-----------------------------------------------------------------------
-            !  approximate factorization
-            !
-            !  third eq., upload csi
-            do k=kparasta,kparaend
-                do j=1,jy
-                    call coef1_par(j,k,delw,aaa,rh,kparasta,kparaend)  !coefficent construction upload csi
-                    do ii=1,jx
-                        aa(ii)=aaa(1,ii)
-                        bb(ii)=aaa(2,ii)
-                        cc(ii)=aaa(3,ii)
-                    end do
-                    do ii=1,1-ip
-                        call triper(aa,bb,cc,rh,jx-1)
-                    end do
-                    do ii=1,ip
-                        call tridag(aa,bb,cc,rh,jx)
-                    end do
-                    do i=1,jx
-                        delw(i,j,k)=rh(i)          !put out in delw
-                    end do
-                end do
-            end do
-            !
-            !  third eq., upload eta
-            do k=kparasta,kparaend
-                do i=1,jx
-                    call coef2_par(i,k,delw,aaa,rh,kparasta,kparaend)  !coefficent construction upload eta
-                    do ii=1,jy
-                        aa(ii)=aaa(1,ii)
-                        bb(ii)=aaa(2,ii)
-                        cc(ii)=aaa(3,ii)
-                    end do
-                    do jj=1,1-jp
-                        call triper(aa,bb,cc,rh,jy-1)
-                    end do
-                    do jj=1,jp
-                        call tridag(aa,bb,cc,rh,jy)
-                    end do
-                    do j=1,jy
-                        delw(i,j,k)=rh(j)          ! put out in delw
-                    end do
-                end do
-            end do
-            !
-            endeq3a=MPI_WTIME()
-
-            starteq3b=MPI_WTIME()
-
-            call tridiag_trasp_para(annit,g33_tr,giac_tr,delw,ktime)!annit_piano,
-
-            endeq3b=MPI_WTIME()
+            scalar=.false.
+            call factorization(scalar,ktime,delw,isc)
 
         end if
+        endeq3a=MPI_WTIME()
+
+
 
         !-----------------------------------------------------------------------
         ! apply orlansky boundary condition
 
         startdiv=MPI_WTIME()
         !
-        if (lett/=0) then
-            call orlansky_generale()
+        if (lett) then
+            call orlansky_generale(giac)
         end if
         !
         !-----------------------------------------------------------------------
@@ -1365,7 +1099,7 @@ contains
         !-----------------------------------------------------------------------
         ! compute intermediate controvariant component
         !
-        if (lett/=0 .and. i_rest/=3) then
+        if (lett .and. i_rest/=3) then
             call contra_infout(ktime)
         else
             call contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
@@ -1390,8 +1124,9 @@ contains
         ! sum local contribution to divint
         ! with MPI_REDUCE only myid=0 knows the value
         !
-        divint=0.
+        divint=0.0
         call MPI_REDUCE(divint_loc,divint,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         !
         ! I know divint
         !
@@ -1399,6 +1134,7 @@ contains
             write(*,*)'divint ',divint
         end if
         !
+
         enddiv=MPI_WTIME()
         endeqstime=MPI_WTIME()
         !
@@ -1408,14 +1144,14 @@ contains
         startmultitime=MPI_WTIME()
 
         ! there used to be also more possibilities: all removed except multi
-        call multi(eps,ficycle,nlevel,jxc,jyc,jzc,islor,tipo,ktime,freesurface)
+        call multi(eps,ficycle,nlevel,jxc,jyc,jzc,islor,tipo,ktime)
 
         call communication_pressure()
                                                                                      
         endmultitime=MPI_WTIME()
 
         if (myid==0) then
-            print*,myid,'mlt ',endmultitime-startmultitime
+            write(*,*) myid,'mlt ',endmultitime-startmultitime
         end if
 
         !-----------------------------------------------------------------------
@@ -1425,12 +1161,12 @@ contains
 
         !-----------------------------------------------------------------------
         ! compute cartesian velocity and controvariant
-        call vel_up(bodyforce,freesurface)
+        call vel_up()
 
         !-----------------------------------------------------------------------
         ! correction on IBM
         if (bodyforce) then
-            if (potenziale==1) then
+            if (potenziale) then
                 ! solid cell
                 do l=1,num_solide
 
@@ -1444,9 +1180,9 @@ contains
 
                 end do
                 ! Giulia boundary condition before correggi_ib
-                call contour() !contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
+                call contour()
                 !
-                call contourp() !contourp(kparasta,kparaend,nproc,myid,lett)
+                call contourp()
             else !potenziale
                 !correggo_rho=0
                 !correggo_delu=0
@@ -1456,20 +1192,25 @@ contains
                 !----------------------------------------------------------------------
                 ! boundary condition
 
-                call contour() !contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
+                call contour()
                 !
-                call contourp() !contourp(kparasta,kparaend,nproc,myid,lett)
+                call contourp()
 
                 ipressione_ibm = 0
                 call correggi_ib(ktime,tipo)
+
+                ! compute forces on the spheres
+                if (particles) then
+                    call compute_sphere_forces()
+                end if
 
             end if !potenziale
 
         else !bodyforce
 
-            call contour() !call contour(kparasta,kparaend,nproc,myid,windyes,ktime,i_rest)
+            call contour()
             !
-            call contourp() !contourp(kparasta,kparaend,nproc,myid,lett)
+            call contourp()
 
         end if
 
@@ -1483,10 +1224,6 @@ contains
         !-----------------------------------------------------------------------
         ! compute max courant or dt
         call courant(ktime)
-
-        !-----------------------------------------------------------------------
-        ! print planes for inflow
-        ! --> moved to output_step
 
         !-----------------------------------------------------------------------
         ! inflow: read the next planes of data
@@ -1522,14 +1259,10 @@ contains
             write(*,*)'                   '
         end if
 
-        !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-        ! END CYCLE
-        !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
         !-----------------------------------------------------------------------
         ! write output
         call output_step(tipo)
-
+!1234 continue
     end subroutine les_core
 
     subroutine les_finalize() bind ( C, name="les_finalize" )
@@ -1538,14 +1271,16 @@ contains
 
         real :: resolution
 
+        ! ---------------------------------------------------------
+
         call output_finalize()
 
         endtime=MPI_WTIME()
         resolution=MPI_WTICK()
         if (myid==0) then
-            print*,'^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
-            print*,myid,'elapsed=',endtime-starttime,'resolution=',resolution
-            print*,'------------------------------'
+            write(*,*) '^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
+            write(*,*) 'elapsed=',endtime-starttime,'resolution=',resolution
+            write(*,*) '------------------------------'
         end if
 
         deallocate(u,v,w,uc,vc,wc,fi,rhov)
@@ -1559,7 +1294,7 @@ contains
         deallocate(gg221,gg231,gg331,gg112,gg222,gg122,gg113,gg333,gg133)
 
         ! deallocate
-        if (inmod==1.or.inmodrho==1) then
+        if (inmod.or.inmodrho) then
 
             deallocate (m21,m22,m23,m33)
             deallocate (ucof,vcof,wcof)
@@ -1574,7 +1309,7 @@ contains
 
         end if
         !
-        if (inmod==1) then
+        if (inmod) then
             deallocate (lmf11,lmf12,lmf13,lmf21,lmf22,lmf23,lmf31,lmf32,lmf33)
             deallocate (uf,vf,wf)
             deallocate (uvcof,uwcof,vucof,vwcof,wucof,wvcof)
@@ -1582,7 +1317,7 @@ contains
 
         end if
 
-        if (inmodrho==1) then
+        if (inmodrho) then
 
             deallocate (rhof,rhofl)
 
@@ -1602,45 +1337,13 @@ contains
         !----------------------------------------------
         ! matrix deallocation
 
-        if (wavebk==1) then
-            deallocate(u_wind,w_wind)
-            deallocate(u_att,w_att)
+        if (windyes==1) then
             ! Giulia modificavento:
             deallocate(tauu_att,tauw_att)
-        ! Giulia modificavento:
         end if
 
-        if ((wavebk==1.and.windyes==1)) then ! .or. imoist==1
-            deallocate(Fx,Fz)
-        end if
-
-        deallocate(vortx,vorty,vortz)
-        deallocate(u_drift,w_drift)
-
-        deallocate(ucs,wcs)
-      
         deallocate(pran,prsc)
-      
-        !-----------------------------------------------------
-        !*****************************************************
-        !-----------------------------------------------------
 
-        !call MPI_FINALIZE(ierr)
-
-        call cpu_time(end_cput)
-        !ccc      write (*,*)myid, 'end_cput= ',end_cput
-        !
-        call system_clock(endc,ratc)
-        !ccc      write (*,*)myid, 'endc= ',endc,'ratc= ',ratc
-        elapsed_time=real(endc-startc)/real(ratc)
-        elapsed_cput=end_cput-start_cput
-      
-        !  do iproc=0,nproc-1
-        write (*,*)myid, 'elapsed_time= ',elapsed_time,' seconds'
-        write (*,*)myid, 'elapsed_cput= ',elapsed_cput,' seconds'
-    !  end do
-  
-    !ccc      close(1000)
 
     end subroutine les_finalize
 
@@ -1822,12 +1525,12 @@ contains
 !    end if
 
         ! turn off some features
-        if (potenziale==1) then
+        if (potenziale) then
             if (myid==0) then
                 write(*,*)'TURN OFF att_wm_sgs and coef_wall'
                 write(info_run_file,*)'TURN OFF att_wm_sgs and coef_wall'
             end if
-            att_wm_sgs = 0
+            att_wm_sgs=.false.
             coef_wall = 0
         end if
 
@@ -1836,7 +1539,7 @@ contains
                 write(*,*)'TURN OFF att_wm_sgs'
                 write(info_run_file,*)'TURN OFF att_wm_sgs'
             end if
-            att_wm_sgs = 0
+            att_wm_sgs=.false.
         end if
 
     end subroutine init_parallel
@@ -2062,6 +1765,7 @@ contains
         call MPI_ALLREDUCE(massa4,massa4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(massa5,massa5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(massa6,massa6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         if (myid==0) then
             bilancio = massa1tot + massa2tot + massa3tot + massa4tot + massa5tot + massa6tot
@@ -2127,6 +1831,7 @@ contains
         call MPI_ALLREDUCE(massa4,massa4tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(massa5,massa5tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLREDUCE(massa6,massa6tot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         if (myid==0) then
             bilancio = massa1tot + massa2tot + massa3tot + massa4tot + massa5tot + massa6tot

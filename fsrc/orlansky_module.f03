@@ -2,8 +2,7 @@ module orlansky_module
 
     use,intrinsic :: iso_c_binding
 
-    use myarrays_metri3
-    use myarrays_velo3
+    use myarrays_velo3, only: delu, delv, delw, rhov, u, uc, v, w
     use mysending
     !
     use scala3
@@ -88,25 +87,20 @@ contains
 
     end subroutine initialize_Orlansky
 
-        !***********************************************************************
-    subroutine orlansky_generale()
-        !***********************************************************************
+    subroutine orlansky_generale(giac)
         ! compute boundary conditions with orlansky
         !
         implicit none
 
         !-----------------------------------------------------------------------
-        !     array declaration
+        real,intent(in) :: giac(1:n1,1:n2,kparasta:kparaend)
+        !-----------------------------------------------------------------------
         integer i,j,k,ii,iii,isc
         integer ierr
         integer,parameter :: i_ob = 1
-
         double precision c_orl ,amass,amass_loc
         double precision vol,vol_loc,c_orlansky(n2)
-
         real deltax
-        !-----------------------------------------------------------------------
-
         !-----------------------------------------------------------------------
 
         ! initialization
@@ -206,6 +200,7 @@ contains
 
                     call MPI_ALLREDUCE(amass_loc,amass,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
                     call MPI_ALLREDUCE(vol_loc,vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+                    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
                     !      c_orl = amass/( (z(1,1,jz)-z(1,1,0)) * (y(1,jy,1)-y(1,0,1))  )
                     !      if(myid.eq.0)write(*,*)'C_ORL',c_orl

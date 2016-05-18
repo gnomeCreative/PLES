@@ -30,7 +30,7 @@ subroutine courant(ktime)
     real cmax
     !-----------------------------------------------------------------------
     !     potential flow time step equal to 1.
-    if(potenziale==1)then
+    if(potenziale)then
         dt = 1.
     else
         !
@@ -58,6 +58,7 @@ subroutine courant(ktime)
             end do
 
             call MPI_ALLREDUCE(cou_loc,cou,1,MPI_REAL_SD,MPI_MAX,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
             if (myid==0) then
                 write(*,*)'test courant max = ',cou
@@ -204,8 +205,8 @@ subroutine courant(ktime)
 
             !
             ! I need to find the min dt
-            call MPI_ALLREDUCE(dt_loc,dtc,1,MPI_REAL_SD,MPI_MIN, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(dt_loc,dtc,1,MPI_REAL_SD,MPI_MIN,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
             if(myid==0)then
                 write(*,*)'dt convective = ',dtc
@@ -244,8 +245,8 @@ subroutine courant(ktime)
 
             !    the min between the procs
             dtd=0.
-            call MPI_ALLREDUCE(dt,dtd,1,MPI_REAL_SD,MPI_MIN, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(dt,dtd,1,MPI_REAL_SD,MPI_MIN,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
             dt=dtc
 

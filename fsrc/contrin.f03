@@ -144,8 +144,8 @@ subroutine contrin
       enddo
    enddo
    !
-   call MPI_REDUCE(divmax_loc,divmax,1,MPI_REAL_SD,MPI_MAX,0, &
-      MPI_COMM_WORLD,ierr)
+   call MPI_REDUCE(divmax_loc,divmax,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
      
    write(*,*)'divergence dns-interpolato:',divmax
    !

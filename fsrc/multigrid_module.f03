@@ -5,6 +5,7 @@ module multigrid_module
     use scala3
     use period
     use mysending, only: MPI_REAL_SD
+    use mysettings, only: freesurface,bodyforce
     !
     use mpi
 
@@ -50,14 +51,13 @@ module multigrid_module
 
 contains
 
-    subroutine multi(eps,ficycle,nlevel,jxc,jyc,jzc,islor,tipo,iterat,freesurface)
+    subroutine multi(eps,ficycle,nlevel,jxc,jyc,jzc,islor,tipo,iterat)
 
         ! pressure solution with sor+multigrid
         !
         use myarrays_metri3
         use myarrays_velo3
         use mysending
-        use myarrays_ibm, only: bodyforce,bodypressure
         !
         implicit none
 
@@ -72,7 +72,7 @@ contains
         !
         real aresi,eps,resmax
         real resmax_loc
-        real,allocatable ::  rhsn(:,:,:) !n3)
+        real,allocatable :: rhsn(:,:,:) !n3)
         real,allocatable :: rhs2v(:,:,:) !n32)
         real,allocatable :: rhs2n(:,:,:) !n32)
         real,allocatable :: rhs3v(:,:,:) !n33)
@@ -89,7 +89,7 @@ contains
         integer islor
         integer ficycle
         !
-        integer freesurface,iterat
+        integer iterat
 
         !
         !     for potential flow with ibm
@@ -217,12 +217,12 @@ contains
                             g11,g12,g13,g21,g22,g23,g31,g32,g33, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            iterat,freesurface)
+                            iterat)
 
-                        if (bodyforce .and. bodypressure) then
-                                call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
-                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
-                        end if
+!                        if (bodyforce .and. bodypressure) then
+!                                call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
+!                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
+!                        end if
 
 
                     elseif (islor==1) then
@@ -241,7 +241,7 @@ contains
                         pr1,rhsn,rhs,g11,g22,g33,kstamg,kendmg)
 
                     !
-                    if (nlevel /= 1) then
+                    if (nlevel/=1) then
                         call restrict_sndrcv(n,n1,n2,n12,n22, &
                             jxc,jyc,rhsn,rhs2v,kstamg,kendmg)
                     end if
@@ -259,7 +259,7 @@ contains
                             g31_2,g32_2,g33_2, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            iterat,freesurface)
+                            iterat)
                     elseif (islor==1) then
 
                         call solut_sndrcv_slor(n,n12,n22, &
@@ -300,7 +300,7 @@ contains
                             g31_3,g32_3,g33_3, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            iterat,freesurface)
+                            iterat)
                     elseif (islor==1) then
 
                         call solut_sndrcv_slor(n,n13,n23,kss,jxc,jyc,jzc, &
@@ -339,7 +339,7 @@ contains
                             g31_4,g32_4,g33_4, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            iterat,freesurface)
+                            iterat)
 
                     elseif (islor==1) then
 
@@ -382,7 +382,7 @@ contains
                             g31_3,g32_3,g33_3, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            iterat,freesurface)
+                            iterat)
                     elseif (islor==1) then
 
                         call solut_sndrcv_slor(n,n13,n23,kss,jxc,jyc,jzc, &
@@ -414,7 +414,7 @@ contains
                             g31_2,g32_2,g33_2, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            iterat,freesurface)
+                            iterat)
                     elseif (islor==1) then
 
                         call solut_sndrcv_slor(n,n12,n22, &
@@ -439,22 +439,22 @@ contains
                     !
                     if (islor==0) then
 
-                        if (bodyforce .and. bodypressure) then
-                                call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
-                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
-                        end if
+!                        if (bodyforce .and. bodypressure) then
+!                                call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
+!                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
+!                        end if
 
                         call solut_sndrcv_sor(n,n1,n2, &
                             kss,jxc,jyc,jzc,pr1,rhs, &
                             g11,g12,g13,g21,g22,g23,g31,g32,g33, &
                             kstamg,kendmg,rightpe,leftpe, &
                             tagls,taglr,tagrs,tagrr, &
-                            iterat,freesurface)
+                            iterat)
 
-                        if (bodyforce .and. bodypressure) then
-                                call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
-                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
-                        end if
+!                        if (bodyforce .and. bodypressure) then
+!                                call potenziale_ibm(myid,nproc,tipo,deepl,deepr,kparasta, &
+!                                    kparaend,rightpe,leftpe,tagls,taglr,tagrs,tagrr)
+!                        end if
 
                     elseif (islor==1) then
 
@@ -528,8 +528,8 @@ contains
                 end do
             end if
             !
-            call MPI_ALLREDUCE(resmax_loc,resmax,1,MPI_REAL_SD,MPI_MAX, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(resmax_loc,resmax,1,MPI_REAL_SD,MPI_MAX,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
             if (myid==0) then
                 write(*,*)myid,' ','ktime, resmax',ktime,resmax
@@ -558,7 +558,7 @@ contains
         r11,r12,r13,r21,r22,r23,r31,r32,r33, &
         kstamg,kendmg,rightpe,leftpe, &
         tagls,taglr,tagrs,tagrr, &
-        iterat,freesurface)
+        iterat)
         !***********************************************************************
         ! smoothing on every level with SOR
 
@@ -598,7 +598,7 @@ contains
         integer tagls,taglr,tagrs,tagrr
         !
         !      integer tipo(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
-        integer freesurface,iterat
+        integer iterat
 
         !-----------------------------------------------------------------------
         CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
@@ -638,7 +638,7 @@ contains
                 r11,r12,r13,r21,r22,r23,r31,r32,r33,pr, &
                 kstamg,kendmg,rightpe,leftpe, &
                 tagls,taglr,tagrs,tagrr, &
-                iterat,freesurface)
+                iterat)
 
             ! smoothing with SOR
             ! on vertical plane zebra! odd and even
@@ -659,7 +659,7 @@ contains
                 !c      if (kcs==1) then
 
                 if (myid==nproc-1) then
-                    call MPI_SSEND(pr(1,1,jzc(n)),1,prplan,0,11,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(pr(1,1,jzc(n)),1,prplan,0,11,MPI_COMM_WORLD,ierr)
                 else if (myid==0) then
                     call MPI_RECV(pr(1,1,0),1,prplan,nproc-1,11,MPI_COMM_WORLD,status,ierr)
                 end if
@@ -667,7 +667,7 @@ contains
                 !c      else if (kcs==2) then
 
                 if (myid==0) then
-                    call MPI_SSEND(pr(1,1,1),1,prplan,nproc-1,12,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(pr(1,1,1),1,prplan,nproc-1,12,MPI_COMM_WORLD,ierr)
                 else if (myid==nproc-1) then
                     call MPI_RECV(pr(1,1,jzc(n)+1),1,prplan,0,12,MPI_COMM_WORLD,status,ierr)
                 end if
@@ -792,7 +792,7 @@ contains
             !c      if (kcs==1) then
 
             if (leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(pr(1,1,kstamg(n)),1, &
+                call MPI_SEND(pr(1,1,kstamg(n)),1, &
                     prplan,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             end if
@@ -805,7 +805,7 @@ contains
             !c      else if (kcs==2) then
 
             if (rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(pr(1,1,kendmg(n)),1, &
+                call MPI_SEND(pr(1,1,kendmg(n)),1, &
                     prplan,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             end if
@@ -825,7 +825,7 @@ contains
 
         !     send ghost cell
         if (leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(pr(0,0,kstamg(n)),(jxc(n)+2)*(jyc(n)+2), &
+            call MPI_SEND(pr(0,0,kstamg(n)),(jxc(n)+2)*(jyc(n)+2), &
                 MPI_REAL_SD,leftpem,tagls, &
                 MPI_COMM_WORLD,ierr)
         end if
@@ -835,7 +835,7 @@ contains
                 MPI_COMM_WORLD,status,ierr)
         end if
         if (rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(pr(0,0,kendmg(n)),(jxc(n)+2)*(jyc(n)+2), &
+            call MPI_SEND(pr(0,0,kendmg(n)),(jxc(n)+2)*(jyc(n)+2), &
                 MPI_REAL_SD,rightpem,tagrs, &
                 MPI_COMM_WORLD,ierr)
         end if
@@ -854,7 +854,7 @@ contains
         r11,r12,r13,r21,r22,r23,r31,r32,r33,pr, &
         kstamg,kendmg,rightpe,leftpe, &
         tagls,taglr,tagrs,tagrr, &
-        iterat,freesurface)
+        iterat)
         !***********************************************************************
         ! update boundary condition for pressure with multigrid
         !
@@ -874,7 +874,7 @@ contains
         integer leftpe,rightpe
         integer leftpem,rightpem
         integer tagls,taglr,tagrs,tagrr
-        integer iterat,freesurface
+        integer iterat
         !
         real an
         real PrS0
@@ -1002,7 +1002,7 @@ contains
                         !
                         inv_r22 = 1./r22(i,jyc(n),k)
 
-                        if (freesurface==0) then !no free surface <<<<<<<<<<<<<<<
+                        if (.not.freesurface) then !no free surface <<<<<<<<<<<<<<<
                             !    ORIGINAL code for the pressure at the surface:
                             pr(i,jyc(n)+1,k)=pr(i,jyc(n),k)+an*cs4(i,k)*inv_dt*inv_r22 & !/dt/r22(i,jyc(n),k)
                                 -coef*inv_r22* &
@@ -1013,7 +1013,7 @@ contains
                                 (pr(i,jyc(n)+1,k+1)+pr(i,jyc(n),k+1) &
                                 -pr(i,jyc(n)+1,k-1)-pr(i,jyc(n),k-1)))
                         !
-                        elseif (freesurface==1) then !free surface on<<<<<<<<<<<<<<<<
+                        elseif (freesurface) then !free surface on<<<<<<<<<<<<<<<<
                             !
                             !      the following if condition is to have an initial imposed surface pressure
                             PrS0=0.
@@ -1579,7 +1579,7 @@ contains
                 ! 2) exchange the vector
                 !
                 if (leftpem /= MPI_PROC_NULL) then
-                    call MPI_SSEND(buff1s(1),4*jyc(n), &
+                    call MPI_SEND(buff1s(1),4*jyc(n), &
                         MPI_REAL_SD,leftpem,tagls, &
                         MPI_COMM_WORLD,ierr)
                 end if
@@ -1589,7 +1589,7 @@ contains
                         MPI_COMM_WORLD,status,ierr)
                 end if
                 if (rightpem /= MPI_PROC_NULL) then
-                    call MPI_SSEND(buff2s(1),4*jyc(n), &
+                    call MPI_SEND(buff2s(1),4*jyc(n), &
                         MPI_REAL_SD,rightpem,tagrs, &
                         MPI_COMM_WORLD,ierr)
                 end if
@@ -1662,7 +1662,7 @@ contains
                 ! 2) exchange the vectors
                 !
                 if (leftpem /= MPI_PROC_NULL) then
-                    call MPI_SSEND(buff1s(1),4*jxc(n), &
+                    call MPI_SEND(buff1s(1),4*jxc(n), &
                         MPI_REAL_SD,leftpem,tagls, &
                         MPI_COMM_WORLD,ierr)
                 end if
@@ -1672,7 +1672,7 @@ contains
                         MPI_COMM_WORLD,status,ierr)
                 end if
                 if (rightpem /= MPI_PROC_NULL) then
-                    call MPI_SSEND(buff2s(1),4*jxc(n), &
+                    call MPI_SEND(buff2s(1),4*jxc(n), &
                         MPI_REAL_SD,rightpem,tagrs, &
                         MPI_COMM_WORLD,ierr)
                 end if
@@ -1776,9 +1776,10 @@ contains
         real cc0(0:jyc(n)+1)
         real ff0(0:jyc(n)+1)
 
-        integer freesurface,iterat
+        integer iterat
 
-        freesurface = 0
+        freesurface = .false.
+        !freesurface = 0
 
         !-----------------------------------------------------------------------
         CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
@@ -1826,7 +1827,7 @@ contains
                 r11,r12,r13,r21,r22,r23,r31,r32,r33,pr, &
                 kstamg,kendmg,rightpe,leftpe, &
                 tagls,taglr,tagrs,tagrr, &
-                iterat,freesurface)
+                iterat)
             !
             ! smoothing with line SOR zebra with four coulors
             !
@@ -1844,7 +1845,7 @@ contains
                 !c      if (kcs==1) then
 
                 if (myid==nproc-1) then
-                    call MPI_SSEND(pr(1,1,jzc(n)),1,prplan,0,11,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(pr(1,1,jzc(n)),1,prplan,0,11,MPI_COMM_WORLD,ierr)
                 else if (myid==0) then
                     call MPI_RECV(pr(1,1,0),1,prplan,nproc-1,11,MPI_COMM_WORLD,status,ierr)
                 end if
@@ -1852,7 +1853,7 @@ contains
                 !c      else if (kcs==2) then
 
                 if (myid==0) then
-                    call MPI_SSEND(pr(1,1,1),1,prplan,nproc-1,12,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(pr(1,1,1),1,prplan,nproc-1,12,MPI_COMM_WORLD,ierr)
                 else if (myid==nproc-1) then
                     call MPI_RECV(pr(1,1,jzc(n)+1),1,prplan,0,12,MPI_COMM_WORLD,status,ierr)
                 end if
@@ -1961,7 +1962,7 @@ contains
             !c      if (kcs==1) then
             !
             if (leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(pr(1,1,kstamg(n)),1, &
+                call MPI_SEND(pr(1,1,kstamg(n)),1, &
                     prplan,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             end if
@@ -1974,7 +1975,7 @@ contains
             !c      else if (kcs==2) then
             !
             if (rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(pr(1,1,kendmg(n)),1, &
+                call MPI_SEND(pr(1,1,kendmg(n)),1, &
                     prplan,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             end if
@@ -1997,7 +1998,7 @@ contains
         !
         !
         if (leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(pr(0,0,kstamg(n)),(jxc(n)+2)*(jyc(n)+2), &
+            call MPI_SEND(pr(0,0,kstamg(n)),(jxc(n)+2)*(jyc(n)+2), &
                 MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
         end if
         if (rightpem /= MPI_PROC_NULL) then
@@ -2005,7 +2006,7 @@ contains
                 MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
         end if
         if (rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(pr(0,0,kendmg(n)),(jxc(n)+2)*(jyc(n)+2), &
+            call MPI_SEND(pr(0,0,kendmg(n)),(jxc(n)+2)*(jyc(n)+2), &
                 MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
         end if
         if (leftpem /= MPI_PROC_NULL) then
@@ -3053,7 +3054,7 @@ contains
 
         !     send left
         if (myid/=0) then
-            call MPI_SSEND(fi(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(fi(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierr)
         end if
         if (myid/=nproc-1) then
             call MPI_RECV(fi(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierr)
@@ -3061,7 +3062,7 @@ contains
 
         !     send right
         if (myid/=nproc-1) then
-            call MPI_SSEND(fi(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(fi(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierr)
         end if
         if (myid/=0) then
             call MPI_RECV(fi(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierr)
@@ -3777,7 +3778,7 @@ contains
     ! the plane computed by each procs which belong to its right
     !
     if (rightpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(prf(0,0,kendmg(n)+1),1, &
+        call MPI_SEND(prf(0,0,kendmg(n)+1),1, &
             plantypef,rightpem,tagrs,MPI_COMM_WORLD,ierr)
     end if
     if (leftpem /= MPI_PROC_NULL) then
@@ -3786,7 +3787,7 @@ contains
     end if
 
     if (rightpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(prf(0,0,kendmg(n)),1, &
+        call MPI_SEND(prf(0,0,kendmg(n)),1, &
             plantypef,rightpem,tagrs,MPI_COMM_WORLD,ierr)
     end if
     if (leftpem /= MPI_PROC_NULL) then

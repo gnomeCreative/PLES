@@ -5,6 +5,7 @@ module nesting_module
     !-----------------------------------------------------------------------
     use contour_module
     use orlansky_module
+    use buffer_bodyforce_module, only: ti_pom_new,ti_pom_old,ti_pom_fin
     !
     use mysending, only: kparasta,kparaend,myid,nproc,MPI_REAL_SD
     use scala3
@@ -18,17 +19,17 @@ module nesting_module
     real,allocatable,dimension(:,:) :: uo5,vo5,wo5,un5,vn5,wn5
     real,allocatable,dimension(:,:) :: uo6,vo6,wo6,un6,vn6,wn6
 
-    real ti_pom_old,ti_pom_new,ti_pom_fin
     integer n_ti_pom
     logical,bind(C) :: termina
     integer ntke
 
 contains
 
-    subroutine nesting(ti,freesurface)
+    subroutine nesting(ti)
         !***********************************************************************
         ! subroutine for nesting procedure
         use inflow_module, only: redistribuzione
+        use mysettings, only: freesurface
         !
 
         implicit none
@@ -37,7 +38,6 @@ contains
         ! array declaration
         integer tii
         real ti
-        integer freesurface
         !-----------------------------------------------------------------------
         ! check that dt not larger than t_new_pom
 
@@ -46,12 +46,12 @@ contains
             call interpola_pareti_pom(ti)
             call contrin_lat
 
-            if(freesurface.eq.0)then !if freesurface off
+            if(.not.freesurface)then !if freesurface off
                 if(myid.eq.0)then
                     write(*,*)'freesurface is off and entering redistribuzione.'
                 end if
                 call redistribuzione()
-            elseif(freesurface.eq.1)then !if freesurface is on
+            elseif(freesurface)then !if freesurface is on
                 if(myid.eq.0)then
                     write(*,*)'free surface is on. redistribuzione skipped.'
                 end if
@@ -97,12 +97,12 @@ contains
             call interpola_pareti_pom(ti)
             call contrin_lat
 
-            if(freesurface.eq.0)then !if freesurface off
+            if(.not.freesurface)then !if freesurface off
                 if(myid.eq.0)then
                     write(*,*)'freesurface is off and entering redistribuzione.'
                 end if
                 call redistribuzione()
-            elseif(freesurface.eq.1)then !if freesurface is on
+            elseif(freesurface)then !if freesurface is on
                 if(myid.eq.0)then
                     write(*,*)'free surface is on. redistribuzione skipped.'
                 end if
@@ -352,7 +352,7 @@ contains
         end if
         !-----------------------------------------------------------------------
         !
-        if(potenziale==0)then
+        if(.not.potenziale)then
             !        CASE START WITH RESTART FILE
             !        allocation for nesting
             !        side 1

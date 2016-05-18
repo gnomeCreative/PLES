@@ -164,10 +164,10 @@ void DEM::discreteElementInit(){
 	// initializing DEM parameters from lattice parameters
 	if (myid==0) {
 		cout<<endl;
-		cout<<"DEM INITIALIZATION"<<endl;
+		cout<<" DEM INITIALIZATION"<<endl;
 	}
 
-	// setting time
+	//	 setting time
 	demTime=0.0;
 
 	// DEM domain
@@ -175,16 +175,19 @@ void DEM::discreteElementInit(){
 	demSize[1]=aly;
 	demSize[2]=alz;
 
+	// for the moment being, deltat is set to be equal to the one of LES
 	// DEM time step
 	// if multistep is 0, it should be calculated by the program here
-	if (elmts.size()) {
-		if (deltat==0) {
-			// find critical deltaT
-			const double crit=0.005*criticalTimeStep();
-			deltat=crit;
-		}
-		// multistep can also be imposed by the user
-	}
+//	if (elmts.size()) {
+//		if (deltat==0) {
+//			// find critical deltaT
+//			const double crit=0.005*criticalTimeStep();
+//			deltat=crit;
+//		}
+//		// multistep can also be imposed by the user
+//	}
+
+
 
 	// initializing particles
 	const double partDensity=sphereMat.density;
@@ -225,6 +228,7 @@ void DEM::discreteElementInit(){
 
 	if (myid==0) {
 		cout<<"DEM parameters\n";
+		cout<<"Domain size: "<<demSize[0]<<" "<<demSize[1]<<" "<<demSize[2]<<endl;
 		cout<<"Tot elements: "<<elmts.size()<<";\t";
 		cout<<"Tot standard particles: "<<stdParticles<<endl;
 		cout<<"Deltat ="<<deltat<<endl;
@@ -253,38 +257,30 @@ void DEM::discreteElementStep1(){
 
 	// set trigger for new neighbor list
 	const double neighListTrigger=0.25*nebrRange;//0.25*nebrRange;   // 0.25 -> update particle when particle is inside 0.25 other particle domain
-
 	// neighbor management
 	evalMaxDisp();
 	if (maxDisp>neighListTrigger) { // maxDisp>0.25*(nebrRange-2.0*cutOff)
 		maxDisp=0.0;
 		evalNeighborTable();
 	}
-
 	// predictor step
 	predictor();
-
 	// particles generation
 	updateParticlesPredicted();
-
 	// send to Fortran!
 	communicateGeometry();
 }
 
 void DEM::discreteElementStep2(){
 
-	// force evaluation
-	evalForces();
-
 	// hydrodynamic forces from Fortran
 	communicateForces();
-
+	// force evaluation
+	evalForces();
 	// corrector step
 	corrector();
-
 	// particles re-generation
 	updateParticlesCorrected();
-
 }
 
 void DEM::reset(){
@@ -540,85 +536,85 @@ void DEM::initializeWalls() {
 
 	// additional walls
 	switch (problemName) {
-	case DRUM: {
-		// left wall
-		if ((boundary[2]==5)||(boundary[2]==6)||(boundary[2]==7)||(boundary[2]==8)) {
-			dummyWall.p=tVect(0.0+0.6+0.35,0.0,0.0);
-			dummyWall.n=tVect(0.0,1.0,0.0);
-			dummyWall.index=index;
-			dummyWall.flag=false;
-			dummyWall.translating=false;
-			dummyWall.trans.reset();
-			if (boundary[2]==5) {
-				dummyWall.moving=false;
-				dummyWall.slip=true;
-				dummyWall.rotCenter.reset();
-				dummyWall.omega.reset();
-				dummyWall.vel.reset();
-			}
-			else if (boundary[2]==6) {
-				dummyWall.moving=true;
-				dummyWall.slip=true;
-				dummyWall.rotCenter=tVect(0.0+0.6+0.35,0.0,1.260);
-				dummyWall.omega=tVect(0.0,drumSpeed,0.0);
-				dummyWall.vel=tVect(-0.0,0.0,0.0);
-			}
-			else if (boundary[2]==7) {
-				dummyWall.moving=false;
-				dummyWall.slip=false;
-				dummyWall.rotCenter.reset();
-				dummyWall.omega.reset();
-				dummyWall.vel.reset();
-			}
-			else if (boundary[2]==8) {
-				dummyWall.moving=true;
-				dummyWall.slip=false;
-				dummyWall.rotCenter=tVect(0.0+0.6+0.35,0.0,1.260);
-				dummyWall.omega=tVect(0.0,drumSpeed,0.0);
-				dummyWall.vel=tVect(-0.0,0.0,0.0);
-			}
-			++index;
-			walls.push_back(dummyWall);
-		}
-		// right wall
-		if ((boundary[3]==5)||(boundary[3]==6)||(boundary[3]==7)||(boundary[3]==8)) {
-			dummyWall.p=tVect(0.0+0.6+0.35,demSize[1],0.0);
-			dummyWall.n=tVect(0.0,-1.0,0.0);
-			dummyWall.index=index;
-			dummyWall.flag=false;
-			dummyWall.translating=false;
-			dummyWall.trans.reset();
-			if (boundary[3]==5) {
-				dummyWall.moving=false;
-				dummyWall.slip=true;
-				dummyWall.rotCenter.reset();
-				dummyWall.omega.reset();
-				dummyWall.vel.reset();
-			}
-			else if (boundary[3]==6) {
-				dummyWall.moving=true;
-				dummyWall.slip=true;
-				dummyWall.rotCenter=tVect(0.0+0.6+0.35,demSize[1],1.260);
-				dummyWall.omega=tVect(0.0,drumSpeed,0.0);
-				dummyWall.vel=tVect(-0.0,0.0,0.0);
-			}
-			else if (boundary[3]==7) {
-				dummyWall.moving=false;
-				dummyWall.slip=false;
-				dummyWall.rotCenter.reset();
-				dummyWall.omega.reset();
-				dummyWall.vel.reset();
-			}
-			else if (boundary[3]==8) {
-				dummyWall.moving=true;
-				dummyWall.slip=false;
-				dummyWall.rotCenter=tVect(0.0+0.6+0.35,demSize[1],1.260);
-				dummyWall.omega=tVect(0.0,drumSpeed,0.0);
-				dummyWall.vel=tVect(-0.0,0.0,0.0);
-			}
-			++index;
-			walls.push_back(dummyWall);
-		}
+	case NONE: {
+//		// left wall
+//		if ((boundary[2]==5)||(boundary[2]==6)||(boundary[2]==7)||(boundary[2]==8)) {
+//			dummyWall.p=tVect(0.0+0.6+0.35,0.0,0.0);
+//			dummyWall.n=tVect(0.0,1.0,0.0);
+//			dummyWall.index=index;
+//			dummyWall.flag=false;
+//			dummyWall.translating=false;
+//			dummyWall.trans.reset();
+//			if (boundary[2]==5) {
+//				dummyWall.moving=false;
+//				dummyWall.slip=true;
+//				dummyWall.rotCenter.reset();
+//				dummyWall.omega.reset();
+//				dummyWall.vel.reset();
+//			}
+//			else if (boundary[2]==6) {
+//				dummyWall.moving=true;
+//				dummyWall.slip=true;
+//				dummyWall.rotCenter=tVect(0.0+0.6+0.35,0.0,1.260);
+//				dummyWall.omega=tVect(0.0,drumSpeed,0.0);
+//				dummyWall.vel=tVect(-0.0,0.0,0.0);
+//			}
+//			else if (boundary[2]==7) {
+//				dummyWall.moving=false;
+//				dummyWall.slip=false;
+//				dummyWall.rotCenter.reset();
+//				dummyWall.omega.reset();
+//				dummyWall.vel.reset();
+//			}
+//			else if (boundary[2]==8) {
+//				dummyWall.moving=true;
+//				dummyWall.slip=false;
+//				dummyWall.rotCenter=tVect(0.0+0.6+0.35,0.0,1.260);
+//				dummyWall.omega=tVect(0.0,drumSpeed,0.0);
+//				dummyWall.vel=tVect(-0.0,0.0,0.0);
+//			}
+//			++index;
+//			walls.push_back(dummyWall);
+//		}
+//		// right wall
+//		if ((boundary[3]==5)||(boundary[3]==6)||(boundary[3]==7)||(boundary[3]==8)) {
+//			dummyWall.p=tVect(0.0+0.6+0.35,demSize[1],0.0);
+//			dummyWall.n=tVect(0.0,-1.0,0.0);
+//			dummyWall.index=index;
+//			dummyWall.flag=false;
+//			dummyWall.translating=false;
+//			dummyWall.trans.reset();
+//			if (boundary[3]==5) {
+//				dummyWall.moving=false;
+//				dummyWall.slip=true;
+//				dummyWall.rotCenter.reset();
+//				dummyWall.omega.reset();
+//				dummyWall.vel.reset();
+//			}
+//			else if (boundary[3]==6) {
+//				dummyWall.moving=true;
+//				dummyWall.slip=true;
+//				dummyWall.rotCenter=tVect(0.0+0.6+0.35,demSize[1],1.260);
+//				dummyWall.omega=tVect(0.0,drumSpeed,0.0);
+//				dummyWall.vel=tVect(-0.0,0.0,0.0);
+//			}
+//			else if (boundary[3]==7) {
+//				dummyWall.moving=false;
+//				dummyWall.slip=false;
+//				dummyWall.rotCenter.reset();
+//				dummyWall.omega.reset();
+//				dummyWall.vel.reset();
+//			}
+//			else if (boundary[3]==8) {
+//				dummyWall.moving=true;
+//				dummyWall.slip=false;
+//				dummyWall.rotCenter=tVect(0.0+0.6+0.35,demSize[1],1.260);
+//				dummyWall.omega=tVect(0.0,drumSpeed,0.0);
+//				dummyWall.vel=tVect(-0.0,0.0,0.0);
+//			}
+//			++index;
+//			walls.push_back(dummyWall);
+//		}
 		break;
 	}
 	}
@@ -634,18 +630,18 @@ void DEM::initializeCylinders() {
 	unsigned int index=0;
 
 	switch (problemName) {
-	case DRUM: {
-		cylinder dummyCylinder;
-		dummyCylinder.index=index;
-		dummyCylinder.p1=tVect(0.0+0.6+0.35,0.0,1.26);
-		dummyCylinder.p2=tVect(0.0+0.6+0.35,1.0,1.26);
-		dummyCylinder.R=1.243;
-		dummyCylinder.omega=tVect(0.0,drumSpeed,0.0);
-		dummyCylinder.initAxes();
-		dummyCylinder.moving=true;
-		dummyCylinder.slip=false;
-		cylinders.push_back(dummyCylinder);
-		++index;
+	case NONE: {
+//		cylinder dummyCylinder;
+//		dummyCylinder.index=index;
+//		dummyCylinder.p1=tVect(0.0+0.6+0.35,0.0,1.26);
+//		dummyCylinder.p2=tVect(0.0+0.6+0.35,1.0,1.26);
+//		dummyCylinder.R=1.243;
+//		dummyCylinder.omega=tVect(0.0,drumSpeed,0.0);
+//		dummyCylinder.initAxes();
+//		dummyCylinder.moving=true;
+//		dummyCylinder.slip=false;
+//		cylinders.push_back(dummyCylinder);
+//		++index;
 		break;
 	}
 	}
@@ -716,40 +712,60 @@ void DEM::initializePbcs() {
 // communication with Fortran
 void DEM::communicateForces() {
 
+	const double fluidDensity=1000.0;
+
 
 	int totpart=int(particles.size())+int(objects.size());
 
 	double sforx[totpart],sfory[totpart],sforz[totpart];
 	double pforx[totpart],pfory[totpart],pforz[totpart];
-
+	double mforx[totpart],mfory[totpart],mforz[totpart];
 
 	// reset hydrodynamic forces
 	for (int n=0; n<elmts.size(); ++n) {
 		elmts[n].FHydroShear.reset();
 		elmts[n].FHydroPressure.reset();
+		elmts[n].FHydroMomentum.reset();
 	}
-	for (int n=0; n<totpart; ++n) {
+	for (int n=0; n<objects.size(); ++n) {
 		objects[n].FHydroShear.reset();
 		objects[n].FHydroPressure.reset();
+		objects[n].FHydroMomentum.reset();
 	}
 
 	// get from Fortran!
-	pass_forces(sforx,sfory,sforz,pforx,pfory,pforz);
+	pass_forces(sforx,sfory,sforz,pforx,pfory,pforz,mforx,mfory,mforz);
+
+	double averageShearForce,averagePressureForce,averageMomentumForce;
+	averageShearForce=averagePressureForce=averageMomentumForce=0.0;
 
 	// assing to proper particles
 	for (int n=0; n<particles.size(); ++n) {
 		const unsigned int clusterIndexHere=particles[n].clusterIndex;
-		elmts[clusterIndexHere].FHydroShear=tVect(sforx[n],sfory[n],sforz[n]);
-		elmts[clusterIndexHere].FHydroPressure=tVect(pforx[n],pfory[n],pforz[n]);
+		elmts[clusterIndexHere].FHydroShear=tVect(sforx[n],sfory[n],sforz[n])*fluidDensity;
+		elmts[clusterIndexHere].FHydroPressure=tVect(pforx[n],pfory[n],pforz[n])*fluidDensity;
+		elmts[clusterIndexHere].FHydroMomentum=tVect(mforx[n],mfory[n],mforz[n])*fluidDensity;
+		averageShearForce+=elmts[clusterIndexHere].FHydroShear.dot(X)/double(totpart);
+		averagePressureForce+=elmts[clusterIndexHere].FHydroPressure.dot(X)/double(totpart);
+		averageMomentumForce+=elmts[clusterIndexHere].FHydroMomentum.dot(X)/double(totpart);
+
 	}
+
 
 	for (int n=particles.size(); n<totpart; ++n) {
 
 		// cout<<" Getting"<<orad[n]<<" "<<oposx[n]<<" "<<oposy[n]<<" "<<oposz[n];
-		objects[n].FHydroShear=tVect(sforx[n],sfory[n],sforz[n]);
-		objects[n].FHydroPressure=tVect(pforx[n],pfory[n],pforz[n]);
+		objects[n].FHydroShear=tVect(sforx[n],sfory[n],sforz[n])*fluidDensity;
+		objects[n].FHydroPressure=tVect(pforx[n],pfory[n],pforz[n])*fluidDensity;
+		objects[n].FHydroMomentum=tVect(mforx[n],mfory[n],mforz[n])*fluidDensity;
+		averageShearForce+=objects[n].FHydroShear.dot(X)/double(totpart);
+		averagePressureForce+=objects[n].FHydroPressure.dot(X)/double(totpart);
+		averageMomentumForce+=objects[n].FHydroMomentum.dot(X)/double(totpart);
 	}
 
+	if (myid==0) {
+		cout<<" Force | (S): "<<averageShearForce<<" | (P): "<<averagePressureForce<<" | (M): "<<averageMomentumForce<<endl;
+	}
 
 }
 
@@ -759,6 +775,8 @@ void DEM::communicateGeometry() {
 	int totpart=int(particles.size())+int(objects.size());
 
 	double pposx[totpart],pposy[totpart],pposz[totpart];
+	double pvelx[totpart],pvely[totpart],pvelz[totpart];
+	double pspinx[totpart],pspiny[totpart],pspinz[totpart];
 	double prad[totpart];
 	bool pmoves[totpart];
 
@@ -767,23 +785,38 @@ void DEM::communicateGeometry() {
 		pposx[n]=particles[n].x0.dot(X);
 		pposy[n]=particles[n].x0.dot(Y);
 		pposz[n]=particles[n].x0.dot(Z);
+		pvelx[n]=particles[n].x1.dot(X);
+		pvely[n]=particles[n].x1.dot(Y);
+		pvelz[n]=particles[n].x1.dot(Z);
+		pspinx[n]=elmts[particles[n].clusterIndex].wGlobal.dot(X);
+		pspiny[n]=elmts[particles[n].clusterIndex].wGlobal.dot(Y);
+		pspinz[n]=elmts[particles[n].clusterIndex].wGlobal.dot(Z);
 		prad[n]=particles[n].r;
 		pmoves[n]=true;
+		//if (myid==0) {
+		//	cout<<" Passing particle with "<<prad[n]<<" "<<pposx[n]<<" "<<pposy[n]<<" "<<pposz[n]<<endl;
+		//}
 	}
 
-	for (int n=particles.size(); n<objects.size(); ++n) {
+	for (int n=particles.size(); n<particles.size()+objects.size(); ++n) {
 		pposx[n]=objects[n].x0.dot(X);
 		pposy[n]=objects[n].x0.dot(Y);
 		pposz[n]=objects[n].x0.dot(Z);
+		pvelx[n]=0.0;
+		pvely[n]=0.0;
+		pvelz[n]=0.0;
+		pspinx[n]=0.0;
+		pspiny[n]=0.0;
+		pspinz[n]=0.0;
 		prad[n]=objects[n].radius;
 		pmoves[n]=false;
-		if (myid==0) {
-			cout<<" Passing"<<prad[n]<<" "<<pposx[n]<<" "<<pposy[n]<<" "<<pposz[n];
-		}
+		//if (myid==0) {
+		//	cout<<" Passing object with "<<prad[n]<<" "<<pposx[n]<<" "<<pposy[n]<<" "<<pposz[n]<<endl;
+		//}
 	}
 
 	// and now... to fortran!
-	pass_geometry(&totpart,pposx,pposy,pposz,prad,pmoves);
+	pass_geometry(&totpart,pposx,pposy,pposz,pvelx,pvely,pvelz,pspinx,pspiny,pspinz,prad,pmoves);
 
 }
 
@@ -803,16 +836,8 @@ void DEM::corrector() {
 	static double gear[6] = {3.0/16.0, 251.0/360.0, 1.0, 11.0/18.0, 1.0/6.0, 1.0/60.0};
 	static const double c[5]={deltat, deltat*deltat/2.0, deltat*deltat*deltat/6.0, deltat*deltat*deltat*deltat/24.0, deltat*deltat*deltat*deltat*deltat/120.0};
 	static const double coeff[6]={gear[0]*c[1], gear[1]*c[1]/c[0], gear[2]*c[1]/c[1], gear[3]*c[1]/c[2], gear[4]*c[1]/c[3], gear[5]*c[1]/c[4]};
-	//    doubleList coeff;
-	//    coeff.resize(6);
-	//    coeff[0]=gear[0]*c[1];
-	//    coeff[1]=gear[1]*c[1]/c[0];
-	//    coeff[2]=gear[2]*c[1]/c[1];
-	//    coeff[3]=gear[3]*c[1]/c[2];
-	//    coeff[4]=gear[4]*c[1]/c[3];
-	//    coeff[5]=gear[5]*c[1]/c[4];
 
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int n=0; n<elmts.size(); n++) {
 		elmts[n].correct(coeff);
 	}
@@ -851,14 +876,14 @@ void DEM::evalForces() {
 
 		// numerical viscosity for stability
 		// see "Viscous torque on a sphere under arbitrary rotation" by Lei,  Yang, and Wu, Applied Physics Letters 89, 181908 (2006)
-		const tVect FVisc=-6.0*M_PI*numVisc*elmts[n].radius*elmts[n].x1;
-		const tVect MVisc=-8.0*M_PI*numVisc*elmts[n].radius*elmts[n].radius*elmts[n].radius*elmts[n].wpGlobal;
+		const tVect FVisc=Zero; //-6.0*M_PI*numVisc*elmts[n].radius*elmts[n].xp1;
+		const tVect MVisc=Zero; //-8.0*M_PI*numVisc*elmts[n].radius*elmts[n].radius*elmts[n].radius*elmts[n].wpGlobal;
 
 
 		// translational motion
 		// double massCoeff=(elmts[n].m-elmts[n].fluidMass)/elmts[n].m;
 		// acceleration
-		elmts[n].x2 = (FVisc+elmts[n].FParticle+elmts[n].FWall)/elmts[n].m + demF; //(sphereMat.density-1000.0)/sphereMat.density*
+		elmts[n].x2=(FVisc+elmts[n].FParticle+elmts[n].FWall+elmts[n].FHydroShear)/elmts[n].m+demF; //(sphereMat.density-1000.0)/sphereMat.density*
 
 		// rotational motion
 		// adjoint of orientation quaternion
@@ -889,7 +914,6 @@ void DEM::updateParticlesPredicted() {
 		const unsigned int clusterIndex=particles[p].clusterIndex;
 		particles[p].updatePredicted(elmts[clusterIndex],prototypes);
 	}
-
 	if (ghosts.size()!=0) {
 		// updating ghost particles
 		for (int g=0; g<ghosts.size(); ++g) {
@@ -1053,7 +1077,7 @@ void DEM::evalCellTable() {
 		// if the coordinate exceeds the borders of the box, a message is displayed
 		if (c>cellTable.size() || c<0) { // just put control over ghost, here !!!!!!!!!!!!!!!!!!!!!!
 			cout<<"#neighborList, "<<c<<" initCellTable: particle "<<n<<" outside box, ignoring for force calculation."<<endl;
-			//            exit(0);
+			exit(0);
 			//            continue;
 		}
 

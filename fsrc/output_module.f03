@@ -1,6 +1,5 @@
-!***********************************************************************
 module output_module
-    !***********************************************************************
+
     !     contains arrays and settings for printing procedure
 
     use iso_c_binding
@@ -22,7 +21,7 @@ module output_module
     ! flags
     integer(kind=c_int),bind(C),public :: print_iter_or_time,i_printfile,iformat_newres
     logical(kind=c_bool),bind(C),public :: i_paraview,i_newres,i_medietempo
-    logical(kind=c_bool),bind(C),public :: i_cumulative,iformat_grid
+    logical(kind=c_bool),bind(C),public :: i_cumulative
     real(kind=c_double),bind(C),public :: i_time
 
     character(len=500),public :: result_folder
@@ -32,8 +31,7 @@ module output_module
     integer,parameter,public :: info_run_file=11
 
     ! formats
-    character(len=12),public :: string_newres_format
-    character(len=12),public :: string_grid_format
+    character(len=500),public :: string_newres_format
 
     ! piani & sonde
     integer(kind=c_int),bind(C),public :: npiani,nsonde
@@ -59,6 +57,7 @@ module output_module
     integer,parameter :: subrho_file=33
     integer,parameter :: bulkvel_file=34
     integer,parameter :: encheck_file=13
+    integer,parameter :: wallstress_file=55
     integer,parameter :: drag_file=54
     integer,parameter :: maxvel_file=53
     integer,parameter :: sonde_file_base=2000
@@ -69,10 +68,11 @@ module output_module
     ! file names
     character(len=500) :: filename_newres,filename_medietempo,filename_paraview
     character(len=500) :: filename_movie,filename_paraview_piece
-    character(len=500) :: filename_inforun,filename_turbo,filename_subdis
-    character(len=500) :: filename_subscl,filename_subrho,filename_drag
+    character(len=500) :: filename_inforun,filename_drag
     character(len=500) :: filename_bulkvel,filename_maxvel,filename_encheck
-    character(len=500) :: flename_sondefilebase
+    character(len=500) :: filename_wallstress
+    !character(len=500) :: flename_sondefilebase
+
     character*120,allocatable   :: paraview_piecename(:)
 
     ! folders to store results (see output_init)
@@ -104,17 +104,17 @@ module output_module
     real,allocatable :: ucol(:),utot(:),vcol(:),vtot(:),wcol(:),wtot(:)
     real,allocatable :: uccol(:),uctot(:),vccol(:),vctot(:),wccol(:),wctot(:)
     real,allocatable :: annitcol(:),annittot(:),akaptcol(:),akapttot(:)
-    real,allocatable :: upncol(:),upntot(:),vpncol(:),vpntot(:),wpncol(:),wpntot(:)
-    real,allocatable :: updcol(:),updtot(:),vpdcol(:),vpdtot(:),wpdcol(:),wpdtot(:)
-    real,allocatable :: uptcol(:),upttot(:),vptcol(:),vpttot(:),wptcol(:),wpttot(:)
-    real,allocatable :: upqcol(:),upqtot(:),vpqcol(:),vpqtot(:),wpqcol(:),wpqtot(:)
+!    real,allocatable :: upncol(:),upntot(:),vpncol(:),vpntot(:),wpncol(:),wpntot(:)
+!    real,allocatable :: updcol(:),updtot(:),vpdcol(:),vpdtot(:),wpdcol(:),wpdtot(:)
+!    real,allocatable :: uptcol(:),upttot(:),vptcol(:),vpttot(:),wptcol(:),wpttot(:)
+!    real,allocatable :: upqcol(:),upqtot(:),vpqcol(:),vpqtot(:),wpqcol(:),wpqtot(:)
 
 contains
 
     subroutine create_output_folder()
 
-        use mysettings, only: lagr
-
+        use wallmodel_module, only: wfp3,wfp4
+        use mysettings, only: bodyforce
         use mpi
 
         implicit none
@@ -135,13 +135,7 @@ contains
         !call date_and_time(date,time)
 
         if (myid == 0) then
-
             write(*,*) 'Initialize output step'
-
-            if (lagr == 0) then
-                write(*,*) 'Warning: in output files no subrid section has been implemented'
-            end if
-
         end if
 
 
@@ -184,16 +178,6 @@ contains
         !     open output files
 
         if (myid==0) then
-            if (lagr==0) then
-                filename_turbo=trim(result_folder)//'/'//'turbo.out'
-                filename_subdis=trim(result_folder)//'/'//'subdis.out'
-                filename_subscl=trim(result_folder)//'/'//'subscl.out'
-                filename_subrho=trim(result_folder)//'/'//'subrho.out'
-                open(turbo_file,file=filename_turbo,action='write',status='replace')
-                open(subdis_file,file=filename_subdis,action='write',status='replace')
-                open(subscl_file,file=filename_subscl,action='write',status='replace')
-                open(subrho_file,file=filename_subrho,action='write',status='replace')
-            end if
 
             filename_bulkvel=trim(result_folder)//'/'//'bulk_velocity.dat'
             open(bulkvel_file,file=filename_bulkvel,action='write',status='replace')
@@ -210,6 +194,11 @@ contains
                 filesonda = trim(result_folder)//'nsonda'//identificosonda//'.dat'
                 open(sonde_file_base+isonde,file=filesonda,action='write',status='unknown')
             end do
+
+            if (wfp4.or.wfp3.or.bodyforce) then
+                filename_wallstress=trim(result_folder)//'/'//'wall_stress.dat'
+                open(wallstress_file,file=filename_wallstress,action='write',status='replace')
+            end if
 
         end if
 
@@ -228,10 +217,6 @@ contains
         ! check date and time for the result folder creation
 
         !-----------------------------------------------------------------------
-        ! Setting for input/output formats
-        string_newres_format="10e18.10"
-        string_grid_format="10e18.10"
-
 
         allocate(paraview_piecename(0:nproc-1))
 
@@ -255,14 +240,6 @@ contains
         end do
         !rid_myid   =len_trim(char_myid)
 
-        ! if I write with format recognize it
-        ! set the format
-        if (iformat_newres == 1) then
-            string_newres_format = adjustl(string_newres_format)  ! with format
-
-            fmt_newres = '('//trim(string_newres_format)//')'
-            if (myid == 0) write(*,*) 'New_res file format: ',fmt_newres
-        end if
 
         count_print_time = 0
         ti_start = ti
@@ -271,13 +248,11 @@ contains
 
     subroutine initialize_input()
 
-        use mysettings, only: rich
-        use myarrays_density, only: pran,prsc
+        use mysettings, only: rich,pran,prsc
 
         implicit none
 
         integer :: i
-
 
         ! variable allocation for piani and sonde and convert (see above)
         allocate(piani(npiani))
@@ -320,9 +295,8 @@ contains
     subroutine output_step(tipo)
 
         ! write output
-
-        use mysettings, only: bbx
-        use myarrays_ibm, only: particles,bodyforce
+        use wallmodel_module, only: wfp3,wfp4
+        use mysettings, only: bbx,particles,bodyforce
         !
         use mpi
 
@@ -424,9 +398,14 @@ contains
         ! print bulk velocity
         call print_velocity(tipo)
 
-        ! print bulk velocity
+        ! print average drag force on particles
         if (bodyforce .and. particles) then
             call print_drag()
+        end if
+
+        ! print bulk velocity
+        if (wfp3.or.wfp4.or.bodyforce) then
+            call print_wallstress()
         end if
 
         ! print priano for inflow
@@ -562,9 +541,8 @@ contains
         !     if iprint_file = 1 print_u is allocated locally and it is used
         !     instead of directly u just for simplicity in the writing subroutine
         !
-        use myarrays_velo3, only: fi, rhov, u, uc, v, vc, w, wc
+        use myarrays_velo3, only: fi,rhov,u,uc,v,vc,w,wc,akapt
         use myarrays_metri3, only: annit, annitV
-        use myarrays_density, only: akapt
         !
         use mpi
 
@@ -644,7 +622,7 @@ contains
             deallocate(annitcol,annittot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_annit(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1061,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(print_annit(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1061,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
                 call MPI_RECV(print_annit(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1061,MPI_COMM_WORLD,istatus,ierr)
             end if
@@ -687,7 +665,7 @@ contains
             deallocate(annitcol,annittot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_annitV(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1061,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(print_annitV(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1061,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
                 call MPI_RECV(print_annitV(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1061,MPI_COMM_WORLD,istatus,ierr)
             end if
@@ -731,7 +709,7 @@ contains
             deallocate(akaptcol,akapttot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_akapt(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1071,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(print_akapt(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1071,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
                 call MPI_RECV(print_akapt(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1071,MPI_COMM_WORLD,istatus,ierr)
             end if
@@ -775,7 +753,7 @@ contains
             deallocate(ucol,utot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_u(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1011,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(print_u(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1011,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
                 call MPI_RECV(print_u(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1011,MPI_COMM_WORLD,istatus,ierr)
             end if
@@ -817,7 +795,7 @@ contains
             deallocate(vcol,vtot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_v(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1021,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(print_v(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1021,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
                 call MPI_RECV(print_v(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1021,MPI_COMM_WORLD,istatus,ierr)
             end if
@@ -859,7 +837,7 @@ contains
             deallocate(wcol,wtot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_w(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1031,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(print_w(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1031,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
                 call MPI_RECV(print_w(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1031,MPI_COMM_WORLD,istatus,ierr)
             end if
@@ -912,7 +890,7 @@ contains
                 deallocate(rhocol,rhotot)
 
                 if (myid==nproc-1) then
-                    call MPI_SSEND(rho(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1041,MPI_COMM_WORLD,ierr)
+                    call MPI_SEND(rho(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1041,MPI_COMM_WORLD,ierr)
                 else if (myid==0) then
                     call MPI_RECV(rho(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1041,MPI_COMM_WORLD,istatus,ierr)
                 end if
@@ -965,7 +943,7 @@ contains
             deallocate(ficol,fitot)
 
             if (myid==nproc-1) then
-                call MPI_SSEND(print_fi(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1051,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(print_fi(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,0,1051,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
                 call MPI_RECV(print_fi(0,0,jz+1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1051,MPI_COMM_WORLD,istatus,ierr)
             end if
@@ -1170,8 +1148,8 @@ contains
 
         !-----------------------------------------------------------------------
         ! local variables declaration
-        integer kstawrite,kendwrite
-        integer i,j,k,isc
+        integer :: kstawrite,kendwrite
+        integer :: i,j,k,isc
         real,parameter :: dumpvalue=0.0
 
         !-----------------------------------------------------------------------
@@ -1294,11 +1272,13 @@ contains
                 do k=kstawrite,kendwrite         !0,jz+1
                     do j=0,jy+1
                         do i=0,jx+1
-                            write(new_res_file,fmt_newres)print_u(i,j,k), &
-                                print_v(i,j,k), &
-                                print_w(i,j,k), &
-                                print_fi(i,j,k), &
-                                (print_rhov(isc,i,j,k),isc=1,nscal)
+                            write (new_res_file,fmt_newres) print_u(i,j,k)
+                            write (new_res_file,fmt_newres) print_v(i,j,k)
+                            write (new_res_file,fmt_newres) print_w(i,j,k)
+                            write (new_res_file,fmt_newres) print_fi(i,j,k)
+                            do isc = 1,nscal
+                                write (new_res_file,fmt_newres) print_rhov(isc,i,j,k)
+                            end do
                         end do
                     end do
                 end do
@@ -1549,14 +1529,14 @@ contains
 
     end subroutine write_tracers
 
-
     subroutine write_paraview(tipo)
 
         use myarrays_metri3, only: x,y,z
         use myarrays_velo3, only: u,v,w,fi,rhov
-        use myarrays_ibm, only: bodyforce,normalVectorX,normalVectorY,normalVectorZ
-        use particle_module, only: fluidPressureForce,fluidShearForce,forceCaso
-        use mysettings, only: attiva_scal
+        !use myarrays_ibm, only: !,normalVectorX,normalVectorY,normalVectorZ
+        use particle_module, only: fluidPressureForce,fluidShearForce,forceCaso,fluidMomentumForce, &
+            fluidParticleVel
+        use mysettings, only: attiva_scal,bodyforce,particles
 
         use mpi
 
@@ -1601,13 +1581,17 @@ contains
             write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="pres"/>'
             if (bodyforce) then
                 write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="tipo"/>'
-                write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="normal" NumberOfComponents="3"/>'
-                write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="caso"/>'
-                write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fluidPressureForce" NumberOfComponents="3"/>'
-                write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fluidShearForce" NumberOfComponents="3"/>'
+                !write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="normal" NumberOfComponents="3"/>'
+                !write(paraview_file,'(A)')'      <PDataArray type="Int32" Name="caso"/>'
+                if (particles) then
+                    write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fluidPressureForce" NumberOfComponents="3"/>'
+                    write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fluidShearForce" NumberOfComponents="3"/>'
+                    write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fluidMomentumForce" NumberOfComponents="3"/>'
+                    write(paraview_file,'(A)')'      <PDataArray type="Float64" Name="fluidParticleVel" NumberOfComponents="3"/>'
+                end if
             end if
-            if (attiva_scal==1) then
-                do isc = 1,nscal
+            if (attiva_scal) then
+                do isc=1,nscal
                     write(paraview_file,'(A,I0.1,A)')'      <PDataArray type="Float64" Name="scal',isc,'"/>'
                 end do
             end if
@@ -1684,52 +1668,76 @@ contains
             end do
             write(piecefile,*)
             write(piecefile,'(A)')'      </DataArray>'
-            write(piecefile,'(A)')'      <DataArray type="Float64" Name="normal" NumberOfComponents="3">'
-            do k=kparasta-1,kparaend+1
-                do j=0,jy+1
-                    do i=0,jx+1
-                        write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
-                            normalVectorX(i,j,k),' ',normalVectorY(i,j,k),' ',normalVectorZ(i,j,k),' '
+            !            write(piecefile,'(A)')'      <DataArray type="Float64" Name="normal" NumberOfComponents="3">'
+            !            do k=kparasta-1,kparaend+1
+            !                do j=0,jy+1
+            !                    do i=0,jx+1
+            !                        write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+            !                            normalVectorX(i,j,k),' ',normalVectorY(i,j,k),' ',normalVectorZ(i,j,k),' '
+            !                    end do
+            !                end do
+            !            end do
+            !            write(piecefile,*)
+            !            write(piecefile,'(A)')'      </DataArray>'
+            !            write(piecefile,'(A)')'      <DataArray type="Int32" Name="caso">'
+            !            do k=kparasta-1,kparaend+1
+            !                do j=0,jy+1
+            !                    do i=0,jx+1
+            !                        write(piecefile,'(I0.1,A)',advance='no') forceCaso(i,j,k),' '
+            !                    end do
+            !                end do
+            !            end do
+            !            write(piecefile,*)
+            !            write(piecefile,'(A)')'      </DataArray>'
+            if (particles) then
+                write(piecefile,'(A)')'      <DataArray type="Float64" Name="fluidPressureForce" NumberOfComponents="3">'
+                do k=kparasta-1,kparaend+1
+                    do j=0,jy+1
+                        do i=0,jx+1
+                            write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+                                fluidPressureForce(i,j,k,1),' ',fluidPressureForce(i,j,k,2),' ',fluidPressureForce(i,j,k,3),' '
+                        end do
                     end do
                 end do
-            end do
-            write(piecefile,*)
-            write(piecefile,'(A)')'      </DataArray>'
-            write(piecefile,'(A)')'      <DataArray type="Int32" Name="caso">'
-            do k=kparasta-1,kparaend+1
-                do j=0,jy+1
-                    do i=0,jx+1
-                        write(piecefile,'(I0.1,A)',advance='no') forceCaso(i,j,k),' '
+                write(piecefile,*)
+                write(piecefile,'(A)')'      </DataArray>'
+                write(piecefile,'(A)')'      <DataArray type="Float64" Name="fluidShearForce" NumberOfComponents="3">'
+                do k=kparasta-1,kparaend+1
+                    do j=0,jy+1
+                        do i=0,jx+1
+                            write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+                                fluidShearForce(i,j,k,1),' ',fluidShearForce(i,j,k,2),' ',fluidShearForce(i,j,k,3),' '
+                        end do
                     end do
                 end do
-            end do
-            write(piecefile,*)
-            write(piecefile,'(A)')'      </DataArray>'
-            write(piecefile,'(A)')'      <DataArray type="Float64" Name="fluidPressureForce" NumberOfComponents="3">'
-            do k=kparasta-1,kparaend+1
-                do j=0,jy+1
-                    do i=0,jx+1
-                        write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
-                            fluidPressureForce(i,j,k,1),' ',fluidPressureForce(i,j,k,2),' ',fluidPressureForce(i,j,k,3),' '
+                write(piecefile,*)
+                write(piecefile,'(A)')'      </DataArray>'
+                write(piecefile,'(A)')'      <DataArray type="Float64" Name="fluidMomentumForce" NumberOfComponents="3">'
+                do k=kparasta-1,kparaend+1
+                    do j=0,jy+1
+                        do i=0,jx+1
+                            write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+                                fluidMomentumForce(i,j,k,1),' ',fluidMomentumForce(i,j,k,2),' ',fluidMomentumForce(i,j,k,3),' '
+                        end do
                     end do
                 end do
-            end do
-            write(piecefile,*)
-            write(piecefile,'(A)')'      </DataArray>'
-            write(piecefile,'(A)')'      <DataArray type="Float64" Name="fluidShearForce" NumberOfComponents="3">'
-            do k=kparasta-1,kparaend+1
-                do j=0,jy+1
-                    do i=0,jx+1
-                        write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
-                            fluidShearForce(i,j,k,1),' ',fluidShearForce(i,j,k,2),' ',fluidShearForce(i,j,k,3),' '
+                write(piecefile,*)
+                write(piecefile,'(A)')'      </DataArray>'
+                write(piecefile,'(A)')'      <DataArray type="Float64" Name="fluidParticleVel" NumberOfComponents="3">'
+                do k=kparasta-1,kparaend+1
+                    do j=0,jy+1
+                        do i=0,jx+1
+                            write(piecefile,'(ES14.6E3,A,ES14.6E3,A,ES14.6E3,A)',advance='no') &
+                                fluidParticleVel(i,j,k,1),' ',fluidParticleVel(i,j,k,2),' ',fluidParticleVel(i,j,k,3),' '
+                        end do
                     end do
                 end do
-            end do
-            write(piecefile,*)
-            write(piecefile,'(A)')'      </DataArray>'
+                write(piecefile,*)
+                write(piecefile,'(A)')'      </DataArray>'
+            end if
         end if
-        if (attiva_scal==1) then
-            do isc = 1,nscal
+        if (attiva_scal) then
+            do isc=1,nscal
                 write(piecefile,'(A,I0.1,A)')'      <DataArray type="Float64" Name="scal',isc,'">'
                 do k=kparasta-1,kparaend+1
                     do j=0,jy+1
@@ -1755,7 +1763,6 @@ contains
 
     subroutine output_finalize()
 
-        use mysettings, only: lagr
 
         implicit none
 
@@ -1763,12 +1770,6 @@ contains
 
         if (myid==0) then
 
-            if (lagr==0) then
-                close(turbo_file)   ! turbo.out
-                close(subdis_file)
-                close(subscl_file)
-                close(subrho_file)
-            end if
             close(bulkvel_file)   ! bulk velocity nel tempo
             close(maxvel_file)
             close(encheck_file)
@@ -1883,11 +1884,13 @@ contains
         call MPI_REDUCE(v_bulk,v_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
         call MPI_REDUCE(w_bulk,w_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
         call MPI_REDUCE(fi_bulk,fi_bulk_tot,1,MPI_REAL_SD,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         ! u_max max between procs
         call MPI_REDUCE(u_max,u_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
         call MPI_REDUCE(v_max,v_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
         call MPI_REDUCE(w_max,w_max_tot,1,MPI_REAL_SD,MPI_MAX,0,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         if (myid==0) then
 
@@ -1912,21 +1915,23 @@ contains
 
     subroutine print_drag()
 
-        use particle_module, only: sphereShearForce,spherePressureForce,totParticles
+        use particle_module, only: sphereShearForce,spherePressureForce,sphereMomentumForce,totParticles
 
         implicit none
 
-        real,dimension(3) :: averageShearForce,averagePressureForce
+        real,dimension(3) :: averageShearForce,averagePressureForce,averageMomentumForce
         integer :: p
 
         ! compute average drag
         averageShearForce(:)=0.0
         averagePressureForce(:)=0.0
+        averageMomentumForce(:)=0.0
 
 
         do p=1,totParticles
             averageShearForce(:)=averageShearForce(:)+sphereShearForce(:,p)/real(totParticles)
             averagePressureForce(:)=averagePressureForce(:)+spherePressureForce(:,p)/real(totParticles)
+            averageMomentumForce(:)=averageMomentumForce(:)+sphereMomentumForce(:,p)/real(totParticles)
         end do
 
         if (myid==0) then
@@ -1934,9 +1939,11 @@ contains
             open(drag_file,file=filename_drag,status='old',action='write',position='append')
             write(*,*) 'Forces written on drag file :'
             write(*,*) ti,averageShearForce(1),averageShearForce(2),averageShearForce(3), &
-                averagePressureForce(1),averagePressureForce(2),averagePressureForce(3)
+                averagePressureForce(1),averagePressureForce(2),averagePressureForce(3), &
+                averageMomentumForce(1),averageMomentumForce(2),averageMomentumForce(3)
             write(drag_file,*) ti,averageShearForce(1),averageShearForce(2),averageShearForce(3), &
-                averagePressureForce(1),averagePressureForce(2),averagePressureForce(3)
+                averagePressureForce(1),averagePressureForce(2),averagePressureForce(3), &
+                averageMomentumForce(1),averageMomentumForce(2),averageMomentumForce(3)
             close(drag_file)
 
         end if
@@ -2013,16 +2020,21 @@ contains
 
     end subroutine update_medie
 
-    subroutine get_cpp_strings(simulation_folder_string,grid_file_string,restart_file_string) bind(C,name='get_cpp_strings')
+    subroutine get_cpp_strings(simulation_folder_string,grid_file_string,restart_file_string, &
+        newresformat_file_string) bind(C,name='get_cpp_strings')
 
         use, intrinsic :: iso_c_binding
 
         implicit none
 
-        character(kind=c_char), dimension(*), intent(IN) :: simulation_folder_string
-        character(kind=c_char), dimension(*), intent(IN) :: grid_file_string
-        character(kind=c_char), dimension(*), intent(IN) :: restart_file_string
+        character(kind=c_char),dimension(500),intent(IN) :: simulation_folder_string
+        character(kind=c_char),dimension(500),intent(IN) :: grid_file_string
+        character(kind=c_char),dimension(500),intent(IN) :: restart_file_string
+        character(kind=c_char),dimension(500),intent(IN) :: newresformat_file_string
+
         integer :: l
+
+        ! ----------------------------------------------------------------------
 
         do l=1,500
             if (simulation_folder_string(l) == C_NULL_CHAR) exit
@@ -2041,6 +2053,22 @@ contains
             restart_file(l:l)=restart_file_string(l)
         end do
         restart_file(l:500)=" "
+
+        ! if I write with format recognize it: set the format
+        if (iformat_newres==1) then
+            do l=1,500
+                if (newresformat_file_string(l) == C_NULL_CHAR) exit
+                string_newres_format(l:l)=newresformat_file_string(l)
+            end do
+            string_newres_format(l:500)=" "
+
+            fmt_newres='('//trim(adjustl(string_newres_format))//')'
+
+            !if (myid == 0) write(*,*) 'newresformat_file_string: ',newresformat_file_string
+            !if (myid == 0) write(*,*) 'string_newres_format: ',string_newres_format
+            !if (myid == 0) write(*,*) 'New_res file format: ',fmt_newres
+
+        end if
 
         if (myid==0) then
             print *, 'simulation folder: ', trim(result_folder)
@@ -2066,10 +2094,10 @@ contains
         integer i,j,k,isc
         ! ----------------------------------------------
 
-        if (inf==1) then
+        if (inf) then
             !       open file
-            if (ktime == 1) then
-                do ipiani = 1,npiani
+            if (ktime==1) then
+                do ipiani=1,npiani
                     if (myid<10) then
                         write(idpiano,'(i1)')ipiani
                         write(idproc ,'(i1)')myid
@@ -2084,8 +2112,8 @@ contains
                 end do
             end if
 
-            do ipiani = 1,npiani
-                i = piani(ipiani)
+            do ipiani=1,npiani
+                i=piani(ipiani)
                 write(5000+ipiani*100+myid,*)ktime
                 do k=kparasta,kparaend
                     do j=1,jy
@@ -2105,6 +2133,125 @@ contains
 100     format(10e13.5)
 
     end subroutine print_inflow_planes
+
+    subroutine print_wallstress()
+
+        use wallmodel_module, only: att_mod_par,u_t
+        use ibm_module, only: num_ib,shear_ib,pressure_ib,momentum_ib,ustar,indici_CELLE_IB
+        use mysettings, only: bodyforce
+        use myarrays_metri3, only: ref_length,ref_area,giac
+
+        implicit none
+
+        !-----------------------------------------------------------------------
+        integer :: l
+        ! tau and ustar for the walls
+        real :: u_t_sotto,u_t_sopra
+        real :: tau_sotto,tau_sopra
+        ! tau in case of ibm
+        real :: tautot,tau_loc
+        real :: sheartot,shear_loc
+        real :: pressuretot,pressure_loc
+        real :: momentumtot,momentum_loc
+        real :: ustartot,ustar_loc
+        real :: refLengthHere,refAreaHere,refVolumeHere
+
+        integer :: i,k,i0,j0,k0
+        integer :: ierr
+        !-----------------------------------------------------------------------
+
+        if (bodyforce) then
+
+
+
+            ! total stress
+            shear_loc=0.0
+            pressure_loc=0.0
+            momentum_loc=0.0
+            ustar_loc=0.0
+            do l=1,num_ib
+
+                ! index ib
+                i0=indici_CELLE_IB(l,1)
+                j0=indici_CELLE_IB(l,2)
+                k0=indici_CELLE_IB(l,3)
+
+                ! reference geometric feature
+                refLengthHere=ref_length(i0,j0,k0)
+                refAreaHere=ref_area(i0,j0,k0)
+                refVolumeHere=giac(i0,j0,k0)
+
+                ! update integral quantities
+                shear_loc=shear_loc+shear_ib(l,1)*refAreaHere
+                pressure_loc=pressure_loc+pressure_ib(l,3)*refAreaHere
+                momentum_loc=momentum_loc+momentum_ib(l,1)*refVolumeHere
+                ustar_loc=ustar_loc+ustar(l)*refAreaHere
+                tau_loc=tau_loc+ustar(l)*ustar(l)
+
+            end do
+
+
+            call MPI_ALLREDUCE(tau_loc,tautot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(shear_loc,sheartot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(pressure_loc,pressuretot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(momentum_loc,momentumtot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(ustar_loc,ustartot,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+            !tautot=tautot/(2.0*real(jx*jz))
+
+            if (myid==0) then
+
+
+                write(*,*)'Av. IBM tau',tautot/real(jx)/real(jz)
+                write(*,*)'IBM ustar',ustartot
+                write(*,*)'IBM shear_ib',sheartot
+                write(*,*)'IBM pressure_ib',pressuretot
+                write(*,*)'IBM momentum_ib',momentumtot
+
+                write(*,*)'-----------------------------------------------'
+
+                open(wallstress_file,file=filename_wallstress,status='old',action='write',position='append')
+                write(wallstress_file,*) ti,ustartot,sheartot,pressuretot,momentumtot
+                close(wallstress_file)
+            end if
+
+        else
+
+            u_t_sotto = 0.0
+            u_t_sopra = 0.0
+            do k=kparasta,kparaend
+                do i=1,jx
+                    if (att_mod_par(i,1,k)) then
+                        u_t_sotto=u_t_sotto+u_t(i,1,k)*u_t(i,1,k)
+                    end if
+                    if (att_mod_par(i,2,k)) then
+                        u_t_sopra=u_t_sopra+u_t(i,2,k)*u_t(i,2,k)
+                    end if
+
+                end do
+            end do
+
+            call MPI_ALLREDUCE(u_t_sotto,tau_sotto,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(u_t_sopra,tau_sopra,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+            if (myid==0) then
+
+                tau_sotto = tau_sotto/real(jx)/real(jz)
+                tau_sopra = tau_sopra/real(jx)/real(jz)
+
+                write(*,*)'tau',tau_sotto,tau_sopra
+
+                open(wallstress_file,file=filename_wallstress,status='old',action='write',position='append')
+                write(wallstress_file,*) ti,tau_sotto,tau_sopra
+                close(wallstress_file)
+
+            end if
+        end if
+
+    end subroutine print_wallstress
 
     !    subroutine print_del(tipo)
     !

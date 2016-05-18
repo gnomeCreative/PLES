@@ -38,6 +38,7 @@ public:
     string demConfigFile;
     // les files
     string lesConfigFile,lesGridFile,lesRestartFile;
+    string restartFormatString;
     // time integration
     unsigned int currentTimeStep;
     // intervals for output

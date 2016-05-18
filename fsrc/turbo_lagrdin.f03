@@ -1,20 +1,17 @@
-!***********************************************************************
-subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
-    in_st1,in_av1,in_in1,kpstamg,kpendmg)
+subroutine turbo_lagrdin(ktime,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
 
     use filter_module
     use turbo_module
     use mysending
-    use mysettings, only: cost,costH,costV,inmod,inmodrho,nsgs,isotropo
+    use mysettings, only: cost,costH,costV,inmod,inmodrho,nsgs,isotropo,pran,prsc,re_analogy
 
-    use myarrays_metri3
     use myarrays_velo3
-    use myarrays_density
+    use myarrays_metri3
     !
-    use scala3
     use subgrid
     use period
     use velpar
+    use scala3
     !
     use mpi
 
@@ -22,7 +19,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
 
     !-----------------------------------------------------------------------
     ! parameters
-    integer,intent(in) :: ktime,i_rest,i_print
+    integer,intent(in) :: ktime
     integer,intent(in) :: kpstamg(0:4),kpendmg(0:4)
     integer,intent(in) :: in_dx1(n1,n2,kpstamg(1):kpendmg(1))
     integer,intent(in) :: in_sn1(n1,n2,kpstamg(1):kpendmg(1))
@@ -320,10 +317,25 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         end do
     end if
     !
-    do j=1,jy
-        cb(j)=float(inmod)       ! 1 mixed , 0 smagorinski
-        cbrho(j)=float(inmodrho) ! 1 mixed , 0 smagorinski
-    end do
+    if (inmod) then
+        do j=1,jy
+            cb(j)=1.0       ! 1 mixed , 0 smagorinski
+        end do
+    else
+        do j=1,jy
+            cb(j)=0.0       ! 1 mixed , 0 smagorinski
+        end do
+    end if
+
+    if (inmodrho) then
+        do j=1,jy
+            cbrho(j)=1.0 ! 1 mixed , 0 smagorinski
+        end do
+    else
+        do j=1,jy
+            cbrho(j)=0.0 ! 1 mixed , 0 smagorinski
+        end do
+    end if
 
     cb(1)=0.
     cb(jy)=0.
@@ -1295,7 +1307,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
 
         if(leftpem /= MPI_PROC_NULL) then
 
-            call MPI_SSEND(sbuff1(1),24*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),24*(jx+2)*(jy+2), &
                 MPI_REAL_SD,leftpem,tagls, &
                 MPI_COMM_WORLD,ierr)
 
@@ -1426,7 +1438,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     else if (kp.eq.1) then
 
         if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),24*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),24*(jx+2)*(jy+2), &
                 MPI_REAL_SD,rightpem,tagrs, &
                 MPI_COMM_WORLD,ierr)
         endif
@@ -1601,7 +1613,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     else if (kp.eq.1) then
 
         if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),9*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),9*(jx+2)*(jy+2), &
                 MPI_REAL_SD,leftpem,tagls, &
                 MPI_COMM_WORLD,ierr)
         endif
@@ -1669,7 +1681,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     else if (kp.eq.1) then
 
         if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),9*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),9*(jx+2)*(jy+2), &
                 MPI_REAL_SD,rightpem,tagrs, &
                 MPI_COMM_WORLD,ierr)
         endif
@@ -2406,7 +2418,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     else if (kp.eq.1) then
 
         if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),16*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),16*(jx+2)*(jy+2), &
                 MPI_REAL_SD,leftpem,tagls, &
                 MPI_COMM_WORLD,ierr)
         endif
@@ -2504,7 +2516,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     else if (kp.eq.1) then
 
         if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(sbuff1(1),16*(jx+2)*(jy+2), &
+            call MPI_SEND(sbuff1(1),16*(jx+2)*(jy+2), &
                 MPI_REAL_SD,rightpem,tagrs, &
                 MPI_COMM_WORLD,ierr)
         endif
@@ -2886,7 +2898,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     ! Aik term (not computed at j=1 and j=jy)
     ! bar filtering for metric
 
-    if(inmod.eq.1)then
+    if(inmod)then
 
         call filter04g(uco,m21,kparasta,kparaend,myid,nproc)
         call filter04g(vco,m22,kparasta,kparaend,myid,nproc)
@@ -3171,7 +3183,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),25*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),25*(jx+2)*(jy+2), &
                     MPI_REAL_SD,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -3306,7 +3318,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),25*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),25*(jx+2)*(jy+2), &
                     MPI_REAL_SD,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -3524,11 +3536,10 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         ! only in csi and eta, while on zita is done one time at the
         ! end
         !
-        call periodic(ass11,ass12,ass13,myid,nproc,kparasta,kparaend)
-        call periodic(ass21,ass22,ass23,myid,nproc,kparasta,kparaend)
-        call periodic(ass31,ass32,ass33,myid,nproc,kparasta,kparaend)
-        call periodic(assrho11,assrho22,assrho33,myid,nproc, &
-            kparasta,kparaend)
+        call periodic(ass11,ass12,ass13)
+        call periodic(ass21,ass22,ass23)
+        call periodic(ass31,ass32,ass33)
+        call periodic(assrho11,assrho22,assrho33)
 
 
         if (debugg.eq.1) then
@@ -3743,7 +3754,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),12*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),12*(jx+2)*(jy+2), &
                     MPI_REAL_SD,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -3823,7 +3834,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
 
 
             if(rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),12*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),12*(jx+2)*(jy+2), &
                     MPI_REAL_SD,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -4015,7 +4026,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),13*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),13*(jx+2)*(jy+2), &
                     MPI_REAL_SD,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -4093,7 +4104,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
 
 
             if(rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),13*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),13*(jx+2)*(jy+2), &
                     MPI_REAL_SD,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -4214,14 +4225,11 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         ! periodicity (necessary for the next filtering) is done only
         ! in csi and eta in the subroutine, while in zita is done once at the end
         !
-        call periodic(ucof,vcof,wcof,myid,nproc,kparasta,kparaend)
-        call periodic(rhof,rhof,rhof,myid,nproc,kparasta,kparaend)
-        call periodic(lmf11,lmf12,lmf13,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(lmf21,lmf22,lmf23,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(lmf31,lmf32,lmf33,myid,nproc, &
-            kparasta,kparaend)
+        call periodic(ucof,vcof,wcof)
+        call periodic(rhof,rhof,rhof)
+        call periodic(lmf11,lmf12,lmf13)
+        call periodic(lmf21,lmf22,lmf23)
+        call periodic(lmf31,lmf32,lmf33)
         !
         ! periodicity in zita
         !
@@ -4454,7 +4462,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),13*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),13*(jx+2)*(jy+2), &
                     MPI_REAL_SD,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -4544,7 +4552,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),13*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),13*(jx+2)*(jy+2), &
                     MPI_REAL_SD,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -4629,16 +4637,11 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         ! periodicity necessary for next filtering in the subroutine is done
         ! only for csi and eta, while zita is done once at the end
         !
-        call periodic(ucofb,vcofb,wcofb,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(rhofb,rhofb,rhofb,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(lmfb11,lmfb12,lmfb13,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(lmfb21,lmfb22,lmfb23,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(lmfb31,lmfb32,lmfb33,myid,nproc, &
-            kparasta,kparaend)
+        call periodic(ucofb,vcofb,wcofb)
+        call periodic(rhofb,rhofb,rhofb)
+        call periodic(lmfb11,lmfb12,lmfb13)
+        call periodic(lmfb21,lmfb22,lmfb23)
+        call periodic(lmfb31,lmfb32,lmfb33)
         !
         ! periodicity in zita
         !
@@ -4856,7 +4859,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),13*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),13*(jx+2)*(jy+2), &
                     MPI_REAL_SD,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -4947,7 +4950,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
 
 
             if(rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),13*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),13*(jx+2)*(jy+2), &
                     MPI_REAL_SD,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -5157,7 +5160,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),13*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),13*(jx+2)*(jy+2), &
                     MPI_REAL_SD,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -5247,7 +5250,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),13*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),13*(jx+2)*(jy+2), &
                     MPI_REAL_SD,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -5390,14 +5393,10 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         ! periodicity (necessary for the next filtering) is done
         ! for csi and eta, for zita it is done at the end just one time
         !
-        call periodic(ufucof,vfucof,wfucof,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(ufvcof,vfvcof,wfvcof,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(ufwcof,vfwcof,wfwcof,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(rhofucof,rhofvcof,rhofwcof,myid,nproc, &
-            kparasta,kparaend)
+        call periodic(ufucof,vfucof,wfucof)
+        call periodic(ufvcof,vfvcof,wfvcof)
+        call periodic(ufwcof,vfwcof,wfwcof)
+        call periodic(rhofucof,rhofvcof,rhofwcof)
         !
         ! periodicity in zita
         !
@@ -5611,7 +5610,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),12*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),12*(jx+2)*(jy+2), &
                     MPI_REAL_SD,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -5690,7 +5689,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),12*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),12*(jx+2)*(jy+2), &
                     MPI_REAL_SD,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -5768,14 +5767,10 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         ! periodicity (necessary for the next filtering) is done
         ! for csi and eta, for zita it is done at the end just one time
         !
-        call periodic(uucof,uvcof,uwcof,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(vucof,vvcof,vwcof,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(wucof,wvcof,wwcof,myid,nproc, &
-            kparasta,kparaend)
-        call periodic(rhoucof,rhovcof,rhowcof,myid,nproc, &
-            kparasta,kparaend)
+        call periodic(uucof,uvcof,uwcof)
+        call periodic(vucof,vvcof,vwcof)
+        call periodic(wucof,wvcof,wwcof)
+        call periodic(rhoucof,rhovcof,rhowcof)
 
         !
         ! periodicity in zita
@@ -5991,7 +5986,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(leftpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),12*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),12*(jx+2)*(jy+2), &
                     MPI_REAL_SD,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6070,7 +6065,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else if (kp.eq.1) then
 
             if(rightpem /= MPI_PROC_NULL) then
-                call MPI_SSEND(sbuff1(1),12*(jx+2)*(jy+2), &
+                call MPI_SEND(sbuff1(1),12*(jx+2)*(jy+2), &
                     MPI_REAL_SD,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6550,8 +6545,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             call buffvect1d(sbuffd,numrhomed_loc,3)
             call buffvect1d(sbuffd,denrhomed_loc,4)
 
-            call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),4*jy,MPI_DOUBLE_PRECISION, &
-                MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),4*jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
             call buffvect2d(rbuffd,nummed,1)
             call buffvect2d(rbuffd,denmed,2)
@@ -6597,7 +6592,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         else
 
             if(leftpem/=MPI_PROC_NULL) then
-                call MPI_SSEND(alalm(1,1,kparasta),((jx+2)*(jy+2)), &
+                call MPI_SEND(alalm(1,1,kparasta),((jx+2)*(jy+2)), &
                     MPI_DOUBLE_PRECISION,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6609,7 +6604,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             endif
 
             if(leftpem/=MPI_PROC_NULL) then
-                call MPI_SSEND(alamm(1,1,kparasta),((jx+2)*(jy+2)), &
+                call MPI_SEND(alamm(1,1,kparasta),((jx+2)*(jy+2)), &
                     MPI_DOUBLE_PRECISION,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6621,7 +6616,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             endif
 
             if(rightpem/=MPI_PROC_NULL) then
-                call MPI_SSEND(alalm(1,1,kparaend),((jx+2)*(jy+2)), &
+                call MPI_SEND(alalm(1,1,kparaend),((jx+2)*(jy+2)), &
                     MPI_DOUBLE_PRECISION,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6633,7 +6628,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             endif
 
             if(rightpem/=MPI_PROC_NULL) then
-                call MPI_SSEND(alamm(1,1,kparaend),((jx+2)*(jy+2)), &
+                call MPI_SEND(alamm(1,1,kparaend),((jx+2)*(jy+2)), &
                     MPI_DOUBLE_PRECISION,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6645,7 +6640,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             endif
             !-----------------------------
             if(leftpem/=MPI_PROC_NULL) then
-                call MPI_SSEND(alalmrho(1,1,kparasta),((jx+2)*(jy+2)), &
+                call MPI_SEND(alalmrho(1,1,kparasta),((jx+2)*(jy+2)), &
                     MPI_DOUBLE_PRECISION,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6657,7 +6652,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             endif
 
             if(leftpem/=MPI_PROC_NULL) then
-                call MPI_SSEND(alammrho(1,1,kparasta),((jx+2)*(jy+2)), &
+                call MPI_SEND(alammrho(1,1,kparasta),((jx+2)*(jy+2)), &
                     MPI_DOUBLE_PRECISION,leftpem,tagls, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6669,7 +6664,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             endif
 
             if(rightpem/=MPI_PROC_NULL) then
-                call MPI_SSEND(alalmrho(1,1,kparaend),((jx+2)*(jy+2)), &
+                call MPI_SEND(alalmrho(1,1,kparaend),((jx+2)*(jy+2)), &
                     MPI_DOUBLE_PRECISION,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6681,7 +6676,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             endif
 
             if(rightpem/=MPI_PROC_NULL) then
-                call MPI_SSEND(alammrho(1,1,kparaend),((jx+2)*(jy+2)), &
+                call MPI_SEND(alammrho(1,1,kparaend),((jx+2)*(jy+2)), &
                     MPI_DOUBLE_PRECISION,rightpem,tagrs, &
                     MPI_COMM_WORLD,ierr)
             endif
@@ -6778,8 +6773,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             call buffvect1d(sbuffd,numrhomed_loc,3)
             call buffvect1d(sbuffd,denrhomed_loc,4)
 
-            call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),4*jy,MPI_DOUBLE_PRECISION, &
-                MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),4*jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
             call buffvect2d(rbuffd,nummed,1)
             call buffvect2d(rbuffd,denmed,2)
@@ -6877,8 +6872,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
                 call buffvect1d(sbuffd,denrhomed_loc,jx*3+i)
             end do
 
-            call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),4*jx*jy &
-                ,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),4*jx*jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
             do i=1,jx
                 call buffvect2d(rbuffd,nummed,i)
@@ -6939,7 +6934,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     !
     ! compute sgs (scale similar) cartesian stress momentum
     !
-    if(inmod.eq.1)then
+    if(inmod)then
 
         do k=kparasta,kparaend
             do j=1,n2
@@ -7093,8 +7088,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         call buffvect1d(sbuffd,sus_loc23,5)
         call buffvect1d(sbuffd,sus_loc33,6)
 
-        call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),6*jy,MPI_DOUBLE_PRECISION, &
-            MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),6*jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         call buffvect2d(rbuffd,sus11,1)
         call buffvect2d(rbuffd,sus12,2)
@@ -7257,8 +7252,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         ! now sum of local sum and send the result to all procs
         ! for each plane
         !
-        call MPI_ALLREDUCE(sus_loc(1),sus(1),jy,MPI_DOUBLE_PRECISION, &
-            MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(sus_loc(1),sus(1),jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
         !
         ! finally the mean value, the sum divided by the number of points
         ! for each plane (known by all the procs)
@@ -7332,8 +7327,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         call buffvect1d(sbuffd,susrho_loc22,2)
         call buffvect1d(sbuffd,susrho_loc33,3)
 
-        call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),3*jy,MPI_DOUBLE_PRECISION, &
-            MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),3*jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         call buffvect2d(rbuffd,susrho11,1)
         call buffvect2d(rbuffd,susrho22,2)
@@ -7541,8 +7536,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     call buffvect1d(sbuffd,sub13_loc,5)
     call buffvect1d(sbuffd,sub23_loc,6)
 
-    call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),6*jy,MPI_DOUBLE_PRECISION, &
-        MPI_SUM,MPI_COMM_WORLD,ierr)
+    call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),6*jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
     call buffvect2d(rbuffd,sub11,1)
     call buffvect2d(rbuffd,sub22,2)
@@ -7714,8 +7709,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     ! now sum over local sum and send the result to all procs
     ! for  each plane
     !
-    call MPI_ALLREDUCE(sub_loc(1),sub(1),jy,MPI_DOUBLE_PRECISION, &
-        MPI_SUM,MPI_COMM_WORLD,ierr)
+    call MPI_ALLREDUCE(sub_loc(1),sub(1),jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
     !
     ! finally the mean value, the sum divided by the number
     ! of point for each plane (known by all prc)
@@ -7795,8 +7790,8 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     call buffvect1d(sbuffd,subrho_loc22,2)
     call buffvect1d(sbuffd,subrho_loc33,3)
 
-    call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),3*jy,MPI_DOUBLE_PRECISION, &
-        MPI_SUM,MPI_COMM_WORLD,ierr)
+    call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),3*jy,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
     call buffvect2d(rbuffd,subrho11,1)
     call buffvect2d(rbuffd,subrho22,2)
@@ -7849,7 +7844,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         rzer=0.
 
         !-----------------------------------------------------------------------
-        if(isotropo==1)then
+        if(isotropo)then
             do k=kparasta,kparaend
                 do j=1,jy
                     do i=1,jx
@@ -7879,7 +7874,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
                         annitV(i,j,k)=annit(i,j,k)
 
                         !        eddy diffusivity
-                        if(re_analogy==1)then
+                        if(re_analogy)then
                             do isc=1,nscal
                                 akapt(isc,i,j,k)  = annit(i,j,k)/prsc(isc)
                                 akaptV(isc,i,j,k) = annitV(i,j,k)/prsc(isc)
@@ -7899,7 +7894,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
 
         !-----------------------------------------------------------------------
 
-        if(isotropo==0)then
+        if(.not.isotropo)then
             do k=kparasta,kparaend
                 do j=1,jy
                     do i=1,jx
@@ -7948,7 +7943,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
 
                         !        ------------------------------------------------
                         !        eddy diffusivity
-                        if(re_analogy==1)then
+                        if(re_analogy)then
                             do isc=1,nscal
                                 akapt(isc,i,j,k)  = prsc(isc)*annit(i,j,k)
                                 akaptV(isc,i,j,k) = prsc(isc)*annitV(i,j,k)
@@ -8237,7 +8232,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
     ! pass the closer plane
     !
     if(leftpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(annit(0,0,kparasta),(jx+2)*(jy+2), &
+        call MPI_SEND(annit(0,0,kparasta),(jx+2)*(jy+2), &
             MPI_REAL_SD,leftpem,tagls, &
             MPI_COMM_WORLD,ierr)
     endif
@@ -8247,7 +8242,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
             MPI_COMM_WORLD,status,ierr)
     endif
     if(rightpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(annit(0,0,kparaend),(jx+2)*(jy+2), &
+        call MPI_SEND(annit(0,0,kparaend),(jx+2)*(jy+2), &
             MPI_REAL_SD,rightpem,tagrs, &
             MPI_COMM_WORLD,ierr)
     endif
@@ -8280,7 +8275,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
         end do
 
         if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(P_akapt(0,0,kparasta),(jx+2)*(jy+2), &
+            call MPI_SEND(P_akapt(0,0,kparasta),(jx+2)*(jy+2), &
                 MPI_REAL_SD,leftpem,tagls, &
                 MPI_COMM_WORLD,ierr)
         endif
@@ -8290,7 +8285,7 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
                 MPI_COMM_WORLD,status,ierr)
         endif
         if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(P_akapt(0,0,kparaend),(jx+2)*(jy+2), &
+            call MPI_SEND(P_akapt(0,0,kparaend),(jx+2)*(jy+2), &
                 MPI_REAL_SD,rightpem,tagrs, &
                 MPI_COMM_WORLD,ierr)
         endif
@@ -8369,6 +8364,168 @@ subroutine turbo_lagrdin(ktime,i_print,i_rest,in_dx1,in_sn1,in_sp1, &
 end subroutine turbo_lagrdin
 
 
+!***********************************************************************
+subroutine interp3(xx1,yy1,zz1,vvf,kparasta,kparaend,alalm,alamm,alalmrho,alammrho)
+   !***********************************************************************
+   ! interpolazione delle funzioni num e den per modello
+   ! lagrangiano in spazio computazionale
+   !
+   use myarrays_metri3
+   use scala3
+
+   implicit none
+   !-----------------------------------------------------------------------
+   !     variable declaration
+   integer i,j,k,inp,jnp,knp,ist,jst,kst,ii
+   integer kparasta,kparaend
+
+   real alalm(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+   real alamm(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+
+   real alalmrho(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+   real alammrho(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+   !
+   real dx1,dx2,dy1,dy2,dz1,dz2
+   real epsi,ax,ay,az
+   real vv1(4),vv2(4),vv3(4),vv4(4),vv5(4),vv6(4),vv7(4),vv8(4)
+   real vv13(4),vv24(4),vv57(4),vv68(4)
+   real vv1324(4),vv5768(4)
+   real vvf(n1,n2,kparasta:kparaend,4)
+   real xx1(n1,n2,kparasta:kparaend)
+   real yy1(n1,n2,kparasta:kparaend)
+   real zz1(n1,n2,kparasta:kparaend)
+   !-----------------------------------------------------------------------
+   !
+   !     start cycling on plane
+   !
+   epsi=1.e-12
+   do k=kparasta,kparaend
+      do j=1,jy
+         do i=1,jx
+            !
+            ax=abs(xx1(i,j,k))
+            ist=int((xx1(i,j,k)+ax)/(2.*ax+epsi)+.5)
+            inp=i-1+ist
+            !
+            ay=abs(yy1(i,j,k))
+            jst=int((yy1(i,j,k)+ay)/(2.*ay+epsi)+.5)
+            jnp=j-1+jst
+            !
+            az=abs(zz1(i,j,k))
+            kst=int((zz1(i,j,k)+az)/(2.*az+epsi)+.5)
+            knp=k-1+kst
+            !
+            vv1(1)=alalm(inp,jnp,knp)
+            vv1(2)=alamm(inp,jnp,knp)
+            vv1(3)=alalmrho(inp,jnp,knp)
+            vv1(4)=alammrho(inp,jnp,knp)
+            !
+            vv2(1)=alalm(inp+1,jnp,knp)
+            vv2(2)=alamm(inp+1,jnp,knp)
+            vv2(3)=alalmrho(inp+1,jnp,knp)
+            vv2(4)=alammrho(inp+1,jnp,knp)
+
+            !
+            vv3(1)=alalm(inp,jnp,knp+1)
+            vv3(2)=alamm(inp,jnp,knp+1)
+            vv3(3)=alalmrho(inp,jnp,knp+1)
+            vv3(4)=alammrho(inp,jnp,knp+1)
+
+            !
+            vv4(1)=alalm(inp+1,jnp,knp+1)
+            vv4(2)=alamm(inp+1,jnp,knp+1)
+            vv4(3)=alalmrho(inp+1,jnp,knp+1)
+            vv4(4)=alammrho(inp+1,jnp,knp+1)
+            !
+            vv5(1)=alalm(inp,jnp+1,knp)
+            vv5(2)=alamm(inp,jnp+1,knp)
+            vv5(3)=alalmrho(inp,jnp+1,knp)
+            vv5(4)=alammrho(inp,jnp+1,knp)
+            !
+            vv6(1)=alalm(inp+1,jnp+1,knp)
+            vv6(2)=alamm(inp+1,jnp+1,knp)
+            vv6(3)=alalmrho(inp+1,jnp+1,knp)
+            vv6(4)=alammrho(inp+1,jnp+1,knp)
+            !
+            vv7(1)=alalm(inp,jnp+1,knp+1)
+            vv7(2)=alamm(inp,jnp+1,knp+1)
+            vv7(3)=alalmrho(inp,jnp+1,knp+1)
+            vv7(4)=alammrho(inp,jnp+1,knp+1)
+            !
+            vv8(1)=alalm(inp+1,jnp+1,knp+1)
+            vv8(2)=alamm(inp+1,jnp+1,knp+1)
+            vv8(3)=alalmrho(inp+1,jnp+1,knp+1)
+            vv8(4)=alammrho(inp+1,jnp+1,knp+1)
+            !
+            ! trova distanze in spazio computazionale
+            !
+            !      if(xx1(i,j,k).gt.0.) then
+            !      dx1=xx1(i,j,k)
+            !      dx2=1-xx1(i,j,k)
+            !      else
+            !      dx1=1.+xx1(i,j,k)
+            !      dx2=-xx1(i,j,k)
+            !      end if
+            !
+            dx1=    xx1(i,j,k) *ist + (1.+xx1(i,j,k))*(1-ist)
+            dx2=(1.-xx1(i,j,k))*ist + (  -xx1(i,j,k))*(1-ist)
+            !
+            !      if(yy1(i,j,k).gt.0.) then
+            !      dy1=yy1(i,j,k)
+            !      dy2=1-yy1(i,j,k)
+            !      else
+            !      dy1=1.+yy1(i,j,k)
+            !      dy2=-yy1(i,j,k)
+            !      end if
+            !
+            dy1=    yy1(i,j,k) *jst + (1.+yy1(i,j,k))*(1-jst)
+            dy2=(1.-yy1(i,j,k))*jst + (  -yy1(i,j,k))*(1-jst)
+            !
+            !      if(zz1(i,j,k).gt.0.) then
+            !      dz1=zz1(i,j,k)
+            !      dz2=1.-zz1(i,j,k)
+            !      else
+            !      dz1=1.+zz1(i,j,k)
+            !      dz2=-zz1(i,j,k)
+            !      end if
+            !
+            dz1=    zz1(i,j,k) *kst + (1.+zz1(i,j,k))*(1-kst)
+            dz2=(1.-zz1(i,j,k))*kst + (  -zz1(i,j,k))*(1-kst)
+            !
+            ! parte interpolazione
+            ! interseca il volume sul piano z=zp
+            !
+
+            ! interpola valori delle funzioni sui punti
+            !
+            do ii=1,4
+               vv13(ii)=vv1(ii)*dz2+vv3(ii)*dz1
+               vv24(ii)=vv2(ii)*dz2+vv4(ii)*dz1
+               vv57(ii)=vv5(ii)*dz2+vv7(ii)*dz1
+               vv68(ii)=vv6(ii)*dz2+vv8(ii)*dz1
+
+            end do
+
+            !
+            ! adesso interseco il piano con linea x=xp
+            !
+            do ii=1,4
+               vv5768(ii)=vv57(ii)*dx2+vv68(ii)*dx1
+               vv1324(ii)=vv13(ii)*dx2+vv24(ii)*dx1
+            end do
+            !
+            ! infine interpola sul punto
+            !
+            do ii=1,4
+               vvf(i,j,k,ii)=vv1324(ii)*dy2+vv5768(ii)*dy1
+            end do
+         !
+         enddo
+      enddo
+   enddo
+   !
+   return
+end
 
 
 

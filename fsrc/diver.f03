@@ -17,7 +17,7 @@ subroutine diver(kparasta,kparaend,nproc,myid)
    integer i,j,k
    !-----------------------------------------------------------------------
    !
-   if(potenziale .eq. 0)then
+   if(.not.potenziale)then
       do k=kparasta,kparaend
          do j=1,jy
             do i=1,jx

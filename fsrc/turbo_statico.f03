@@ -1,21 +1,18 @@
 !***********************************************************************
-subroutine turbo_statico(ktime,i_print, &
-    in_dx1,in_sn1,in_sp1, &
-    in_st1,in_av1,in_in1, &
-    kpstamg,kpendmg)
+subroutine turbo_statico(in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
     !***********************************************************************
     ! compute the eddy viscosity and diffusivity with Smagorinsky
     ! with fixed constant
     !
-    use filter_module
     use turbo_module
-    use myarrays_wallmodel, only: att_mod_par, att_wm_sgs, punto_wfp3, punto_wfp4, u_t, utangente
+    use filter_module, only: buffer1g,buffer1old_par,buffer1old_par_nscal, &
+        buffer2gg,buffer2old_par,buffer2old_par_nscal
+    use wallmodel_module, only: att_mod_par,att_wm_sgs,u_t,utangente,wf_distance
 
     use mysending
-    use mysettings, only: cost,costH,costV
+    use mysettings, only: cost,costH,costV,pran,prsc,isotropo
     use myarrays_metri3
     use myarrays_velo3
-    use myarrays_density
     !
     use scala3
     use subgrid
@@ -27,36 +24,25 @@ subroutine turbo_statico(ktime,i_print, &
     implicit none
     !-----------------------------------------------------------------------
     !     array declaration
-    integer i,j,k,i_print
-    integer lagr
-    integer ktime,kper,lll,m
+    integer i,j,k
+    integer kper,m
 
     integer kpstamg(0:4),kpendmg(0:4)
-    integer in_dx1(n1  ,n2  ,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
-    integer in_sn1(n1  ,n2  ,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
-    integer in_sp1(n1  ,n2  ,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
-    integer in_st1(n1  ,n2  ,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
-    integer in_av1(n1  ,n2  ,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
-    integer in_in1(n1  ,n2  ,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
+    integer in_dx1(n1,n2,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
+    integer in_sn1(n1,n2,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
+    integer in_sp1(n1,n2,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
+    integer in_st1(n1,n2,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
+    integer in_av1(n1,n2,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
+    integer in_in1(n1,n2,kpstamg(1):kpendmg(1)) !    (n1,n2,n3)
     !
-    integer ierr
-    !integer ncolperproc
-    integer status(MPI_STATUS_SIZE)
-    integer req1,req2,req3,req4
-    integer istatus(MPI_STATUS_SIZE)
-    integer kparastal,kparaendl
+    integer ierr,status(MPI_STATUS_SIZE)
 
-    integer debugg,ttt
     !
     real sbuff((n1+2)*(n2+2)*40)
     real rbuff((n1+2)*(n2+2)*40)
     !
-    real somma,delt
-    real grg
+    real somma
     !
-    real xcsi,ycsi,zcsi
-    real xeta,yeta,zeta
-    real xzet,yzet,zzet
     real dudx,dudy,dudz
     real dvdx,dvdy,dvdz
     real dwdx,dwdy,dwdz
@@ -66,40 +52,17 @@ subroutine turbo_statico(ktime,i_print, &
     real w1,w2,w3,w4,w5,w6
     real s1,s2,s3,s4,s5,s6
     real rho1,rho2,rho3,rho4,rho5,rho6
-    real,allocatable :: s1_loc(:),s2_loc(:),s3_loc(:)
-    real,allocatable :: s4_loc(:),s5_loc(:),s6_loc(:)
-    real,allocatable :: s1_tot(:),s2_tot(:),s3_tot(:)
-    real,allocatable :: s4_tot(:),s5_tot(:),s6_tot(:)
 
-    real,allocatable :: s1rho_loc(:),s2rho_loc(:),s3rho_loc(:)
-    real,allocatable :: s1rho_tot(:),s2rho_tot(:),s3rho_tot(:)
-
-    real,allocatable :: grg_loc(:)
-    real,allocatable :: grg_tot(:)
-
-    integer pp
     !
-    real tp,ti
-    double precision costante
+    real costante
     real lhor,lhorx,lhorz,lver
     real costanteV,costanteH
     !
-    integer iso,isotropo
-
     integer iii
     integer isc,cont
 
     real, allocatable :: P_akapt(:,:,:),P_akaptV(:,:,:)
-    !-----------------------------------------------------------------------
-    !     for debugging
-    lagr=1.
-    debugg = 200
-    if (ktime.eq.1) then
-        ttt = 0
-    end if
-    if (ktime.eq.2) then
-        ttt = 10000
-    end if
+
     !-----------------------------------------------------------------------
     ! velocity extrapolation on sides i=0 and i=jx+1
     !
@@ -292,46 +255,6 @@ subroutine turbo_statico(ktime,i_print, &
     ! tensor Sij, its module is needed to compute the eddy viscosity
     ! with Smagorinsky model
 
-    if(lagr .eq. 0) then
-        ! compute dissipative strain from Smagorinsky model, averaged on
-        ! horizontal plane
-        allocate(s1_loc(jy))
-        allocate(s2_loc(jy))
-        allocate(s3_loc(jy))
-        allocate(s4_loc(jy))
-        allocate(s5_loc(jy))
-        allocate(s6_loc(jy))
-        allocate(s1rho_loc(jy))
-        allocate(s2rho_loc(jy))
-        allocate(s3rho_loc(jy))
-
-        allocate(s1_tot(jy))
-        allocate(s2_tot(jy))
-        allocate(s3_tot(jy))
-        allocate(s4_tot(jy))
-        allocate(s5_tot(jy))
-        allocate(s6_tot(jy))
-        allocate(s1rho_tot(jy))
-        allocate(s2rho_tot(jy))
-        allocate(s3rho_tot(jy))
-
-        allocate(grg_loc(jy))
-        allocate(grg_tot(jy))
-        s1_loc=0.
-        s2_loc=0.
-        s3_loc=0.
-        s4_loc=0.
-        s5_loc=0.
-        s6_loc=0.
-
-        s1rho_loc=0.
-        s2rho_loc=0.
-        s3rho_loc=0.
-
-        grg_loc=0.
-    end if
-
-
     do k=kparasta,kparaend
         do j=1,jy
             do i=1,jx
@@ -462,24 +385,20 @@ subroutine turbo_statico(ktime,i_print, &
                 !-----------------------------------------------------------------------
                 ! for wall modeling, dudy and dwdy computation considering the coarse grid
 
-                !hicco mettere anche in funzione di coeff wall
-                do lll=1,att_wm_sgs
-                    if(j==1)then
-                        do iii=1,att_mod_par(i,1,k)
-                            dudy =(u_t(i,1,k)/(0.41*punto_wfp3(3,1,i,k))) &
-                                *u(i,j,k)/utangente(i,1,k)
-                            dwdy =(u_t(i,1,k)/(0.41*punto_wfp3(3,1,i,k))) &
-                                *w(i,j,k)/utangente(i,1,k)
-                        enddo
-                    elseif(j==jy) then
-                        do iii=1,att_mod_par(i,2,k)
-                            dudy =(u_t(i,2,k)/(0.41*punto_wfp4(3,1,i,k))) &
-                                *u(i,j,k)/utangente(i,2,k)
-                            dwdy =(u_t(i,2,k)/(0.41*punto_wfp4(3,1,i,k))) &
-                                *w(i,j,k)/utangente(i,2,k)
-                        enddo
+                ! chicco mettere anche in funzione di coeff wall
+                if (att_wm_sgs) then
+                    if (j==1) then
+                        if (att_mod_par(i,1,k)) then
+                            dudy =(u_t(i,1,k)/(0.41*wf_distance(i,k,1)))*u(i,j,k)/utangente(i,1,k)
+                            dwdy =(u_t(i,1,k)/(0.41*wf_distance(i,k,1)))*w(i,j,k)/utangente(i,1,k)
+                        end if
+                    else if(j==jy) then
+                        if (att_mod_par(i,2,k)) then
+                            dudy =(u_t(i,2,k)/(0.41*wf_distance(i,k,2)))*u(i,j,k)/utangente(i,2,k)
+                            dwdy =(u_t(i,2,k)/(0.41*wf_distance(i,k,2)))*w(i,j,k)/utangente(i,2,k)
+                        end if
                     endif
-                enddo
+                end if
                 !-----------------------------------------------------------------------
                 !
                 s1=dudx
@@ -503,88 +422,12 @@ subroutine turbo_statico(ktime,i_print, &
                 smodH(i,j,k)=sqrt(2.*s1*s1+ &
                     2.*s6*s6+ &
                     4.*s3*s3)
-                !
-                if(ktime.eq.i_print*(ktime/i_print)) then
-
-                    do pp=1,1-lagr
-                        !
-                        grg=cost*cost*giac(i,j,k)**(2./3.)*smod(i,j,k)
-
-                        s1=grg*s1
-                        s2=grg*s2
-                        s3=grg*s3
-                        s4=grg*s4
-                        s5=grg*s5
-                        s6=grg*s6
-
-
-                        s1_loc(j)=s1_loc(j)+s1
-                        s2_loc(j)=s2_loc(j)+s2
-                        s3_loc(j)=s3_loc(j)+s3
-                        s4_loc(j)=s4_loc(j)+s4
-                        s5_loc(j)=s5_loc(j)+s5
-                        s6_loc(j)=s6_loc(j)+s6
-
-                        s1rho_loc(j)=s1rho_loc(j)+0.5*grg*drhodx
-                        s2rho_loc(j)=s2rho_loc(j)+0.5*grg*drhody
-                        s3rho_loc(j)=s3rho_loc(j)+0.5*grg*drhodz
-
-                        grg_loc(j)=grg_loc(j)+grg
-                    end do
-                end if
 
             enddo
         enddo
     enddo
 
-    if(ktime.eq.i_print*(ktime/i_print)) then
-        do pp=1,1-lagr
-            call MPI_REDUCE(s1_loc(1),s1_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            call MPI_REDUCE(s2_loc(1),s2_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            call MPI_REDUCE(s3_loc(1),s3_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            call MPI_REDUCE(s4_loc(1),s4_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            call MPI_REDUCE(s5_loc(1),s5_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            call MPI_REDUCE(s6_loc(1),s6_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-
-            call MPI_REDUCE(s1rho_loc(1),s1rho_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            call MPI_REDUCE(s2rho_loc(1),s2rho_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            call MPI_REDUCE(s3rho_loc(1),s3rho_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            call MPI_REDUCE(grg_loc(1),grg_tot(1),jy,MPI_REAL_SD, &
-                MPI_SUM,0,MPI_COMM_WORLD,ierr)
-            if( myid.eq.0)then
-                s1_tot=s1_tot/(float(jx)*float(jz))
-                s2_tot=s2_tot/(float(jx)*float(jz))
-                s3_tot=s3_tot/(float(jx)*float(jz))
-                s4_tot=s4_tot/(float(jx)*float(jz))
-                s5_tot=s5_tot/(float(jx)*float(jz))
-                s6_tot=s6_tot/(float(jx)*float(jz))
-
-                s1rho_tot=s1rho_tot/(float(jx)*float(jz))
-                s2rho_tot=s2rho_tot/(float(jx)*float(jz))
-                s3rho_tot=s3rho_tot/(float(jx)*float(jz))
-
-                grg_tot=grg_tot/(float(jx)*float(jz))
-                do j=1,jy
-                    if(j==1)then
-                        grg_tot(1)=grg_tot(2)+((y(i,1,k)-y(i,2,k))/ &
-                            (y(i,3,k)-y(i,2,k))) &
-                            *(grg_tot(3)-grg_tot(2))
-                    end if
-                end do
-            end if
-        end do
-    end if !iprint
-6666 format(8e14.4)
-    !
+        !
     ! extrapolation on sides i=0 i=jx+1
     ! periodic/ not periodic
     do k=kparasta,kparaend
@@ -731,7 +574,7 @@ subroutine turbo_statico(ktime,i_print, &
     endif
 
 
-    if(isotropo == 1)then
+    if(isotropo)then
         !     isotropic model, one eddy viscosity
 
         costante = cost * cost
@@ -757,7 +600,7 @@ subroutine turbo_statico(ktime,i_print, &
     end if
 
 
-    if(isotropo == 0)then
+    if(.not.isotropo)then
         !     anisotropic model, two eddy viscosity
         costanteH = costH * costH
         costanteV = costV * costV
@@ -965,70 +808,42 @@ subroutine turbo_statico(ktime,i_print, &
     !
     !     annit
     if(leftpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(annit(0,0,kparasta),(jx+2)*(jy+2), &
-            MPI_REAL_SD,leftpem,tagls, &
-            MPI_COMM_WORLD,ierr)
-    !if(ierr == MPI_SUCCESS) print *, "va bene3", myid
+        call MPI_SEND(annit(0,0,kparasta),(jx+2)*(jy+2), &
+            MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
     endif
     if(rightpem /= MPI_PROC_NULL) then
         call MPI_RECV(annit(0,0,kparaend+1),(jx+2)*(jy+2), &
-            MPI_REAL_SD,rightpem,tagrr, &
-            MPI_COMM_WORLD,status,ierr)
-    !if(ierr == MPI_SUCCESS) print *, "va bene3", myid
+            MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
     endif
     if(rightpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(annit(0,0,kparaend),(jx+2)*(jy+2), &
-            MPI_REAL_SD,rightpem,tagrs, &
-            MPI_COMM_WORLD,ierr)
-    !if(ierr == MPI_SUCCESS) print *, "va bene3", myid
+        call MPI_SEND(annit(0,0,kparaend),(jx+2)*(jy+2), &
+            MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
     endif
     if(leftpem /= MPI_PROC_NULL) then
         call MPI_RECV(annit(0,0,kparasta-1),(jx+2)*(jy+2), &
-            MPI_REAL_SD,leftpem,taglr, &
-            MPI_COMM_WORLD,status,ierr)
-    !if(ierr == MPI_SUCCESS) print *, "va bene3", myid
+            MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
     endif
 
-    if(leftpem /= MPI_PROC_NULL) then
-    !      call MPI_WAIT(req1,istatus,ierr)
-    !      call MPI_WAIT(req4,istatus,ierr)
-    endif
-    if(rightpem /= MPI_PROC_NULL) then
-    !      call MPI_WAIT(req2,istatus,ierr)
-    !      call MPI_WAIT(req3,istatus,ierr)
-    endif
 
     !     annit and annitV
     if(leftpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(annitV(0,0,kparasta),(jx+2)*(jy+2), &
-            MPI_REAL_SD,leftpem,tagls, &
-            MPI_COMM_WORLD,ierr)
+        call MPI_SEND(annitV(0,0,kparasta),(jx+2)*(jy+2), &
+            MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
     endif
     if(rightpem /= MPI_PROC_NULL) then
         call MPI_RECV(annitV(0,0,kparaend+1),(jx+2)*(jy+2), &
-            MPI_REAL_SD,rightpem,tagrr, &
-            MPI_COMM_WORLD,status,ierr)
+            MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
     endif
     if(rightpem /= MPI_PROC_NULL) then
-        call MPI_SSEND(annitV(0,0,kparaend),(jx+2)*(jy+2), &
-            MPI_REAL_SD,rightpem,tagrs, &
-            MPI_COMM_WORLD,ierr)
+        call MPI_SEND(annitV(0,0,kparaend),(jx+2)*(jy+2), &
+            MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
     endif
     if(leftpem /= MPI_PROC_NULL) then
         call MPI_RECV(annitV(0,0,kparasta-1),(jx+2)*(jy+2), &
-            MPI_REAL_SD,leftpem,taglr, &
-            MPI_COMM_WORLD,status,ierr)
+            MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
     endif
 
-    if(leftpem /= MPI_PROC_NULL) then
-    !      call MPI_WAIT(req1,istatus,ierr)
-    !      call MPI_WAIT(req4,istatus,ierr)
-    endif
-    if(rightpem /= MPI_PROC_NULL) then
-    !      call MPI_WAIT(req2,istatus,ierr)
-    !      call MPI_WAIT(req3,istatus,ierr)
-    endif
-    !
+
     !-----------------------------------------------------------------------
     !
     !     annitV and akaptV vertical component
@@ -1051,65 +866,40 @@ subroutine turbo_statico(ktime,i_print, &
         end do
 
         if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(P_akapt(0,0,kparasta),(jx+2)*(jy+2), &
-                MPI_REAL_SD,leftpem,tagls, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_SEND(P_akapt(0,0,kparasta),(jx+2)*(jy+2), &
+                MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
         endif
         if(rightpem /= MPI_PROC_NULL) then
             call MPI_RECV(P_akapt(0,0,kparaend+1),(jx+2)*(jy+2), &
-                MPI_REAL_SD,rightpem,tagrr, &
-                MPI_COMM_WORLD,status,ierr)
+                MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
         endif
         if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(P_akapt(0,0,kparaend),(jx+2)*(jy+2), &
-                MPI_REAL_SD,rightpem,tagrs, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_SEND(P_akapt(0,0,kparaend),(jx+2)*(jy+2), &
+                MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
         endif
         if(leftpem /= MPI_PROC_NULL) then
             call MPI_RECV(P_akapt(0,0,kparasta-1),(jx+2)*(jy+2), &
-                MPI_REAL_SD,leftpem,taglr, &
-                MPI_COMM_WORLD,status,ierr)
-        endif
-
-        if(leftpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req1,istatus,ierr)
-        !      call MPI_WAIT(req4,istatus,ierr)
-        endif
-        if(rightpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req2,istatus,ierr)
-        !      call MPI_WAIT(req3,istatus,ierr)
+                MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
         endif
 
 
         if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(P_akaptV(0,0,kparasta),(jx+2)*(jy+2), &
-                MPI_REAL_SD,leftpem,tagls, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_SEND(P_akaptV(0,0,kparasta),(jx+2)*(jy+2), &
+                MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
         endif
         if(rightpem /= MPI_PROC_NULL) then
             call MPI_RECV(P_akaptV(0,0,kparaend+1),(jx+2)*(jy+2), &
-                MPI_REAL_SD,rightpem,tagrr, &
-                MPI_COMM_WORLD,status,ierr)
+                MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
         endif
         if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SSEND(P_akaptV(0,0,kparaend),(jx+2)*(jy+2), &
-                MPI_REAL_SD,rightpem,tagrs, &
-                MPI_COMM_WORLD,ierr)
+            call MPI_SEND(P_akaptV(0,0,kparaend),(jx+2)*(jy+2), &
+                MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
         endif
         if(leftpem /= MPI_PROC_NULL) then
             call MPI_RECV(P_akaptV(0,0,kparasta-1),(jx+2)*(jy+2), &
-                MPI_REAL_SD,leftpem,taglr, &
-                MPI_COMM_WORLD,status,ierr)
+                MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
         endif
 
-        if(leftpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req1,istatus,ierr)
-        !      call MPI_WAIT(req4,istatus,ierr)
-        endif
-        if(rightpem /= MPI_PROC_NULL) then
-        !      call MPI_WAIT(req2,istatus,ierr)
-        !      call MPI_WAIT(req3,istatus,ierr)
-        endif
 
         do k=kparasta-deepl,kparasta+deepr
             do j=0,n2+1
