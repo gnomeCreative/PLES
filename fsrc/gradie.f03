@@ -6,9 +6,9 @@ subroutine gradie()
    !
    use myarrays_metri3
    use myarrays_velo3, only: cgra1,cgra2,cgra3,fi,gra1,gra2,gra3
-   use mysending, only: kparasta,kparaend,myid
+   use mysending, only: myid
    !
-   use scala3, only: dt,jx,jy
+   use scala3, only: dt,n1,n2,kparasta,kparaend
    !
    use mpi
 
@@ -26,8 +26,8 @@ subroutine gradie()
 
    !     gradient for cartesian velocity
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
       
             coef = coef_dt/giac(i,j,k)
             !
@@ -58,14 +58,14 @@ subroutine gradie()
             !
             gra3(i,j,k)=coef*gra3(i,j,k)
          !
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     gradient for controvariant velocity
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=0,jx
+      do j=1,n2
+         do i=0,n1
             !
             cgra1(i,j,k)=g11(i,j,k)*(fi(i+1,j,k)-fi(i,j,k))+ &
                .25*g12(i,j,k)*(fi(i+1,j+1,k)+fi(i,j+1,k) &
@@ -73,13 +73,13 @@ subroutine gradie()
                .25*g13(i,j,k)*(fi(i+1,j,k+1)+fi(i,j,k+1) &
                -fi(i+1,j,k-1)-fi(i,j,k-1))
          !
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    do k=kparasta,kparaend
-      do j=0,jy
-         do i=1,jx
+      do j=0,n2
+         do i=1,n1
             !
             cgra2(i,j,k)=g22(i,j,k)*(fi(i,j+1,k)-fi(i,j,k))+ &
                .25*g21(i,j,k)*(fi(i+1,j+1,k)+fi(i+1,j,k) &
@@ -87,11 +87,11 @@ subroutine gradie()
                .25*g23(i,j,k)*(fi(i,j+1,k+1)+fi(i,j,k+1) &
                -fi(i,j+1,k-1)-fi(i,j,k-1))
          !
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
-   if (myid.eq.0) then
+   if (myid==0) then
       kparastal=0
       kparaendl=kparaend
    else
@@ -100,8 +100,8 @@ subroutine gradie()
    endif
 
    do k=kparastal,kparaendl
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             !
             cgra3(i,j,k)=g33(i,j,k)*(fi(i,j,k+1)-fi(i,j,k))+ &
                .25*g31(i,j,k)*(fi(i+1,j,k+1)+fi(i+1,j,k) &
@@ -109,9 +109,9 @@ subroutine gradie()
                .25*g32(i,j,k)*(fi(i,j+1,k+1)+fi(i,j+1,k) &
                -fi(i,j-1,k+1)-fi(i,j-1,k))
          !
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    return
 end subroutine gradie

@@ -1,6 +1,7 @@
 module filter_module
 
    use scala3
+   use mysending
    use period
    !
    use mpi
@@ -9,9 +10,7 @@ module filter_module
 
 contains
 
-!***********************************************************************
-subroutine filter01(pp0,pp2,myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine filter01(pp0,pp2)
    ! apply test filter on csi and eta
    !
 
@@ -19,8 +18,7 @@ subroutine filter01(pp0,pp2,myid,nproc,kparasta,kparaend)
    !
    !-----------------------------------------------------------------------
    !     array declaration
-   integer i,j,k,myid,nproc
-   integer kparasta,kparaend
+   integer i,j,k
    real pp0(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
    real pp1(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix filtered in csi
    real pp2(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix filtered in eta
@@ -29,43 +27,39 @@ subroutine filter01(pp0,pp2,myid,nproc,kparasta,kparaend)
    !     filter on csi
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp1(i,j,k)=.25*(pp0(i-1,j,k)+2.*pp0(i,j,k)+pp0(i+1,j,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity in eta (necessary for next filtering)
    !
    do k=kparasta,kparaend
-      do i=1,jx
-         pp1(i,0,k)=(1-jp)*pp1(i,jy,k) +  &
-            jp*(2.*pp1(i,1,k)-pp1(i,2,k))
-         pp1(i,jy+1,k)=(1-jp)*pp1(i,1,k) + &
-            jp*(2.*pp1(i,jy,k)-pp1(i,jy-1,k))
-      enddo
-   enddo
+      do i=1,n1
+         pp1(i,0,k)=2.*pp1(i,1,k)-pp1(i,2,k)
+         pp1(i,n2+1,k)=2.*pp1(i,n2,k)-pp1(i,n2-1,k)
+      end do
+   end do
 
    !
    !     filter on eta
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp2(i,j,k)=.25*(pp1(i,j-1,k)+2.*pp1(i,j,k)+pp1(i,j+1,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity and filtering on zita will done later in a second step
    !
    return
 end
 
-!***********************************************************************
-subroutine filter01np(myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine filter01np()
    ! apply test filter on csi and eta
    use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3, rbuff1, sbuff1
    !
@@ -73,8 +67,7 @@ subroutine filter01np(myid,nproc,kparasta,kparaend)
 
    !-----------------------------------------------------------------------
    !     array declaration
-   integer i,j,k,myid,nproc
-   integer kparasta,kparaend
+   integer i,j,k
    !      pp0 matrix to filter
    !      pp1 matrix filtered on csi
    !      pp2 matrix filtered on eta
@@ -83,54 +76,44 @@ subroutine filter01np(myid,nproc,kparasta,kparaend)
    !     filter on csi
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp1(i,j,k)=.25*(pp0(i-1,j,k)+2.*pp0(i,j,k)+pp0(i+1,j,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity on eta (necessary for next filtering)
    !
    do k=kparasta,kparaend
-      do i=1,jx
-         pp1(i,0,k)=(1-jp)*pp1(i,jy,k) +  &
-            jp*(2.*pp1(i,1,k)-pp1(i,2,k))
-         pp1(i,jy+1,k)=(1-jp)*pp1(i,1,k) + &
-            jp*(2.*pp1(i,jy,k)-pp1(i,jy-1,k))
-      enddo
-   enddo
+      do i=1,n1
+         pp1(i,0,k)=2.*pp1(i,1,k)-pp1(i,2,k)
+         pp1(i,n2+1,k)=2.*pp1(i,n2,k)-pp1(i,n2-1,k)
+      end do
+   end do
    !
    !     filter on eta
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp2(i,j,k)=.25*(pp1(i,j-1,k)+2.*pp1(i,j,k)+pp1(i,j+1,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity and filtering on zita is done in a next step
    !
    return
 end
 
-!***********************************************************************
-subroutine filter02(p0a,p0b,pp2,myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine filter02(p0a,p0b,pp2)
    ! apply test filter in csi and eta on a product
    !
-   use scala3
-   use period
-   !
-   use mpi
-
    implicit none
    !
    !-----------------------------------------------------------------------
    integer i,j,k
-   integer kparasta,kparaend,myid,nproc
 
    real p0a(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
    real p0b(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
@@ -141,45 +124,39 @@ subroutine filter02(p0a,p0b,pp2,myid,nproc,kparasta,kparaend)
    !     filter on csi
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
-            pp1(i,j,k)=.25*(p0a(i-1,j,k)*p0b(i-1,j,k)+ &
-               2.*p0a(i,j,k)*p0b(i,j,k)+ &
-               p0a(i+1,j,k)*p0b(i+1,j,k))
-         enddo
-      enddo     
-   enddo
+      do j=1,n2
+         do i=1,n1
+            pp1(i,j,k)=.25*(p0a(i-1,j,k)*p0b(i-1,j,k)+ 2.*p0a(i,j,k)*p0b(i,j,k)+ p0a(i+1,j,k)*p0b(i+1,j,k))
+         end do
+      end do
+   end do
    !
    !     periodicity on eta (necessary for next filtering)
    !
    do k=kparasta,kparaend
-      do i=1,jx
-         pp1(i,0,k)=(1-jp)*pp1(i,jy,k) +  &
-            jp*(2.*pp1(i,1,k)-pp1(i,2,k))
-         pp1(i,jy+1,k)=(1-jp)*pp1(i,1,k) + &
-            jp*(2.*pp1(i,jy,k)-pp1(i,jy-1,k))
-      enddo
-   enddo
+      do i=1,n1
+         pp1(i,0,k)=2.*pp1(i,1,k)-pp1(i,2,k)
+         pp1(i,n2+1,k)=2.*pp1(i,n2,k)-pp1(i,n2-1,k)
+      end do
+   end do
 
    !
    !     filter on eta
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp2(i,j,k)=.25*(pp1(i,j-1,k)+2.*pp1(i,j,k)+pp1(i,j+1,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity and filtering on zita is done in a next step
    !
    return
 end
 
-!***********************************************************************
-subroutine filter02np(myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine filter02np()
    ! apply test filter in csi and eta for a product
    !
    use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3, rbuff1, sbuff1
@@ -188,7 +165,6 @@ subroutine filter02np(myid,nproc,kparasta,kparaend)
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,k
-   integer kparasta,kparaend,myid,nproc
    !     p0a  matrix to filter
    !     p0b  matrix to filter
    !     pp1  product matrix filtered in csi
@@ -198,53 +174,46 @@ subroutine filter02np(myid,nproc,kparasta,kparaend)
    !     filter on csi
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
-            pp1(i,j,k)=.25*(p0a(i-1,j,k)*p0b(i-1,j,k)+ &
-               2.*p0a(i,j,k)*p0b(i,j,k)+ &
-               p0a(i+1,j,k)*p0b(i+1,j,k))
-         enddo
-      enddo
-   enddo
+      do j=1,n2
+         do i=1,n1
+            pp1(i,j,k)=.25*(p0a(i-1,j,k)*p0b(i-1,j,k)+ 2.*p0a(i,j,k)*p0b(i,j,k)+ p0a(i+1,j,k)*p0b(i+1,j,k))
+         end do
+      end do
+   end do
    !
    !     periodicity in eta (necessay for next filtering)
    !
    do k=kparasta,kparaend
-      do i=1,jx
-         pp1(i,0,k)=(1-jp)*pp1(i,jy,k) +  &
-            jp*(2.*pp1(i,1,k)-pp1(i,2,k))
-         pp1(i,jy+1,k)=(1-jp)*pp1(i,1,k) + &
-            jp*(2.*pp1(i,jy,k)-pp1(i,jy-1,k))
-      enddo
-   enddo
+      do i=1,n1
+         pp1(i,0,k)=2.*pp1(i,1,k)-pp1(i,2,k)
+         pp1(i,n2+1,k)=2.*pp1(i,n2,k)-pp1(i,n2-1,k)
+      end do
+   end do
 
    !
    !     filter on eta
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp2(i,j,k)=.25*(pp1(i,j-1,k)+2.*pp1(i,j,k)+pp1(i,j+1,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity and filtering in zita is done in a next step
    !
    return
 end
 
-!***********************************************************************
-subroutine filter03(pp2,pp3,kparasta,kparaend,myid,nproc)
-   !***********************************************************************
+subroutine filter03(pp2,pp3)
    !     apply test filter on zita
    !
    implicit none
 
    !-----------------------------------------------------------------------
    !     array declaration
-   integer i,j,k,myid,nproc
-   integer kparasta,kparaend
+   integer i,j,k
 
    real pp2(0:n1+1,0:n2+1,kparasta-1:kparaend+1) !matrix to filter
    real pp3(0:n1+1,0:n2+1,kparasta-1:kparaend+1) !matrix filtered
@@ -254,42 +223,39 @@ subroutine filter03(pp2,pp3,kparasta,kparaend,myid,nproc)
    !     already done passing ghost plane
    !
    if((kp.eq.1).and.(myid.eq.0))then
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp2(i,j,0)=2.*pp2(i,j,1)-pp2(i,j,2)
-         enddo
-      enddo
+         end do
+      end do
    else if((kp.eq.1).and.(myid.eq.nproc-1))then
-      do j=1,jy
-         do i=1,jx
-            pp2(i,j,jz+1)=2.*pp2(i,j,jz)-pp2(i,j,jz-1)
-         enddo
-      enddo
+      do j=1,n2
+         do i=1,n1
+            pp2(i,j,n3+1)=2.*pp2(i,j,n3)-pp2(i,j,n3-1)
+         end do
+      end do
    endif
    !
    !     filter on zita
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp3(i,j,k)=.25*(pp2(i,j,k-1)+2.*pp2(i,j,k)+pp2(i,j,k+1))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    return
 end
 
-!***********************************************************************
-subroutine filter04b(pp0,pp2,myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine filter04b(pp0,pp2)
    !     apply test filter on csi and eta
    !
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,k
-   integer kparasta,kparaend,myid,nproc
 
    real pp0(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
    real pp1(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix filtered on csi
@@ -299,51 +265,45 @@ subroutine filter04b(pp0,pp2,myid,nproc,kparasta,kparaend)
    !     filtered on csi
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp1(i,j,k)=.125*(pp0(i-1,j,k)+6.*pp0(i,j,k)+pp0(i+1,j,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity in eta (necessary for next filtering)
    !
    do k=kparasta,kparaend
-      do i=1,jx
-         pp1(i,0,k)=(1-jp)*pp1(i,jy,k) +  &
-            jp*(2.*pp1(i,1,k)-pp1(i,2,k))
-         pp1(i,jy+1,k)=(1-jp)*pp1(i,1,k) + &
-            jp*(2.*pp1(i,jy,k)-pp1(i,jy-1,k))
-      enddo
-   enddo
+      do i=1,n1
+         pp1(i,0,k)=2.*pp1(i,1,k)-pp1(i,2,k)
+         pp1(i,n2+1,k)=2.*pp1(i,n2,k)-pp1(i,n2-1,k)
+      end do
+   end do
    !
    !     filter on eta
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp2(i,j,k)=.125*(pp1(i,j-1,k)+6.*pp1(i,j,k)+pp1(i,j+1,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity and filter in zita are done in a next step
    !
    return
 end
 
-!***********************************************************************
-subroutine filter04g(pp0g,pp2g,kparasta,kparaend,myid,nproc)
-   !***********************************************************************
+subroutine filter04g(pp0g,pp2g)
    ! apply test filter on csi and eta
    !
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,k
-   integer kparasta,kparaend
    integer kparastal,kparaendl
-   integer myid,nproc
 
    real pp0g(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
    real pp1g(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix filtered on csi
@@ -353,38 +313,35 @@ subroutine filter04g(pp0g,pp2g,kparasta,kparaend,myid,nproc)
    !     filter on csi
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp1g(i,j,k)=.125*(pp0g(i-1,j,k)+6.*pp0g(i,j,k)+pp0g(i+1,j,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    do k=kparasta,kparaend
-      do j=1+jp,jy-jp
-         do i=1+ip,jx-ip
+      do j=2,n2-1
+         do i=1+ip,n1-ip
             pp2g(i,j,k)=.125*(pp1g(i,j-1,k)+6.*pp1g(i,j,k)+pp1g(i,j+1,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicty and filtering in zita are done in a next step
    !
    return
 end
 
-!***********************************************************************
-subroutine filter05g(p0ag,p0bg,pp2g,kparasta,kparaend,myid,nproc)
-   !***********************************************************************
+subroutine filter05g(p0ag,p0bg,pp2g)
    ! apply test filter on csi and eta for a product
    !
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,k
-   integer kparasta,kparaend
    integer kparastal,kparaendl
-   integer myid,nproc
+
    real p0ag(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
    real p0bg(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
    real pp1g(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !product matrix filtered on csi
@@ -394,14 +351,12 @@ subroutine filter05g(p0ag,p0bg,pp2g,kparasta,kparaend,myid,nproc)
    !     filter on csi
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
-            pp1g(i,j,k)=.125*(p0ag(i-1,j,k)*p0bg(i-1,j,k)+ &
-               6.*p0ag(i,j,k)*p0bg(i,j,k)+ &
-               p0ag(i+1,j,k)*p0bg(i+1,j,k))
-         enddo
-      enddo
-   enddo
+      do j=1,n2
+         do i=1,n1
+            pp1g(i,j,k)=.125*(p0ag(i-1,j,k)*p0bg(i-1,j,k)+ 6.*p0ag(i,j,k)*p0bg(i,j,k)+ p0ag(i+1,j,k)*p0bg(i+1,j,k))
+         end do
+      end do
+   end do
    !
    !     next filter is not computed at the border
    !     so no periodicity applied
@@ -410,27 +365,24 @@ subroutine filter05g(p0ag,p0bg,pp2g,kparasta,kparaend,myid,nproc)
    !     filter on eta
    !
    do k=kparasta,kparaend
-      do j=1+jp,jy-jp
-         do i=1+ip,jx-ip
+      do j=2,n2-1
+         do i=1+ip,n1-ip
             pp2g(i,j,k)=.125*(pp1g(i,j-1,k)+6.*pp1g(i,j,k)+pp1g(i,j+1,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     periodicity and filtering on zita are done in a next step
    !
    return
 end
 
-!***********************************************************************
-subroutine filter06(pp2,pp3,kparasta,kparaend,myid,nproc)
-   !***********************************************************************
+subroutine filter06(pp2,pp3)
    ! apply test filter on zita
    !
    implicit none
    !-----------------------------------------------------------------------
-   integer i,j,k,myid,nproc
-   integer kparasta,kparaend
+   integer i,j,k
    integer kparastal,kparaendl
 
    real pp2(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
@@ -454,27 +406,24 @@ subroutine filter06(pp2,pp3,kparasta,kparaend,myid,nproc)
    endif
    !
    do k=kparastal,kparaendl
-      do j=1+jp,jy-jp
-         do i=1+ip,jx-ip
+      do j=2,n2-1
+         do i=1+ip,n1-ip
             pp3(i,j,k)=.125*(pp2(i,j,k-1)+6.*pp2(i,j,k)+pp2(i,j,k+1))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    return
 end
 
-!***********************************************************************
-subroutine filter06b(pp2,pp3,kparasta,kparaend,myid,nproc)
-   !***********************************************************************
+subroutine filter06b(pp2,pp3)
    ! apply test filter on zita
    !
 
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
-   integer i,j,k,myid,nproc
-   integer kparasta,kparaend
+   integer i,j,k
 
    real pp2(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   ! matrix to filter
    real pp3(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   ! matrix filtered on zita
@@ -483,44 +432,40 @@ subroutine filter06b(pp2,pp3,kparasta,kparaend,myid,nproc)
    ! passing ghost plane
    !
    if((kp.eq.1).and.(myid.eq.0))then
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp2(i,j,0)=2.*pp2(i,j,1)-pp2(i,j,2)
-         enddo
-      enddo
+         end do
+      end do
    else if((kp.eq.1).and.(myid.eq.nproc-1))then
-      do j=1,jy
-         do i=1,jx
-            pp2(i,j,jz+1)=2.*pp2(i,j,jz)-pp2(i,j,jz-1)
-         enddo
-      enddo
+      do j=1,n2
+         do i=1,n1
+            pp2(i,j,n3+1)=2.*pp2(i,j,n3)-pp2(i,j,n3-1)
+         end do
+      end do
    endif
    !
    !     filter on zita
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp3(i,j,k)=.125*(pp2(i,j,k-1)+6.*pp2(i,j,k)+pp2(i,j,k+1))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    return
 end
 
-!***********************************************************************
-subroutine filterb_csieta(pp0g,pp2g,kparasta,kparaend,myid,nproc)
-   !***********************************************************************
+subroutine filterb_csieta(pp0g,pp2g)
    ! apply test filter for scale similar model on csi and eta
    ! filtering coefficent 1/8 3/4 1/8
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,k
-   integer kparasta,kparaend
    integer kparastal,kparaendl
-   integer myid,nproc
    !
    real pp0g(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
    real pp1g(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix filtered on csi
@@ -530,29 +475,27 @@ subroutine filterb_csieta(pp0g,pp2g,kparasta,kparaend,myid,nproc)
    !     filter on csi
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp1g(i,j,k)=.125*(pp0g(i-1,j,k)+6.*pp0g(i,j,k)+pp0g(i+1,j,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp2g(i,j,k)=.125*(pp1g(i,j-1,k)+6.*pp1g(i,j,k)+pp1g(i,j+1,k))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    !     filtering on zita is done in a next step
    !
    return
 end
 
-!***********************************************************************
-subroutine filterb_zita(pp2,pp3,kparasta,kparaend,myid,nproc)
-   !***********************************************************************
+subroutine filterb_zita(pp2,pp3)
    ! apply test filter on zita for scale similar model
    ! filtering coefficent 1/8, 6/8, 1/8
    !
@@ -560,7 +503,6 @@ subroutine filterb_zita(pp2,pp3,kparasta,kparaend,myid,nproc)
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,k,myid,nproc
-   integer kparasta,kparaend
    integer kparastal,kparaendl
 
    real pp2(0:n1+1,0:n2+1,kparasta-1:kparaend+1)   !matrix to filter
@@ -568,46 +510,41 @@ subroutine filterb_zita(pp2,pp3,kparasta,kparaend,myid,nproc)
    !-----------------------------------------------------------------------
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             pp3(i,j,k)=.125*(pp2(i,j,k-1)+6.*pp2(i,j,k)+pp2(i,j,k+1))
-         enddo
-      enddo
-   enddo
+         end do
+      end do
+   end do
    !
    return
 end
 
 ! BUFFERS ------------------------------------------------------------------
 
-!***********************************************************************
-subroutine buffer1d_par(sbuff,var,n,kest,kparasta,kparaend)
-   !***********************************************************************
+subroutine buffer1d_par(sbuff,var,n,kest)
    ! update vector sbuff to exchange variable
    !
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
-   integer kparasta,kparaend
    real var(0:n1+1,0:n2+1,kparasta-1:kparaend+1) !0:n3+1)
    real sbuff((n1+2)*(n2+2)*40)
    integer i,j,n,kest,m
    !-----------------------------------------------------------------------
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
 
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          sbuff(m)=var(i,j,kest)
 
-      enddo
-   enddo
+      end do
+   end do
    !
    return
 end
 
-!***********************************************************************
-subroutine buffer1g(var,n,kest,myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine buffer1g(var,n,kest)
    ! update sbuff vector for sending variables
    !
    !use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3,
@@ -617,28 +554,25 @@ subroutine buffer1g(var,n,kest,myid,nproc,kparasta,kparaend)
 
    !-----------------------------------------------------------------------
    !     array declaration
-   integer myid,nproc,kparasta,kparaend
-   real var(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
-   integer i,j,n,kest,m
+   real,intent(in) :: var(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+   integer,intent(in) :: n,kest
+   integer i,j,m
    !-----------------------------------------------------------------------
    !
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
          !
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          sbuff1(m)=var(i,j,kest)
       !
-      enddo
-   enddo
+      end do
+   end do
    !
    return
 end
 
-!***********************************************************************
 subroutine buffer1old_par_nscal(sbuff,var,n,kest,isc)
-   !***********************************************************************
    ! update sbuff vector to send variables
-   use mysending
 
    implicit none
    !-----------------------------------------------------------------------
@@ -648,25 +582,20 @@ subroutine buffer1old_par_nscal(sbuff,var,n,kest,isc)
    integer i,j,n,kest,m,isc
    !-----------------------------------------------------------------------
    !
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
          !
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          sbuff(m)=var(isc,i,j,kest)
       !
-      enddo
-   enddo
+      end do
+   end do
    !
    return
 end
 
-
-!***********************************************************************
 subroutine buffer1old_par(sbuff,var,n,kest)
-   !***********************************************************************
    ! update sbuff vector to send variables
-   use mysending
-
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
@@ -675,21 +604,19 @@ subroutine buffer1old_par(sbuff,var,n,kest)
    integer i,j,n,kest,m
    !-----------------------------------------------------------------------
    !
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
          !
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          sbuff(m)=var(i,j,kest)
       !
-      enddo
-   enddo
+      end do
+   end do
    !
    return
 end
 
-!***********************************************************************
-subroutine buffer2(rbuff,var,n,kest,myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine buffer2(rbuff,var,n,kest)
    !     put data from buff in the variable
 
    implicit none
@@ -697,28 +624,25 @@ subroutine buffer2(rbuff,var,n,kest,myid,nproc,kparasta,kparaend)
 
    !-----------------------------------------------------------------------
    !     array declaration
-   integer myid,nproc,kparasta,kparaend
    integer i,j,n,kest,m
 
    real var(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
    real rbuff((n1+2)*(n2+2)*40)
    !-----------------------------------------------------------------------
    !
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
          !
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          var(i,j,kest)=rbuff(m)
       !
-      enddo
-   enddo
+      end do
+   end do
    !
    return
 end
 
-!***********************************************************************
 subroutine buffer2d_par(rbuff,var,n,kest)
-   !***********************************************************************
    !     put buff vector in the variable
    !
    implicit none
@@ -728,21 +652,19 @@ subroutine buffer2d_par(rbuff,var,n,kest)
    real var(0:n1+1,0:n2+1,kest:kest) !0:n3+1)
    real rbuff((n1+2)*(n2+2)*40)
    !-----------------------------------------------------------------------
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
 
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          var(i,j,kest)=rbuff(m)
 
-      enddo
-   enddo
+      end do
+   end do
    !
    return
 end
 
-!**********************************************************************
-subroutine buffer2g(rbuff,var,n,myid,nproc,kparasta,kparaend)
-   !**********************************************************************
+subroutine buffer2g(rbuff,var,n)
    !     put data from buff to the variable
    !
    use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3, rbuff1, sbuff1
@@ -751,16 +673,15 @@ subroutine buffer2g(rbuff,var,n,myid,nproc,kparasta,kparaend)
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
-   integer myid,nproc,kparasta,kparaend
    integer i,j,n,m
    real var(0:n1+1,0:n2+1)
    real rbuff((n1+2)*(n2+2)*40)
    !-----------------------------------------------------------------------
    !
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
          !
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          var(i,j)=rbuff(m)
       !
       end do
@@ -769,9 +690,7 @@ subroutine buffer2g(rbuff,var,n,myid,nproc,kparasta,kparaend)
    return
 end
 
-!***********************************************************************
-subroutine buffer2gg(var,n,myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine buffer2gg(var,n)
    ! put the variables from the reciving buff in the variables
 
    use turbo_module, only: p0a, p0b, pp0, pp1, pp2, pp3, rbuff1, sbuff1
@@ -779,15 +698,14 @@ subroutine buffer2gg(var,n,myid,nproc,kparasta,kparaend)
    implicit none
    !-----------------------------------------------------------------------
    !     array declaration
-   integer myid,nproc,kparasta,kparaend
    integer i,j,n,m
    real var(0:n1+1,0:n2+1)
    !-----------------------------------------------------------------------
 
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
          !
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          var(i,j)=rbuff1(m)
       !
       end do
@@ -796,12 +714,8 @@ subroutine buffer2gg(var,n,myid,nproc,kparasta,kparaend)
    return
 end
 
-!***********************************************************************
 subroutine buffer2old_par_nscal(rbuff,var,n,kest,isc)
-   !***********************************************************************
    ! put the reciving buff vector in the variables
-
-   use mysending
 
    implicit none
    !----------------------------------------------------------------------
@@ -810,25 +724,20 @@ subroutine buffer2old_par_nscal(rbuff,var,n,kest,isc)
    real rbuff((n1+2)*(n2+2)*40)
    integer i,j,n,kest,m,isc
    !-----------------------------------------------------------------------
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
          !
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          var(isc,i,j,kest) = rbuff(m)
       !
-      enddo
-   enddo
+      end do
+   end do
    !
    return
 end
 
-!***********************************************************************
 subroutine buffer2old_par(rbuff,var,n,kest)
-   !***********************************************************************
    ! put the reciving buff vector in the variables
-
-   use mysending
-
    implicit none
    !----------------------------------------------------------------------
    !     array declaration
@@ -836,21 +745,19 @@ subroutine buffer2old_par(rbuff,var,n,kest)
    real rbuff((n1+2)*(n2+2)*40)
    integer i,j,n,kest,m
    !-----------------------------------------------------------------------
-   do j=0,jy+1
-      do i=0,jx+1
+   do j=0,n2+1
+      do i=0,n1+1
          !
-         m=(n-1)*(jx+2)*(jy+2)+i+1+(jx+2)*j
+         m=(n-1)*(n1+2)*(n2+2)+i+1+(n1+2)*j
          var(i,j,kest) = rbuff(m)
       !
-      enddo
-   enddo
+      end do
+   end do
    !
    return
 end
 
-!**********************************************************************
 subroutine buffvect1d(sbuff,var,n)
-   !**********************************************************************
    !
    ! aggiorna il vettore sbuffd per lo scambio di variabili
    implicit none
@@ -859,23 +766,19 @@ subroutine buffvect1d(sbuff,var,n)
    real sbuff((n1+2)*(n2+2)*40)
    integer j,n,m
 
-   do j=1,jy
+   do j=1,n2
 
-      m=(n-1)*jy+j
+      m=(n-1)*n2+j
       sbuff(m)=var(j)
 
-   enddo
+   end do
    !
    return
 end
 
-!**********************************************************************
 subroutine buffvect2d(rbuff,var,n)
-   !**********************************************************************
    !
    ! aggiorna il vettore rbuffd per lo scambio di variabili
-
-   use scala3
 
    implicit none
    !
@@ -883,12 +786,12 @@ subroutine buffvect2d(rbuff,var,n)
    real rbuff((n1+2)*(n2+2)*40)
    integer j,n,m
 
-   do j=1,jy
+   do j=1,n2
 
-      m=(n-1)*jy+j
+      m=(n-1)*n2+j
       var(j)=rbuff(m)
 
-   enddo
+   end do
    !
    return
 end

@@ -1,9 +1,8 @@
-!***********************************************************************
-subroutine inverse_para2(myid,nproc,kparasta,kparaend)
-   !***********************************************************************
+subroutine inverse_para2()
    ! find the component starting from controvariant
    !
    use turbo_module
+   use mysending
    !
    use scala3
    !
@@ -14,14 +13,13 @@ subroutine inverse_para2(myid,nproc,kparasta,kparaend)
    !-----------------------------------------------------------------------
    !     array declaration
    integer i,j,k
-   integer kparasta,kparaend,myid,nproc
 
    real den
    !-----------------------------------------------------------------------
    !
    do k=kparasta,kparaend
-      do j=1,jy    
-         do i=1,jx
+      do j=1,n2    
+         do i=1,n1
             !
             den=ap11(i,j,k)*ap22(i,j,k)*ap33(i,j,k)+ &
                ap12(i,j,k)*ap23(i,j,k)*ap31(i,j,k)+ &

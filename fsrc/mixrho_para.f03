@@ -39,19 +39,19 @@ subroutine mixrho_para(rho)
 
    debugg = 0
    !
-   aden=float(jx)*float(jz)
+   aden=float(n1)*float(n3)
 
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=0,jx
+      do j=1,n2
+         do i=0,n1
             cgra1(i,j,k)=0.
          enddo
       enddo
    enddo
    !
    do k=kparasta,kparaend
-      do j=0,jy
-         do i=1,jx
+      do j=0,n2
+         do i=1,n1
             cgra2(i,j,k)=0.
          enddo
       enddo
@@ -64,8 +64,8 @@ subroutine mixrho_para(rho)
    endif
 
    do k=kparastal,kparaend
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             cgra3(i,j,k)=0.
          enddo
       enddo
@@ -78,8 +78,8 @@ subroutine mixrho_para(rho)
    if (inmodrho) then
 
       do k=kparasta,kparaend
-         do j=1,jy
-            do i=1,jx
+         do j=1,n2
+            do i=1,n1
 
                apcsx(i,j,k)=0.5*(csx(i,j,k)+csx(i-1,j,k))
                apcsy(i,j,k)=0.5*(csy(i,j,k)+csy(i-1,j,k))
@@ -95,17 +95,11 @@ subroutine mixrho_para(rho)
                !
                ! compute controvariant component at the centroid
                !
-               uco(i,j,k)= apcsx(i,j,k)*u(i,j,k)+ &
-                  apcsy(i,j,k)*v(i,j,k)+ &
-                  apcsz(i,j,k)*w(i,j,k)
+               uco(i,j,k)= apcsx(i,j,k)*u(i,j,k)+apcsy(i,j,k)*v(i,j,k)+apcsz(i,j,k)*w(i,j,k)
                !
-               vco(i,j,k)= apetx(i,j,k)*u(i,j,k)+ &
-                  apety(i,j,k)*v(i,j,k)+ &
-                  apetz(i,j,k)*w(i,j,k)
+               vco(i,j,k)= apetx(i,j,k)*u(i,j,k)+apety(i,j,k)*v(i,j,k)+apetz(i,j,k)*w(i,j,k)
                !
-               wco(i,j,k)= apztx(i,j,k)*u(i,j,k)+ &
-                  apzty(i,j,k)*v(i,j,k)+ &
-                  apztz(i,j,k)*w(i,j,k)
+               wco(i,j,k)= apztx(i,j,k)*u(i,j,k)+apzty(i,j,k)*v(i,j,k)+apztz(i,j,k)*w(i,j,k)
                !
                ! compute rhoU rhoV rhoW
                ! and rho, to filter
@@ -125,78 +119,46 @@ subroutine mixrho_para(rho)
       ! extrapolation for velocity on side i=0 and i=jx+1
       !
       do k=kparasta,kparaend
-         do j=1,jy
+         do j=1,n2
 
-            uco(0,j,k)=(1-ip)*uco(jx,j,k) + &
-               ip*(2.*uco(1,j,k)-uco(2,j,k))
-            vco(0,j,k)=(1-ip)*vco(jx,j,k) + &
-               ip*(2.*vco(1,j,k)-vco(2,j,k))
-            wco(0,j,k)=(1-ip)*wco(jx,j,k) + &
-               ip*(2.*wco(1,j,k)-wco(2,j,k))
+            uco(0,j,k)=(1-ip)*uco(n1,j,k) +ip*(2.*uco(1,j,k)-uco(2,j,k))
+            vco(0,j,k)=(1-ip)*vco(n1,j,k) +ip*(2.*vco(1,j,k)-vco(2,j,k))
+            wco(0,j,k)=(1-ip)*wco(n1,j,k) +ip*(2.*wco(1,j,k)-wco(2,j,k))
             !
-            uuco(0,j,k)=(1-ip)*uuco(jx,j,k) + &
-               ip*(2.*uuco(1,j,k)-uuco(2,j,k))
-            vvco(0,j,k)=(1-ip)*vvco(jx,j,k) + &
-               ip*(2.*vvco(1,j,k)-vvco(2,j,k))
-            wwco(0,j,k)=(1-ip)*wwco(jx,j,k) + &
-               ip*(2.*wwco(1,j,k)-wwco(2,j,k))
-            rhofl(0,j,k)=(1-ip)*rhofl(jx,j,k) + &
-               ip*(2.*rhofl(1,j,k)-rhofl(2,j,k))
+            uuco(0,j,k)=(1-ip)*uuco(n1,j,k) +ip*(2.*uuco(1,j,k)-uuco(2,j,k))
+            vvco(0,j,k)=(1-ip)*vvco(n1,j,k) +ip*(2.*vvco(1,j,k)-vvco(2,j,k))
+            wwco(0,j,k)=(1-ip)*wwco(n1,j,k) +ip*(2.*wwco(1,j,k)-wwco(2,j,k))
+            rhofl(0,j,k)=(1-ip)*rhofl(n1,j,k) +ip*(2.*rhofl(1,j,k)-rhofl(2,j,k))
             !
-            apcsx(0,j,k)=(1-ip)*apcsx(jx,j,k) + &
-               ip*(2.*apcsx(1,j,k)-apcsx(2,j,k))
-            apcsy(0,j,k)=(1-ip)*apcsy(jx,j,k) + &
-               ip*(2.*apcsy(1,j,k)-apcsy(2,j,k))
-            apcsz(0,j,k)=(1-ip)*apcsz(jx,j,k) + &
-               ip*(2.*apcsz(1,j,k)-apcsz(2,j,k))
-            apetx(0,j,k)=(1-ip)*apetx(jx,j,k) + &
-               ip*(2.*apetx(1,j,k)-apetx(2,j,k))
-            apety(0,j,k)=(1-ip)*apety(jx,j,k) + &
-               ip*(2.*apety(1,j,k)-apety(2,j,k))
-            apetz(0,j,k)=(1-ip)*apetz(jx,j,k) + &
-               ip*(2.*apetz(1,j,k)-apetz(2,j,k))
-            apztx(0,j,k)=(1-ip)*apztx(jx,j,k) + &
-               ip*(2.*apztx(1,j,k)-apztx(2,j,k))
-            apzty(0,j,k)=(1-ip)*apzty(jx,j,k) + &
-               ip*(2.*apzty(1,j,k)-apzty(2,j,k))
-            apztz(0,j,k)=(1-ip)*apztz(jx,j,k) + &
-               ip*(2.*apztz(1,j,k)-apztz(2,j,k))
+            apcsx(0,j,k)=(1-ip)*apcsx(n1,j,k) +ip*(2.*apcsx(1,j,k)-apcsx(2,j,k))
+            apcsy(0,j,k)=(1-ip)*apcsy(n1,j,k) +ip*(2.*apcsy(1,j,k)-apcsy(2,j,k))
+            apcsz(0,j,k)=(1-ip)*apcsz(n1,j,k) +ip*(2.*apcsz(1,j,k)-apcsz(2,j,k))
+            apetx(0,j,k)=(1-ip)*apetx(n1,j,k) +ip*(2.*apetx(1,j,k)-apetx(2,j,k))
+            apety(0,j,k)=(1-ip)*apety(n1,j,k) +ip*(2.*apety(1,j,k)-apety(2,j,k))
+            apetz(0,j,k)=(1-ip)*apetz(n1,j,k) +ip*(2.*apetz(1,j,k)-apetz(2,j,k))
+            apztx(0,j,k)=(1-ip)*apztx(n1,j,k) +ip*(2.*apztx(1,j,k)-apztx(2,j,k))
+            apzty(0,j,k)=(1-ip)*apzty(n1,j,k) +ip*(2.*apzty(1,j,k)-apzty(2,j,k))
+            apztz(0,j,k)=(1-ip)*apztz(n1,j,k) +ip*(2.*apztz(1,j,k)-apztz(2,j,k))
             !
             !
-            apcsx(jx+1,j,k)=(1-ip)*apcsx(1,j,k) + &
-               ip*(2.*apcsx(jx,j,k)-apcsx(jx-1,j,k))
-            apcsy(jx+1,j,k)=(1-ip)*apcsy(1,j,k) + &
-               ip*(2.*apcsy(jx,j,k)-apcsy(jx-1,j,k))
-            apcsz(jx+1,j,k)=(1-ip)*apcsz(1,j,k) + &
-               ip*(2.*apcsz(jx,j,k)-apcsz(jx-1,j,k))
-            apetx(jx+1,j,k)=(1-ip)*apetx(1,j,k) + &
-               ip*(2.*apetx(jx,j,k)-apetx(jx-1,j,k))
-            apety(jx+1,j,k)=(1-ip)*apety(1,j,k) + &
-               ip*(2.*apety(jx,j,k)-apety(jx-1,j,k))
-            apetz(jx+1,j,k)=(1-ip)*apetz(1,j,k) + &
-               ip*(2.*apetz(jx,j,k)-apetz(jx-1,j,k))
-            apztx(jx+1,j,k)=(1-ip)*apztx(1,j,k) + &
-               ip*(2.*apztx(jx,j,k)-apztx(jx-1,j,k))
-            apzty(jx+1,j,k)=(1-ip)*apzty(1,j,k) + &
-               ip*(2.*apzty(jx,j,k)-apzty(jx-1,j,k))
-            apztz(jx+1,j,k)=(1-ip)*apztz(1,j,k) + &
-               ip*(2.*apztz(jx,j,k)-apztz(jx-1,j,k))
+            apcsx(n1+1,j,k)=(1-ip)*apcsx(1,j,k) +ip*(2.*apcsx(n1,j,k)-apcsx(n1-1,j,k))
+            apcsy(n1+1,j,k)=(1-ip)*apcsy(1,j,k) +ip*(2.*apcsy(n1,j,k)-apcsy(n1-1,j,k))
+            apcsz(n1+1,j,k)=(1-ip)*apcsz(1,j,k) +ip*(2.*apcsz(n1,j,k)-apcsz(n1-1,j,k))
+            apetx(n1+1,j,k)=(1-ip)*apetx(1,j,k) +ip*(2.*apetx(n1,j,k)-apetx(n1-1,j,k))
+            apety(n1+1,j,k)=(1-ip)*apety(1,j,k) +ip*(2.*apety(n1,j,k)-apety(n1-1,j,k))
+            apetz(n1+1,j,k)=(1-ip)*apetz(1,j,k) +ip*(2.*apetz(n1,j,k)-apetz(n1-1,j,k))
+            apztx(n1+1,j,k)=(1-ip)*apztx(1,j,k) +ip*(2.*apztx(n1,j,k)-apztx(n1-1,j,k))
+            apzty(n1+1,j,k)=(1-ip)*apzty(1,j,k) +ip*(2.*apzty(n1,j,k)-apzty(n1-1,j,k))
+            apztz(n1+1,j,k)=(1-ip)*apztz(1,j,k) +ip*(2.*apztz(n1,j,k)-apztz(n1-1,j,k))
             !
-            uco(jx+1,j,k)=(1-ip)*uco(1,j,k) + &
-               ip*(2.*uco(jx,j,k)-uco(jx-1,j,k))
-            vco(jx+1,j,k)=(1-ip)*vco(1,j,k) + &
-               ip*(2.*vco(jx,j,k)-vco(jx-1,j,k))
-            wco(jx+1,j,k)=(1-ip)*wco(1,j,k) + &
-               ip*(2.*wco(jx,j,k)-wco(jx-1,j,k))
+            uco(n1+1,j,k)=(1-ip)*uco(1,j,k) +ip*(2.*uco(n1,j,k)-uco(n1-1,j,k))
+            vco(n1+1,j,k)=(1-ip)*vco(1,j,k) +ip*(2.*vco(n1,j,k)-vco(n1-1,j,k))
+            wco(n1+1,j,k)=(1-ip)*wco(1,j,k) +ip*(2.*wco(n1,j,k)-wco(n1-1,j,k))
             !
-            uuco(jx+1,j,k)=(1-ip)*uuco(1,j,k) + &
-               ip*(2.*uuco(jx,j,k)-uuco(jx-1,j,k))
-            vvco(jx+1,j,k)=(1-ip)*vvco(1,j,k) + &
-               ip*(2.*vvco(jx,j,k)-vvco(jx-1,j,k))
-            wwco(jx+1,j,k)=(1-ip)*wwco(1,j,k) + &
-               ip*(2.*wwco(jx,j,k)-wwco(jx-1,j,k))
-            rhofl(jx+1,j,k)=(1-ip)*rhofl(1,j,k) + &
-               ip*(2.*rhofl(jx,j,k)-rhofl(jx-1,j,k))
+            uuco(n1+1,j,k)=(1-ip)*uuco(1,j,k) +ip*(2.*uuco(n1,j,k)-uuco(n1-1,j,k))
+            vvco(n1+1,j,k)=(1-ip)*vvco(1,j,k) +ip*(2.*vvco(n1,j,k)-vvco(n1-1,j,k))
+            wwco(n1+1,j,k)=(1-ip)*wwco(1,j,k) +ip*(2.*wwco(n1,j,k)-wwco(n1-1,j,k))
+            rhofl(n1+1,j,k)=(1-ip)*rhofl(1,j,k) +ip*(2.*rhofl(n1,j,k)-rhofl(n1-1,j,k))
 
          enddo
       enddo
@@ -204,78 +166,45 @@ subroutine mixrho_para(rho)
       ! extrapolation for velocity on side j=0 j=jy+1
       !
       do k=kparasta,kparaend
-         do i=1,jx
+         do i=1,n1
 
-            uco(i,0,k)=(1-jp)*uco(i,jy,k) + &
-               jp*(2.*uco(i,1,k)-uco(i,2,k))
-            vco(i,0,k)=(1-jp)*vco(i,jy,k) + &
-               jp*(2.*vco(i,1,k)-vco(i,2,k))
-            wco(i,0,k)=(1-jp)*wco(i,jy,k) + &
-               jp*(2.*wco(i,1,k)-wco(i,2,k))
+            uco(i,0,k)=2.*uco(i,1,k)-uco(i,2,k)
+            vco(i,0,k)=2.*vco(i,1,k)-vco(i,2,k)
+            wco(i,0,k)=2.*wco(i,1,k)-wco(i,2,k)
             !
-            uuco(i,0,k)=(1-jp)*uuco(i,jy,k) + &
-               jp*(2.*uuco(i,1,k)-uuco(i,2,k))
-            vvco(i,0,k)=(1-jp)*vvco(i,jy,k) + &
-               jp*(2.*vvco(i,1,k)-vvco(i,2,k))
-            wwco(i,0,k)=(1-jp)*wwco(i,jy,k) + &
-               jp*(2.*wwco(i,1,k)-wwco(i,2,k))
-            rhofl(i,0,k)=(1-jp)*rhofl(i,jy,k) + &
-               jp*(2.*rhofl(i,1,k)-rhofl(i,2,k))
+            uuco(i,0,k)=2.*uuco(i,1,k)-uuco(i,2,k)
+            vvco(i,0,k)=2.*vvco(i,1,k)-vvco(i,2,k)
+            wwco(i,0,k)=2.*wwco(i,1,k)-wwco(i,2,k)
+            rhofl(i,0,k)=2.*rhofl(i,1,k)-rhofl(i,2,k)
             !
-            apcsx(i,0,k)=(1-jp)*apcsx(i,jy,k) + &
-               jp*(2.*apcsx(i,1,k)-apcsx(i,2,k))
-            apcsy(i,0,k)=(1-jp)*apcsy(i,jy,k) + &
-               jp*(2.*apcsy(i,1,k)-apcsy(i,2,k))
-            apcsz(i,0,k)=(1-jp)*apcsz(i,jy,k) + &
-               jp*(2.*apcsz(i,1,k)-apcsz(i,2,k))
-            apetx(i,0,k)=(1-jp)*apetx(i,jy,k) + &
-               jp*(2.*apetx(i,1,k)-apetx(i,2,k))
-            apety(i,0,k)=(1-jp)*apety(i,jy,k) + &
-               jp*(2.*apety(i,1,k)-apety(i,2,k))
-            apetz(i,0,k)=(1-jp)*apetz(i,jy,k) + &
-               jp*(2.*apetz(i,1,k)-apetz(i,2,k))
-            apztx(i,0,k)=(1-jp)*apztx(i,jy,k) + &
-               jp*(2.*apztx(i,1,k)-apztx(i,2,k))
-            apzty(i,0,k)=(1-jp)*apzty(i,jy,k) + &
-               jp*(2.*apzty(i,1,k)-apzty(i,2,k))
-            apztz(i,0,k)=(1-jp)*apztz(i,jy,k) + &
-               jp*(2.*apztz(i,1,k)-apztz(i,2,k))
+            apcsx(i,0,k)=2.*apcsx(i,1,k)-apcsx(i,2,k)
+            apcsy(i,0,k)=2.*apcsy(i,1,k)-apcsy(i,2,k)
+            apcsz(i,0,k)=2.*apcsz(i,1,k)-apcsz(i,2,k)
+            apetx(i,0,k)=2.*apetx(i,1,k)-apetx(i,2,k)
+            apety(i,0,k)=2.*apety(i,1,k)-apety(i,2,k)
+            apetz(i,0,k)=2.*apetz(i,1,k)-apetz(i,2,k)
+            apztx(i,0,k)=2.*apztx(i,1,k)-apztx(i,2,k)
+            apzty(i,0,k)=2.*apzty(i,1,k)-apzty(i,2,k)
+            apztz(i,0,k)=2.*apztz(i,1,k)-apztz(i,2,k)
             !
+            apcsx(i,n2+1,k)=2.*apcsx(i,n2,k)-apcsx(i,n2-1,k)
+            apcsy(i,n2+1,k)=2.*apcsy(i,n2,k)-apcsy(i,n2-1,k)
+            apcsz(i,n2+1,k)=2.*apcsz(i,n2,k)-apcsz(i,n2-1,k)
+            apetx(i,n2+1,k)=2.*apetz(i,n2,k)-apetx(i,n2-1,k)
+            apety(i,n2+1,k)=2.*apety(i,n2,k)-apety(i,n2-1,k)
+            apetz(i,n2+1,k)=2.*apetz(i,n2,k)-apetz(i,n2-1,k)
+            apztx(i,n2+1,k)=2.*apztx(i,n2,k)-apztx(i,n2-1,k)
+            apzty(i,n2+1,k)=2.*apzty(i,n2,k)-apzty(i,n2-1,k)
+            apztz(i,n2+1,k)=2.*apztz(i,n2,k)-apztz(i,n2-1,k)
             !
-            apcsx(i,jy+1,k)=(1-jp)*apcsx(i,1,k) + &
-               jp*(2.*apcsx(i,jy,k)-apcsx(i,jy-1,k))
-            apcsy(i,jy+1,k)=(1-jp)*apcsy(i,1,k) + &
-               jp*(2.*apcsy(i,jy,k)-apcsy(i,jy-1,k))
-            apcsz(i,jy+1,k)=(1-jp)*apcsz(i,1,k) + &
-               jp*(2.*apcsz(i,jy,k)-apcsz(i,jy-1,k))
-            apetx(i,jy+1,k)=(1-jp)*apetx(i,1,k) + &
-               jp*(2.*apetz(i,jy,k)-apetx(i,jy-1,k))
-            apety(i,jy+1,k)=(1-jp)*apety(i,1,k) + &
-               jp*(2.*apety(i,jy,k)-apety(i,jy-1,k))
-            apetz(i,jy+1,k)=(1-jp)*apetz(i,1,k) + &
-               jp*(2.*apetz(i,jy,k)-apetz(i,jy-1,k))
-            apztx(i,jy+1,k)=(1-jp)*apztx(i,1,k) + &
-               jp*(2.*apztx(i,jy,k)-apztx(i,jy-1,k))
-            apzty(i,jy+1,k)=(1-jp)*apzty(i,1,k) + &
-               jp*(2.*apzty(i,jy,k)-apzty(i,jy-1,k))
-            apztz(i,jy+1,k)=(1-jp)*apztz(i,1,k) + &
-               jp*(2.*apztz(i,jy,k)-apztz(i,jy-1,k))
+            uco(i,n2+1,k)=2.*uco(i,n2,k)-uco(i,n2-1,k)
+            vco(i,n2+1,k)=2.*vco(i,n2,k)-vco(i,n2-1,k)
+            wco(i,n2+1,k)=2.*wco(i,n2,k)-wco(i,n2-1,k)
             !
-            uco(i,jy+1,k)=(1-jp)*uco(i,1,k) + &
-               jp*(2.*uco(i,jy,k)-uco(i,jy-1,k))
-            vco(i,jy+1,k)=(1-jp)*vco(i,1,k) + &
-               jp*(2.*vco(i,jy,k)-vco(i,jy-1,k))
-            wco(i,jy+1,k)=(1-jp)*wco(i,1,k) + &
-               jp*(2.*wco(i,jy,k)-wco(i,jy-1,k))
-            !
-            uuco(i,jy+1,k)=(1-jp)*uuco(i,1,k) + &
-               jp*(2.*uuco(i,jy,k)-uuco(i,jy-1,k))
-            vvco(i,jy+1,k)=(1-jp)*vvco(i,1,k) + &
-               jp*(2.*vvco(i,jy,k)-vvco(i,jy-1,k))
-            wwco(i,jy+1,k)=(1-jp)*wwco(i,1,k) + &
-               jp*(2.*wwco(i,jy,k)-wwco(i,jy-1,k))
-            rhofl(i,jy+1,k)=(1-jp)*rhofl(i,1,k) + &
-               jp*(2.*rhofl(i,jy,k)-rhofl(i,jy-1,k))
+            uuco(i,n2+1,k)=2.*uuco(i,n2,k)-uuco(i,n2-1,k)
+            vvco(i,n2+1,k)=2.*vvco(i,n2,k)-vvco(i,n2-1,k)
+            wwco(i,n2+1,k)=2.*wwco(i,n2,k)-wwco(i,n2-1,k)
+            rhofl(i,n2+1,k)=2.*rhofl(i,n2,k)-rhofl(i,n2-1,k)
 
          enddo
       enddo
@@ -287,7 +216,7 @@ subroutine mixrho_para(rho)
       ! I use a sending buffer to contain all the plane jx*jy
       ! (16) for the exchange between P0 and Pn-1
 
-      do m=1,40*(jx+2)*(jy+2)
+      do m=1,40*(n1+2)*(n2+2)
          sbuff(m)=0.
          rbuff(m)=0.
       enddo
@@ -311,41 +240,41 @@ subroutine mixrho_para(rho)
 
       if (myid.eq.nproc-1) then
 
-         call buffer1g(uco,1,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(vco,2,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(wco,3,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(uuco,4,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(vvco,5,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(wwco,6,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(rhofl,7,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apcsx,8,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apcsy,9,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apcsz,10,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apetx,11,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apety,12,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apetz,13,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apztx,14,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apzty,15,jz,myid,nproc,kparasta,kparaend)
-         call buffer1g(apztz,16,jz,myid,nproc,kparasta,kparaend)
+         call buffer1g(uco,1,n3)
+         call buffer1g(vco,2,n3)
+         call buffer1g(wco,3,n3)
+         call buffer1g(uuco,4,n3)
+         call buffer1g(vvco,5,n3)
+         call buffer1g(wwco,6,n3)
+         call buffer1g(rhofl,7,n3)
+         call buffer1g(apcsx,8,n3)
+         call buffer1g(apcsy,9,n3)
+         call buffer1g(apcsz,10,n3)
+         call buffer1g(apetx,11,n3)
+         call buffer1g(apety,12,n3)
+         call buffer1g(apetz,13,n3)
+         call buffer1g(apztx,14,n3)
+         call buffer1g(apzty,15,n3)
+         call buffer1g(apztz,16,n3)
 
       else if (myid.eq.0) then
 
-         call buffer1g(uco,1,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(vco,2,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(wco,3,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(uuco,4,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(vvco,5,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(wwco,6,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(rhofl,7,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apcsx,8,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apcsy,9,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apcsz,10,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apetx,11,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apety,12,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apetz,13,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apztx,14,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apzty,15,1,myid,nproc,kparasta,kparaend)
-         call buffer1g(apztz,16,1,myid,nproc,kparasta,kparaend)
+         call buffer1g(uco,1,1)
+         call buffer1g(vco,2,1)
+         call buffer1g(wco,3,1)
+         call buffer1g(uuco,4,1)
+         call buffer1g(vvco,5,1)
+         call buffer1g(wwco,6,1)
+         call buffer1g(rhofl,7,1)
+         call buffer1g(apcsx,8,1)
+         call buffer1g(apcsy,9,1)
+         call buffer1g(apcsz,10,1)
+         call buffer1g(apetx,11,1)
+         call buffer1g(apety,12,1)
+         call buffer1g(apetz,13,1)
+         call buffer1g(apztx,14,1)
+         call buffer1g(apzty,15,1)
+         call buffer1g(apztz,16,1)
 
       endif
       !
@@ -353,66 +282,53 @@ subroutine mixrho_para(rho)
       !
       if (myid.eq.nproc-1) then
 
-         call MPI_SENDRECV(sbuff1(1),16*(jx+2)*(jy+2), &
-            MPI_REAL_SD,0,9101, &
-            rbuff1(1),16*(jx+2)*(jy+2), &
-            MPI_REAL_SD,0,8101, &
-            MPI_COMM_WORLD,status,ierr)
+         call MPI_SENDRECV(sbuff1(1),16*(n1+2)*(n2+2),MPI_REAL_SD,0,9101, &
+            rbuff1(1),16*(n1+2)*(n2+2),MPI_REAL_SD,0,8101,MPI_COMM_WORLD,status,ierr)
 
       else if (myid.eq.0) then
 
-         call MPI_SENDRECV(sbuff1(1),16*(jx+2)*(jy+2), &
-            MPI_REAL_SD,nproc-1,8101, &
-            rbuff1(1),16*(jx+2)*(jy+2), &
-            MPI_REAL_SD,nproc-1,9101, &
-            MPI_COMM_WORLD,status,ierr)
+         call MPI_SENDRECV(sbuff1(1),16*(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,8101, &
+            rbuff1(1),16*(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,9101,MPI_COMM_WORLD,status,ierr)
       
       endif
 
       if (myid.eq.0) then
 
-         call buffer2gg(piano1,1,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano2,2,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano3,3,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano4,4,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano5,5,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano6,6,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano7,7,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano8,8,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano9,9,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano10,10,myid,nproc, &
-            kparasta,kparaend)
-         call buffer2gg(piano11,11,myid,nproc, &
-            kparasta,kparaend)
-         call buffer2gg(piano12,12,myid,nproc, &
-            kparasta,kparaend)
-         call buffer2gg(piano13,13,myid,nproc, &
-            kparasta,kparaend)
-         call buffer2gg(piano14,14,myid,nproc, &
-            kparasta,kparaend)
-         call buffer2gg(piano15,15,myid,nproc, &
-            kparasta,kparaend)
-         call buffer2gg(piano16,16,myid,nproc, &
-            kparasta,kparaend)
+         call buffer2gg(piano1,1)
+         call buffer2gg(piano2,2)
+         call buffer2gg(piano3,3)
+         call buffer2gg(piano4,4)
+         call buffer2gg(piano5,5)
+         call buffer2gg(piano6,6)
+         call buffer2gg(piano7,7)
+         call buffer2gg(piano8,8)
+         call buffer2gg(piano9,9)
+         call buffer2gg(piano10,10)
+         call buffer2gg(piano11,11)
+         call buffer2gg(piano12,12)
+         call buffer2gg(piano13,13)
+         call buffer2gg(piano14,14)
+         call buffer2gg(piano15,15)
+         call buffer2gg(piano16,16)
 
       else if (myid.eq.nproc-1) then
 
-         call buffer2gg(piano1,1,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano2,2,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano3,3,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano4,4,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano5,5,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano6,6,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano7,7,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano8,8,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano9,9,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano10,10,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano11,11,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano12,12,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano13,13,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano14,14,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano15,15,myid,nproc,kparasta,kparaend)
-         call buffer2gg(piano16,16,myid,nproc,kparasta,kparaend)
+         call buffer2gg(piano1,1)
+         call buffer2gg(piano2,2)
+         call buffer2gg(piano3,3)
+         call buffer2gg(piano4,4)
+         call buffer2gg(piano5,5)
+         call buffer2gg(piano6,6)
+         call buffer2gg(piano7,7)
+         call buffer2gg(piano8,8)
+         call buffer2gg(piano9,9)
+         call buffer2gg(piano10,10)
+         call buffer2gg(piano11,11)
+         call buffer2gg(piano12,12)
+         call buffer2gg(piano13,13)
+         call buffer2gg(piano14,14)
+         call buffer2gg(piano15,15)
+         call buffer2gg(piano16,16)
 
       endif
 
@@ -421,43 +337,27 @@ subroutine mixrho_para(rho)
 
       if(myid.eq.0)then
 
-         do j=1,jy
-            do i=1,jx
+         do j=1,n2
+            do i=1,n1
                !
-               uco(i,j,0)=(1-kp)*piano1(i,j) + &
-                  kp*(2.*uco(i,j,1)-uco(i,j,2))
-               vco(i,j,0)=(1-kp)*piano2(i,j) + &
-                  kp*(2.*vco(i,j,1)-vco(i,j,2))
-               wco(i,j,0)=(1-kp)*piano3(i,j) + &
-                  kp*(2.*wco(i,j,1)-wco(i,j,2))
+               uco(i,j,0)=(1-kp)*piano1(i,j) +kp*(2.*uco(i,j,1)-uco(i,j,2))
+               vco(i,j,0)=(1-kp)*piano2(i,j) +kp*(2.*vco(i,j,1)-vco(i,j,2))
+               wco(i,j,0)=(1-kp)*piano3(i,j) +kp*(2.*wco(i,j,1)-wco(i,j,2))
                !
-               uuco(i,j,0)=(1-kp)*piano4(i,j) + &
-                  kp*(2.*uuco(i,j,1)-uuco(i,j,2))
-               vvco(i,j,0)=(1-kp)*piano5(i,j) + &
-                  kp*(2.*vvco(i,j,1)-vvco(i,j,2))
-               wwco(i,j,0)=(1-kp)*piano6(i,j) + &
-                  kp*(2.*wwco(i,j,1)-wwco(i,j,2))
-               rhofl(i,j,0)=(1-kp)*piano7(i,j) + &
-                  kp*(2.*rhofl(i,j,1)-rhofl(i,j,2))
+               uuco(i,j,0)=(1-kp)*piano4(i,j) +kp*(2.*uuco(i,j,1)-uuco(i,j,2))
+               vvco(i,j,0)=(1-kp)*piano5(i,j) +kp*(2.*vvco(i,j,1)-vvco(i,j,2))
+               wwco(i,j,0)=(1-kp)*piano6(i,j) +kp*(2.*wwco(i,j,1)-wwco(i,j,2))
+               rhofl(i,j,0)=(1-kp)*piano7(i,j) +kp*(2.*rhofl(i,j,1)-rhofl(i,j,2))
                !
-               apcsx(i,j,0)=(1-kp)*piano8(i,j) + &
-                  kp*(2.*apcsx(i,j,1)-apcsx(i,j,2))
-               apcsy(i,j,0)=(1-kp)*piano9(i,j) + &
-                  kp*(2.*apcsy(i,j,1)-apcsy(i,j,2))
-               apcsz(i,j,0)=(1-kp)*piano19(i,j) + &
-                  kp*(2.*apcsz(i,j,1)-apcsz(i,j,2))
-               apetx(i,j,0)=(1-kp)*piano11(i,j) + &
-                  kp*(2.*apetx(i,j,1)-apetx(i,j,2))
-               apety(i,j,0)=(1-kp)*piano12(i,j) + &
-                  kp*(2.*apety(i,j,1)-apety(i,j,2))
-               apetz(i,j,0)=(1-kp)*piano13(i,j) + &
-                  kp*(2.*apetz(i,j,1)-apetz(i,j,2))
-               apztx(i,j,0)=(1-kp)*piano14(i,j) + &
-                  kp*(2.*apztx(i,j,1)-apztx(i,j,2))
-               apzty(i,j,0)=(1-kp)*piano15(i,j) + &
-                  kp*(2.*apzty(i,j,1)-apzty(i,j,2))
-               apztz(i,j,0)=(1-kp)*piano16(i,j) + &
-                  kp*(2.*apztz(i,j,1)-apztz(i,j,2))
+               apcsx(i,j,0)=(1-kp)*piano8(i,j) +kp*(2.*apcsx(i,j,1)-apcsx(i,j,2))
+               apcsy(i,j,0)=(1-kp)*piano9(i,j) +kp*(2.*apcsy(i,j,1)-apcsy(i,j,2))
+               apcsz(i,j,0)=(1-kp)*piano19(i,j) +kp*(2.*apcsz(i,j,1)-apcsz(i,j,2))
+               apetx(i,j,0)=(1-kp)*piano11(i,j) +kp*(2.*apetx(i,j,1)-apetx(i,j,2))
+               apety(i,j,0)=(1-kp)*piano12(i,j) +kp*(2.*apety(i,j,1)-apety(i,j,2))
+               apetz(i,j,0)=(1-kp)*piano13(i,j) +kp*(2.*apetz(i,j,1)-apetz(i,j,2))
+               apztx(i,j,0)=(1-kp)*piano14(i,j) +kp*(2.*apztx(i,j,1)-apztx(i,j,2))
+               apzty(i,j,0)=(1-kp)*piano15(i,j) +kp*(2.*apzty(i,j,1)-apzty(i,j,2))
+               apztz(i,j,0)=(1-kp)*piano16(i,j) +kp*(2.*apztz(i,j,1)-apztz(i,j,2))
             !
             end do
          end do
@@ -467,43 +367,27 @@ subroutine mixrho_para(rho)
       !
       if(myid.eq.nproc-1)then
 
-         do j=1,jy
-            do i=1,jx
+         do j=1,n2
+            do i=1,n1
                !
-               uco(i,j,jz+1)=(1-kp)*piano1(i,j) + &
-                  kp*(2.*uco(i,j,jz)-uco(i,j,jz-1))
-               vco(i,j,jz+1)=(1-kp)*piano2(i,j) + &
-                  kp*(2.*vco(i,j,jz)-vco(i,j,jz-1))
-               wco(i,j,jz+1)=(1-kp)*piano3(i,j) + &
-                  kp*(2.*wco(i,j,jz)-wco(i,j,jz-1))
+               uco(i,j,n3+1)=(1-kp)*piano1(i,j) +kp*(2.*uco(i,j,n3)-uco(i,j,n3-1))
+               vco(i,j,n3+1)=(1-kp)*piano2(i,j) +kp*(2.*vco(i,j,n3)-vco(i,j,n3-1))
+               wco(i,j,n3+1)=(1-kp)*piano3(i,j) +kp*(2.*wco(i,j,n3)-wco(i,j,n3-1))
                !
-               uuco(i,j,jz+1)=(1-kp)*piano4(i,j) + &
-                  kp*(2.*uuco(i,j,jz)-uuco(i,j,jz-1))
-               vvco(i,j,jz+1)=(1-kp)*piano5(i,j) + &
-                  kp*(2.*vvco(i,j,jz)-vvco(i,j,jz-1))
-               wwco(i,j,jz+1)=(1-kp)*piano6(i,j) + &
-                  kp*(2.*wwco(i,j,jz)-wwco(i,j,jz-1))
-               rhofl(i,j,jz+1)=(1-kp)*piano7(i,j) + &
-                  kp*(2.*rhofl(i,j,jz)-rhofl(i,j,jz-1))
+               uuco(i,j,n3+1)=(1-kp)*piano4(i,j) +kp*(2.*uuco(i,j,n3)-uuco(i,j,n3-1))
+               vvco(i,j,n3+1)=(1-kp)*piano5(i,j) +kp*(2.*vvco(i,j,n3)-vvco(i,j,n3-1))
+               wwco(i,j,n3+1)=(1-kp)*piano6(i,j) +kp*(2.*wwco(i,j,n3)-wwco(i,j,n3-1))
+               rhofl(i,j,n3+1)=(1-kp)*piano7(i,j) +kp*(2.*rhofl(i,j,n3)-rhofl(i,j,n3-1))
 
-               apcsx(i,j,jz+1)=(1-kp)*piano8(i,j) + &
-                  kp*(2.*apcsx(i,j,jz)-apcsx(i,j,jz-1))
-               apcsy(i,j,jz+1)=(1-kp)*piano9(i,j) + &
-                  kp*(2.*apcsy(i,j,jz)-apcsy(i,j,jz-1))
-               apcsz(i,j,jz+1)=(1-kp)*piano10(i,j) + &
-                  kp*(2.*apcsz(i,j,jz)-apcsz(i,j,jz-1))
-               apetx(i,j,jz+1)=(1-kp)*piano11(i,j) + &
-                  kp*(2.*apetx(i,j,jz)-apetx(i,j,jz-1))
-               apety(i,j,jz+1)=(1-kp)*piano12(i,j) + &
-                  kp*(2.*apety(i,j,jz)-apety(i,j,jz-1))
-               apetz(i,j,jz+1)=(1-kp)*piano13(i,j) + &
-                  kp*(2.*apetz(i,j,jz)-apetz(i,j,jz-1))
-               apztx(i,j,jz+1)=(1-kp)*piano14(i,j) + &
-                  kp*(2.*apztx(i,j,jz)-apztx(i,j,jz-1))
-               apzty(i,j,jz+1)=(1-kp)*piano15(i,j) + &
-                  kp*(2.*apzty(i,j,jz)-apzty(i,j,jz-1))
-               apztz(i,j,jz+1)=(1-kp)*piano16(i,j) + &
-                  kp*(2.*apztz(i,j,jz)-apztz(i,j,jz-1))
+               apcsx(i,j,n3+1)=(1-kp)*piano8(i,j) +kp*(2.*apcsx(i,j,n3)-apcsx(i,j,n3-1))
+               apcsy(i,j,n3+1)=(1-kp)*piano9(i,j) +kp*(2.*apcsy(i,j,n3)-apcsy(i,j,n3-1))
+               apcsz(i,j,n3+1)=(1-kp)*piano10(i,j) +kp*(2.*apcsz(i,j,n3)-apcsz(i,j,n3-1))
+               apetx(i,j,n3+1)=(1-kp)*piano11(i,j) +kp*(2.*apetx(i,j,n3)-apetx(i,j,n3-1))
+               apety(i,j,n3+1)=(1-kp)*piano12(i,j) +kp*(2.*apety(i,j,n3)-apety(i,j,n3-1))
+               apetz(i,j,n3+1)=(1-kp)*piano13(i,j) +kp*(2.*apetz(i,j,n3)-apetz(i,j,n3-1))
+               apztx(i,j,n3+1)=(1-kp)*piano14(i,j) +kp*(2.*apztx(i,j,n3)-apztx(i,j,n3-1))
+               apzty(i,j,n3+1)=(1-kp)*piano15(i,j) +kp*(2.*apzty(i,j,n3)-apzty(i,j,n3-1))
+               apztz(i,j,n3+1)=(1-kp)*piano16(i,j) +kp*(2.*apztz(i,j,n3)-apztz(i,j,n3-1))
             enddo
          enddo
 
@@ -527,15 +411,15 @@ subroutine mixrho_para(rho)
       !
       ! bar filtering for the scale similar part
       !
-      call filterb_csieta(uco,m21,kparasta,kparaend,myid,nproc)
-      call filterb_csieta(vco,m22,kparasta,kparaend,myid,nproc)
-      call filterb_csieta(wco,m23,kparasta,kparaend,myid,nproc)
+      call filterb_csieta(uco,m21)
+      call filterb_csieta(vco,m22)
+      call filterb_csieta(wco,m23)
       !
-      call filterb_csieta(rhofl,m33,kparasta,kparaend,myid,nproc)
+      call filterb_csieta(rhofl,m33)
       !
-      call filterb_csieta(uuco,l11,kparasta,kparaend,myid,nproc)
-      call filterb_csieta(vvco,l22,kparasta,kparaend,myid,nproc)
-      call filterb_csieta(wwco,l33,kparasta,kparaend,myid,nproc)
+      call filterb_csieta(uuco,l11)
+      call filterb_csieta(vvco,l22)
+      call filterb_csieta(wwco,l33)
 
 
       if (debugg.eq.1) then
@@ -555,128 +439,85 @@ subroutine mixrho_para(rho)
       !
       ! first kparasta
       !
-      do m=1,40*(jx+2)*(jy+2)
+      do m=1,40*(n1+2)*(n2+2)
          sbuff(m)=0.
          rbuff(m)=0.
       enddo
 
-      call buffer1g(m21,1,kparasta,myid,nproc,kparasta,kparaend)
-      call buffer1g(m22,2,kparasta,myid,nproc,kparasta,kparaend)
-      call buffer1g(m23,3,kparasta,myid,nproc,kparasta,kparaend)
-      call buffer1g(m33,4,kparasta,myid,nproc,kparasta,kparaend)
-      call buffer1g(l11,5,kparasta,myid,nproc,kparasta,kparaend)
-      call buffer1g(l22,6,kparasta,myid,nproc,kparasta,kparaend)
-      call buffer1g(l33,7,kparasta,myid,nproc,kparasta,kparaend)
+      call buffer1g(m21,1,kparasta)
+      call buffer1g(m22,2,kparasta)
+      call buffer1g(m23,3,kparasta)
+      call buffer1g(m33,4,kparasta)
+      call buffer1g(l11,5,kparasta)
+      call buffer1g(l22,6,kparasta)
+      call buffer1g(l33,7,kparasta)
       !
       ! if I use pe and not pem I have implicitly the periodicity on k
       ! and the values in k=0 and k=jz+1 are defined in filter06
       !
       if (kp.eq.0) then
 
-         call MPI_SENDRECV(sbuff1(1),7*(jx+2)*(jy+2), &
-            MPI_REAL_SD,leftpe,tagls, &
-            rbuff1(1),7*(jx+2)*(jy+2), &
-            MPI_REAL_SD,rightpe,tagrr, &
-            MPI_COMM_WORLD,status,ierr)
+         call MPI_SENDRECV(sbuff1(1),7*(n1+2)*(n2+2),MPI_REAL_SD,leftpe,tagls, &
+            rbuff1(1),7*(n1+2)*(n2+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierr)
 
       else if (kp.eq.1) then
 
          if(leftpem /= MPI_PROC_NULL) then
-            call MPI_SEND(sbuff1(1),7*(jx+2)*(jy+2), &
-               MPI_REAL_SD,leftpem,tagls, &
-               MPI_COMM_WORLD,ierr)
+            call MPI_SEND(sbuff1(1),7*(n1+2)*(n2+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
          endif
          if(rightpem /= MPI_PROC_NULL) then
-            call MPI_RECV(rbuff1(1),7*(jx+2)*(jy+2), &
-               MPI_REAL_SD,rightpem,tagrr, &
-               MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(rbuff1(1),7*(n1+2)*(n2+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
          endif
-
-         if(leftpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req1,istatus,ierr)
-         endif
-         if(rightpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req2,istatus,ierr)
-         endif
-
 
       endif
       !
-      call buffer2(rbuff1,m21,1,kparaend+1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,m22,2,kparaend+1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,m23,3,kparaend+1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,m33,4,kparaend+1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,l11,5,kparaend+1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,l22,6,kparaend+1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,l33,7,kparaend+1,myid,nproc, &
-         kparasta,kparaend)
+      call buffer2(rbuff1,m21,1,kparaend+1)
+      call buffer2(rbuff1,m22,2,kparaend+1)
+      call buffer2(rbuff1,m23,3,kparaend+1)
+      call buffer2(rbuff1,m33,4,kparaend+1)
+      call buffer2(rbuff1,l11,5,kparaend+1)
+      call buffer2(rbuff1,l22,6,kparaend+1)
+      call buffer2(rbuff1,l33,7,kparaend+1)
       !
       ! now kparaend
       !
-      do m=1,40*(jx+2)*(jy+2)
+      do m=1,40*(n1+2)*(n2+2)
          sbuff(m)=0.
          rbuff(m)=0.
       enddo
       !
-      call buffer1g(m21,1,kparaend,myid,nproc,kparasta,kparaend)
-      call buffer1g(m22,2,kparaend,myid,nproc,kparasta,kparaend)
-      call buffer1g(m23,3,kparaend,myid,nproc,kparasta,kparaend)
-      call buffer1g(m33,4,kparaend,myid,nproc,kparasta,kparaend)
-      call buffer1g(l11,5,kparaend,myid,nproc,kparasta,kparaend)
-      call buffer1g(l22,6,kparaend,myid,nproc,kparasta,kparaend)
-      call buffer1g(l33,7,kparaend,myid,nproc,kparasta,kparaend)
+      call buffer1g(m21,1,kparaend)
+      call buffer1g(m22,2,kparaend)
+      call buffer1g(m23,3,kparaend)
+      call buffer1g(m33,4,kparaend)
+      call buffer1g(l11,5,kparaend)
+      call buffer1g(l22,6,kparaend)
+      call buffer1g(l33,7,kparaend)
 
       if (kp.eq.0) then
 
-         call MPI_SENDRECV(sbuff1(1),7*(jx+2)*(jy+2), &
-            MPI_REAL_SD,rightpe,tagrs, &
-            rbuff1(1),7*(jx+2)*(jy+2), &
-            MPI_REAL_SD,leftpe,taglr, &
-            MPI_COMM_WORLD,status,ierr)
+         call MPI_SENDRECV(sbuff1(1),7*(n1+2)*(n2+2),MPI_REAL_SD,rightpe,tagrs, &
+            rbuff1(1),7*(n1+2)*(n2+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierr)
 
       else if (kp.eq.1) then
 
          if(rightpem /= MPI_PROC_NULL) then
-            call MPI_SEND(sbuff1(1),7*(jx+2)*(jy+2), &
-               MPI_REAL_SD,rightpem,tagrs, &
-               MPI_COMM_WORLD,ierr)
+            call MPI_SEND(sbuff1(1),7*(n1+2)*(n2+2),MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
          endif
          if(leftpem /= MPI_PROC_NULL) then
-            call MPI_RECV(rbuff1(1),7*(jx+2)*(jy+2), &
-               MPI_REAL_SD,leftpem,taglr, &
-               MPI_COMM_WORLD,status,ierr)
-         endif
-
-         if(rightpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req1,istatus,ierr)
-         endif
-         if(leftpem /= MPI_PROC_NULL) then
-         !      call MPI_WAIT(req2,istatus,ierr)
+            call MPI_RECV(rbuff1(1),7*(n1+2)*(n2+2),MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
          endif
 
 
       endif
 
-      call buffer2(rbuff1,m21,1,kparasta-1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,m22,2,kparasta-1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,m23,3,kparasta-1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,m33,4,kparasta-1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,l11,5,kparasta-1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,l22,6,kparasta-1,myid,nproc, &
-         kparasta,kparaend)
-      call buffer2(rbuff1,l33,7,kparasta-1,myid,nproc, &
-         kparasta,kparaend)
+      call buffer2(rbuff1,m21,1,kparasta-1)
+      call buffer2(rbuff1,m22,2,kparasta-1)
+      call buffer2(rbuff1,m23,3,kparasta-1)
+      call buffer2(rbuff1,m33,4,kparasta-1)
+      call buffer2(rbuff1,l11,5,kparasta-1)
+      call buffer2(rbuff1,l22,6,kparasta-1)
+      call buffer2(rbuff1,l33,7,kparasta-1)
 
 
       if (debugg.eq.1) then
@@ -693,13 +534,13 @@ subroutine mixrho_para(rho)
       !
       ! complete filtering in zita
       !
-      call filterb_zita(m21,ucof,kparasta,kparaend,myid,nproc)
-      call filterb_zita(m22,vcof,kparasta,kparaend,myid,nproc)
-      call filterb_zita(m23,wcof,kparasta,kparaend,myid,nproc)
-      call filterb_zita(m33,rhof,kparasta,kparaend,myid,nproc)
-      call filterb_zita(l11,uucof,kparasta,kparaend,myid,nproc)
-      call filterb_zita(l22,vvcof,kparasta,kparaend,myid,nproc)
-      call filterb_zita(l33,wwcof,kparasta,kparaend,myid,nproc)
+      call filterb_zita(m21,ucof)
+      call filterb_zita(m22,vcof)
+      call filterb_zita(m23,wcof)
+      call filterb_zita(m33,rhof)
+      call filterb_zita(l11,uucof)
+      call filterb_zita(l22,vvcof)
+      call filterb_zita(l33,wwcof)
 
 
 
@@ -729,8 +570,8 @@ subroutine mixrho_para(rho)
       endif
 
       do k=kparastam,kparaendm
-         do j=1+jp,jy-jp
-            do i=1+ip,jx-ip
+         do j=2,n2-1
+            do i=1+ip,n1-ip
                ass11(i,j,k)=uucof(i,j,k)-rhof(i,j,k)*ucof(i,j,k)   !rhoU
                ass22(i,j,k)=vvcof(i,j,k)-rhof(i,j,k)*vcof(i,j,k)   !rhoV
                ass33(i,j,k)=wwcof(i,j,k)-rhof(i,j,k)*wcof(i,j,k)   !rhoW
@@ -743,10 +584,10 @@ subroutine mixrho_para(rho)
       do ii=1,ip
 
          do k=kparasta,kparaend
-            do j=1,jy
-               ass11(jx,j,k)=ass11(jx-1,j,k)
-               ass22(jx,j,k)=ass22(jx-1,j,k)
-               ass33(jx,j,k)=ass33(jx-1,j,k)
+            do j=1,n2
+               ass11(n1,j,k)=ass11(n1-1,j,k)
+               ass22(n1,j,k)=ass22(n1-1,j,k)
+               ass33(n1,j,k)=ass33(n1-1,j,k)
 
             enddo
          enddo
@@ -755,17 +596,15 @@ subroutine mixrho_para(rho)
 
       ! impose value j=jy equal to jy-1
       !hicco and j=0 equal to j=1 ????
-      do jj=1,jp
+      ! direction j is always not periodic
 
-         do k=kparasta,kparaend
-            do i=1,jx
-               ass11(i,jy,k)=ass11(i,jy-1,k)
-               ass22(i,jy,k)=ass22(i,jy-1,k)
-               ass33(i,jy,k)=ass33(i,jy-1,k)
+      do k=kparasta,kparaend
+          do i=1,n1
+              ass11(i,n2,k)=ass11(i,n2-1,k)
+              ass22(i,n2,k)=ass22(i,n2-1,k)
+              ass33(i,n2,k)=ass33(i,n2-1,k)
 
-            enddo
-         enddo
-
+          enddo
       enddo
 
       !
@@ -773,11 +612,11 @@ subroutine mixrho_para(rho)
       do kk=1,kp
 
          if(myid.eq.nproc-1)then
-            do j=1,jy
-               do i=1,jx
-                  ass11(i,j,jz)=ass11(i,j,jz-1)
-                  ass22(i,j,jz)=ass22(i,j,jz-1)
-                  ass33(i,j,jz)=ass33(i,j,jz-1)
+            do j=1,n2
+               do i=1,n1
+                  ass11(i,j,n3)=ass11(i,j,n3-1)
+                  ass22(i,j,n3)=ass22(i,j,n3-1)
+                  ass33(i,j,n3)=ass33(i,j,n3-1)
                enddo
             enddo
          endif
@@ -805,61 +644,58 @@ subroutine mixrho_para(rho)
          ! here I need to exchange planes k=0 and k=jz+1
          ! so that P0 knows k=jz and Pn-1 knows k=1
          !
-         do m=1,40*(jx+2)*(jy+2)
+         do m=1,40*(n1+2)*(n2+2)
             sbuff(m)=0.
             rbuff(m)=0.
          enddo
 
          if (myid.eq.nproc-1) then
 
-            call buffer1g(ass11,1,jz,myid,nproc,kparasta,kparaend)
-            call buffer1g(ass22,2,jz,myid,nproc,kparasta,kparaend)
-            call buffer1g(ass33,3,jz,myid,nproc,kparasta,kparaend)
+            call buffer1g(ass11,1,n3)
+            call buffer1g(ass22,2,n3)
+            call buffer1g(ass33,3,n3)
 
          else if (myid.eq.0) then
 
-            call buffer1g(ass11,1,1,myid,nproc,kparasta,kparaend)
-            call buffer1g(ass22,2,1,myid,nproc,kparasta,kparaend)
-            call buffer1g(ass33,3,1,myid,nproc,kparasta,kparaend)
+            call buffer1g(ass11,1,1)
+            call buffer1g(ass22,2,1)
+            call buffer1g(ass33,3,1)
          endif
          !
          ! now the exchange so taht P0 knows k=jz and Pn-1 knows k=1
          !
          if (myid.eq.nproc-1) then
 
-            call MPI_SENDRECV(sbuff1(1),3*(jx+2)*(jy+2),MPI_REAL_SD,0,901, &
-               rbuff1(1),3*(jx+2)*(jy+2),MPI_REAL_SD,0,801, &
-               MPI_COMM_WORLD,status,ierr)
+            call MPI_SENDRECV(sbuff1(1),3*(n1+2)*(n2+2),MPI_REAL_SD,0,901, &
+               rbuff1(1),3*(n1+2)*(n2+2),MPI_REAL_SD,0,801,MPI_COMM_WORLD,status,ierr)
 
          else if (myid.eq.0) then
 
-            call MPI_SENDRECV( &
-               sbuff1(1),3*(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,801, &
-               rbuff1(1),3*(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,901, &
-               MPI_COMM_WORLD,status,ierr)
+            call MPI_SENDRECV(sbuff1(1),3*(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,801, &
+               rbuff1(1),3*(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,901,MPI_COMM_WORLD,status,ierr)
 
          endif
 
          if (myid.eq.0) then
 
 
-            call buffer2g(rbuff1,piano1,1,myid,nproc,kparasta,kparaend)
-            call buffer2g(rbuff1,piano2,2,myid,nproc,kparasta,kparaend)
-            call buffer2g(rbuff1,piano3,3,myid,nproc,kparasta,kparaend)
+            call buffer2g(rbuff1,piano1,1)
+            call buffer2g(rbuff1,piano2,2)
+            call buffer2g(rbuff1,piano3,3)
 
          else if (myid.eq.nproc-1) then
 
-            call buffer2g(rbuff1,piano1,1,myid,nproc,kparasta,kparaend)
-            call buffer2g(rbuff1,piano2,2,myid,nproc,kparasta,kparaend)
-            call buffer2g(rbuff1,piano3,3,myid,nproc,kparasta,kparaend)
+            call buffer2g(rbuff1,piano1,1)
+            call buffer2g(rbuff1,piano2,2)
+            call buffer2g(rbuff1,piano3,3)
 
          endif
          !
          ! now P0 knows plane k=jz and Pn-1 knows plane k=1
          !
          if(myid.eq.0)then
-            do j=1,jy
-               do i=1,jx
+            do j=1,n2
+               do i=1,n1
 
                   ass11(i,j,0)=piano1(i,j)
                   ass22(i,j,0)=piano2(i,j)
@@ -869,12 +705,12 @@ subroutine mixrho_para(rho)
          endif
          !
          if(myid.eq.nproc-1)then
-            do j=1,jy
-               do i=1,jx
+            do j=1,n2
+               do i=1,n1
 
-                  ass11(i,j,jz+1)=piano1(i,j)
-                  ass22(i,j,jz+1)=piano2(i,j)
-                  ass33(i,j,jz+1)=piano3(i,j)
+                  ass11(i,j,n3+1)=piano1(i,j)
+                  ass22(i,j,n3+1)=piano2(i,j)
+                  ass33(i,j,n3+1)=piano3(i,j)
 
                enddo
             enddo
@@ -887,22 +723,12 @@ subroutine mixrho_para(rho)
       !
 
       if(leftpem /= MPI_PROC_NULL) then
-         call MPI_SEND(ass33(1,1,kparasta),(jx+2)*(jy+2), &
-            MPI_REAL_SD,leftpem,tagls, &
-            MPI_COMM_WORLD,ierr)
+         call MPI_SEND(ass33(1,1,kparasta),(n1+2)*(n2+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
       endif
       if(rightpem /= MPI_PROC_NULL) then
-         call MPI_RECV(ass33(1,1,kparaend+1),(jx+2)*(jy+2), &
-            MPI_REAL_SD,rightpem,tagrr, &
-            MPI_COMM_WORLD,status,ierr)
+         call MPI_RECV(ass33(1,1,kparaend+1),(n1+2)*(n2+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
       endif
 
-      if(leftpem /= MPI_PROC_NULL) then
-      !      call MPI_WAIT(req1,istatus,ierr)
-      endif
-      if(rightpem /= MPI_PROC_NULL) then
-      !      call MPI_WAIT(req2,istatus,ierr)
-      endif
 
       !********************************************************
       ! calcola sgs stress parte scale similar
@@ -982,7 +808,7 @@ subroutine mixrho_para(rho)
       !v    call buffvect1d(sbuffd,sus_loc23,5)
       !v    call buffvect1d(sbuffd,sus_loc33,6)
 
-      !v    call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),6*jy,MPI_DOUBLE_PRECISION,
+      !v    call MPI_ALLREDUCE(sbuffd(1),rbuffd(1),6*jy,MPI_REAL_SD,
       !v   >                   MPI_SUM,MPI_COMM_WORLD,ierr)
 
       !v    call buffvect2d(rbuffd,sus11,1)
@@ -1024,24 +850,24 @@ subroutine mixrho_para(rho)
 
 
       do k=kparastam,kparaendm
-         do j=1+jp,jy-jp
-            do i=2*ip,jx-ip
+         do j=2,n2-1
+            do i=2*ip,n1-ip
                cgra1(i,j,k)=.5*(ass11(i,j,k)+ass11(i+1,j,k))
             enddo
          enddo
       enddo
 
       do k=kparastam,kparaendm
-         do j=2*jp,jy-jp
-            do i=1+ip,jx-ip
+         do j=2,n2-1
+            do i=1+ip,n1-ip
                cgra2(i,j,k)=.5*(ass22(i,j,k)+ass22(i,j+1,k))
             enddo
          enddo
       enddo
 
       do k=kparastan,kparaendm
-         do j=1+jp,jy-jp
-            do i=1+ip,jx-ip
+         do j=2,n2-1
+            do i=1+ip,n1-ip
                cgra3(i,j,k)=.5*(ass33(i,j,k)+ass33(i,j,k+1))
             enddo
          enddo

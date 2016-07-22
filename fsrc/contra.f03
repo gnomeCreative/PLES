@@ -1,13 +1,11 @@
-!***********************************************************************
-subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
-   !***********************************************************************
+subroutine contra()
    ! compute intermediate controvariant velocity
    ! and boundary condition cs for pressure
    use myarrays_metri3
    use myarrays_velo3
-   use mysending, only: MPI_REAL_SD
    !
    use scala3
+   use mysending
    use period
    !
    use mpi
@@ -19,11 +17,8 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
    integer i,j,k,ii,jj,kk
    real uinter,vinter,winter
    !
-   integer ierr,myid,nproc
-   integer ncolperproc,kparasta,kparaend,m
    integer kparastal,kparaendl
-   integer status(MPI_STATUS_SIZE)
-   integer rightpe,leftpe,rightpem,leftpem
+   integer ierr,status(MPI_STATUS_SIZE)
 
    real,allocatable :: cs3col(:),cs3tot(:)
    real,allocatable :: cs4col(:),cs4tot(:)
@@ -35,7 +30,7 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
    do ii=1,ip
       !
       do k=kparasta,kparaend
-         do j=1,jy
+         do j=1,n2
             !
             cs1(j,k)=u(0,j,k)*csx(0,j,k)+ &
                v(0,j,k)*csy(0,j,k)+ &
@@ -51,28 +46,28 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                w(0,j,k)*csz(0,j,k)
 
             !
-            cs2(j,k)=u(jx+1,j,k)*csx(jx,j,k)+ &
-               v(jx+1,j,k)*csy(jx,j,k)+ &
-               w(jx+1,j,k)*csz(jx,j,k)-uc(jx,j,k)
+            cs2(j,k)=u(n1+1,j,k)*csx(n1,j,k)+ &
+               v(n1+1,j,k)*csy(n1,j,k)+ &
+               w(n1+1,j,k)*csz(n1,j,k)-uc(n1,j,k)
 
             if(potenziale)then
-               cs2(j,k)=-uc(jx,j,k)
+               cs2(j,k)=-uc(n1,j,k)
             end if
             !
-            uc(jx,j,k)=u(jx+1,j,k)*csx(jx,j,k)+ &
-               v(jx+1,j,k)*csy(jx,j,k)+ &
-               w(jx+1,j,k)*csz(jx,j,k)
+            uc(n1,j,k)=u(n1+1,j,k)*csx(n1,j,k)+ &
+               v(n1+1,j,k)*csy(n1,j,k)+ &
+               w(n1+1,j,k)*csz(n1,j,k)
          !
          end do
       end do
    !
-   enddo
+   end do
    !
    ! into the field
    !
    do k=kparasta,kparaend
-      do j=1,jy
-         do i=ip,jx-ip
+      do j=1,n2
+         do i=ip,n1-ip
             !
             uinter=.5*(u(i,j,k)+u(i+1,j,k))
             vinter=.5*(v(i,j,k)+v(i+1,j,k))
@@ -92,10 +87,10 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
    !
    ! sides bottom and upper vc* - vc^(n+1)
    !
-   do jj=1,jp
+   ! direction j is always periodic
       !
       do k=kparasta,kparaend
-         do i=1,jx
+         do i=1,n1
             !
             cs3(i,k)=u(i,0,k)*etx(i,0,k)+ &
                v(i,0,k)*ety(i,0,k)+ &
@@ -110,28 +105,27 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                v(i,0,k)*ety(i,0,k)+ &
                w(i,0,k)*etz(i,0,k)
             !
-            cs4(i,k)=u(i,jy+1,k)*etx(i,jy,k)+ &
-               v(i,jy+1,k)*ety(i,jy,k)+ &
-               w(i,jy+1,k)*etz(i,jy,k)-vc(i,jy,k)
+            cs4(i,k)=u(i,n2+1,k)*etx(i,n2,k)+ &
+               v(i,n2+1,k)*ety(i,n2,k)+ &
+               w(i,n2+1,k)*etz(i,n2,k)-vc(i,n2,k)
 
             if(potenziale)then
-               cs4(i,k)=-vc(i,jy,k)
+               cs4(i,k)=-vc(i,n2,k)
             end if
 
-            vc(i,jy,k)=u(i,jy+1,k)*etx(i,jy,k)+ &
-               v(i,jy+1,k)*ety(i,jy,k)+ &
-               w(i,jy+1,k)*etz(i,jy,k)
+            vc(i,n2,k)=u(i,n2+1,k)*etx(i,n2,k)+ &
+               v(i,n2+1,k)*ety(i,n2,k)+ &
+               w(i,n2+1,k)*etz(i,n2,k)
          !
          end do
       end do
    !
-   enddo
    !
    ! into the field
    !
    do k=kparasta,kparaend
-      do j=jp,jy-jp
-         do i=1,jx
+      do j=1,n2-1
+         do i=1,n1
             !
             uinter=.5*(u(i,j,k)+u(i,j+1,k))
             vinter=.5*(v(i,j,k)+v(i,j+1,k))
@@ -152,8 +146,8 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
    !
    do kk=1,kp
       !
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             !
             if(myid.eq.0)then
                cs5(i,j)=u(i,j,0)*ztx(i,j,0)+ &
@@ -169,24 +163,24 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                   w(i,j,0)*ztz(i,j,0)
             !
             else if(myid.eq.nproc-1)then
-               cs6(i,j)=u(i,j,jz+1)*ztx(i,j,jz)+ &
-                  v(i,j,jz+1)*zty(i,j,jz)+ &
-                  w(i,j,jz+1)*ztz(i,j,jz)-wc(i,j,jz)
+               cs6(i,j)=u(i,j,n3+1)*ztx(i,j,n3)+ &
+                  v(i,j,n3+1)*zty(i,j,n3)+ &
+                  w(i,j,n3+1)*ztz(i,j,n3)-wc(i,j,n3)
 
                if(potenziale)then
-                  cs6(i,j)=-wc(i,j,jz)
+                  cs6(i,j)=-wc(i,j,n3)
                end if
                !
-               wc(i,j,jz)=u(i,j,jz+1)*ztx(i,j,jz)+ &
-                  v(i,j,jz+1)*zty(i,j,jz)+ &
-                  w(i,j,jz+1)*ztz(i,j,jz)
+               wc(i,j,n3)=u(i,j,n3+1)*ztx(i,j,n3)+ &
+                  v(i,j,n3+1)*zty(i,j,n3)+ &
+                  w(i,j,n3+1)*ztz(i,j,n3)
    
             endif
          !
          end do
       end do
    !
-   enddo
+   end do
    !
    ! into the field
    !
@@ -203,8 +197,8 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
 
    do k=kparastal,kparaendl
 
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             !
             uinter=.5*(u(i,j,k)+u(i,j,k+1))
             vinter=.5*(v(i,j,k)+v(i,j,k+1))
@@ -214,31 +208,15 @@ subroutine contra(kparasta,kparaend,rightpe,leftpe,nproc,myid)
                vinter*zty(i,j,k)+ &
                winter*ztz(i,j,k)
          !
-         enddo
-      enddo
+         end do
+      end do
 
-   enddo
+   end do
 
 
-   ! subroutine diver needs wc(k-1) to compute rhs
-   ! so I need to pass kparaend plane  between proc
-   !
-   if(myid.eq.0)then
-      leftpem=MPI_PROC_NULL
-      rightpem=rightpe
-   else if(myid.eq.nproc-1)then
-      leftpem=leftpe
-      rightpem=MPI_PROC_NULL
-   else if((myid.ne.0).and.(myid.ne.nproc-1))then
-      leftpem=leftpe
-      rightpem=rightpe
-   endif
-   !
-   call MPI_SENDRECV(wc(1,1,kparaend),jx*jy, &
-      MPI_REAL_SD,rightpem,51+myid, &
-      wc(1,1,kparasta-1),jx*jy, &
-      MPI_REAL_SD,leftpem,50+myid, &
-      MPI_COMM_WORLD,status,ierr)
-   !
+   ! subroutine diver needs wc(k-1) to compute rhs so I need to pass kparaend plane between proc
+   call MPI_SENDRECV(wc(1,1,kparaend),n1*n2,MPI_REAL_SD,rightpem,51+myid,wc(1,1,kparasta-1),n1*n2, &
+      MPI_REAL_SD,leftpem,50+myid,MPI_COMM_WORLD,status,ierr)
+
    return
 end

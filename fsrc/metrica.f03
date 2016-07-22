@@ -1,6 +1,4 @@
-!***********************************************************************
 subroutine metrica
-   !***********************************************************************
    !
    ! build metric term 3D
    ! for solution Zang, Street, Koseff
@@ -83,11 +81,11 @@ subroutine metrica
    !
    ! planes at csi constant
    !
-   do i=0,jx
-      do j=1,jy
+   do i=0,n1
+      do j=1,n2
          do k=kparasta,kparaend !kinizio,kfine !1,jz
             !
-            if (i.eq.0.and.ip.eq.1) then
+            if (i==0.and.ip==1) then
                !
                x2=.25*(x(i+2,j,k)+x(i+2,j,k-1)+x(i+2,j-1,k)+x(i+2,j-1,k-1))
                x1=.25*(x(i+1,j,k)+x(i+1,j,k-1)+x(i+1,j-1,k)+x(i+1,j-1,k-1))
@@ -105,7 +103,7 @@ subroutine metrica
                ycsi=.5 * ( -3.*y0 + 4.*y1 - y2 )
                zcsi=.5 * ( -3.*z0 + 4.*z1 - z2 )
             !
-            else if (i.eq.jx.and.ip.eq.1) then
+            else if (i==n1.and.ip==1) then
                !
                x2=.25*(x(i-2,j,k)+x(i-2,j,k-1)+x(i-2,j-1,k)+x(i-2,j-1,k-1))
                x1=.25*(x(i-1,j,k)+x(i-1,j,k-1)+x(i-1,j-1,k)+x(i-1,j-1,k-1))
@@ -181,17 +179,6 @@ subroutine metrica
                +csz(i,j,k)*a_ztz)/a_giac
             !
 
-            ! Coriolis oil
-            if (j.eq.jy) then
-
-               g_co11(i,k)=0
-               !
-               g_co12(i,k)=0.
-               !
-               g_co13(i,k)=(-csx(i,j,k)*a_ztz &
-                  +csz(i,j,k)*a_ztz)/a_giac
-
-            end if
 
          end do
       end do
@@ -201,11 +188,11 @@ subroutine metrica
    !
    ! planes at eta constant
    !
-   do i=1,jx
-      do j=0,jy
+   do i=1,n1
+      do j=0,n2
          do k=kparasta,kparaend !kinizio,kfine  !1,jz
             !
-            if      (j.eq.0.and.jp.eq.1)  then
+            if (j==0)  then
                !
                x2=.25*(x(i,j+2,k)+x(i,j+2,k-1)+x(i-1,j+2,k-1)+x(i-1,j+2,k))
                x1=.25*(x(i,j+1,k)+x(i,j+1,k-1)+x(i-1,j+1,k-1)+x(i-1,j+1,k))
@@ -223,7 +210,7 @@ subroutine metrica
                yeta=.5 * ( -3.*y0 + 4.*y1 - y2 )
                zeta=.5 * ( -3.*z0 + 4.*z1 - z2 )
             !
-            else if (j.eq.jy.and.jp.eq.1) then
+            else if (j==n2) then
                !
                x2=.25*(x(i,j-2,k)+x(i,j-2,k-1)+x(i-1,j-2,k-1)+x(i-1,j-2,k))
                x1=.25*(x(i,j-1,k)+x(i,j-1,k-1)+x(i-1,j-1,k-1)+x(i-1,j-1,k))
@@ -296,10 +283,10 @@ subroutine metrica
    !-----------------------------------------------------------------------
    ! temporary index for k direction
    !
-   if(myid.eq.0)then
+   if(myid==0)then
       kinizio = kparasta-1
       kfine   = kparaend
-   elseif(myid.eq.nproc-1)then
+   elseif(myid==nproc-1)then
       kinizio = kparasta-1
       kfine   = kparaend
    else
@@ -314,11 +301,11 @@ subroutine metrica
    ! myid=0 need to start with k=0
    !
 
-   do i=1,jx
-      do j=1,jy
+   do i=1,n1
+      do j=1,n2
          do k=kparasta-1,kparaend ! needs z at kparaend+1
             !
-            if (k.eq.0.and.kp.eq.1) then   !only myid=0
+            if (k==0.and.kp==1) then   !only myid=0
                !
                x2=.25*(x(i,j,k+2)+x(i,j-1,k+2)+x(i-1,j-1,k+2)+x(i-1,j,k+2))
                x1=.25*(x(i,j,k+1)+x(i,j-1,k+1)+x(i-1,j-1,k+1)+x(i-1,j,k+1))
@@ -336,7 +323,7 @@ subroutine metrica
                yzet=.5 * ( -3.*y0 + 4.*y1 - y2 )
                zzet=.5 * ( -3.*z0 + 4.*z1 - z2 )
             !
-            else if (k.eq.jz.and.kp.eq.1) then !only myid=nproc-1
+            else if (k==n3.and.kp==1) then !only myid=nproc-1
                !
                x2=.25*(x(i,j,k-2)+x(i,j-1,k-2)+x(i-1,j-1,k-2)+x(i-1,j,k-2))
                x1=.25*(x(i,j,k-1)+x(i,j-1,k-1)+x(i-1,j-1,k-1)+x(i-1,j,k-1))
@@ -403,17 +390,6 @@ subroutine metrica
             !
             g33(i,j,k)=(ztx(i,j,k)**2+zty(i,j,k)**2+ztz(i,j,k)**2)/a_giac
             !
-            ! Coriolis oil
-            if(j.eq.jy)then
-
-               g_co31(i,k)=(-ztx(i,j,k)*a_csz+ztz(i,j,k)*a_csx)/a_giac
-               !
-               g_co32(i,k)=0.
-               !
-               g_co33(i,k)=0.
-
-            end if
-
 
          end do
       end do
@@ -432,8 +408,8 @@ subroutine metrica
    ref_length_min=10000000000.0
    ref_length_max=0.0
    !
-   do i=1,jx
-      do j=1,jy
+   do i=1,n1
+      do j=1,n2
          do k=kparasta,kparaend  !1,jz
             !
             xcsi=.25*(x(i  ,j,k)+x(i  ,j,k-1) &
@@ -501,7 +477,7 @@ subroutine metrica
       end do
    end do
 
-   if(myid.eq.0) then
+   if(myid==0) then
       write(*,*)'giac min, giac max',giac_min,giac_max
       write(*,*)'ref_length min, ref_length max',ref_length_min,ref_length_max
    end if

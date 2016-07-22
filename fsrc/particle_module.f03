@@ -1,86 +1,82 @@
 module particle_module
 
     use,intrinsic :: iso_c_binding
+
     use ibm_module
     use mysending
-    !
+
     use mpi
 
     implicit none
 
-    private
+    integer :: num_part_loc,num_part_tot
 
-    integer,public :: totParticles
-
-    real,allocatable,public :: sphereRadius(:),sphereRadius2(:),sphereSurface(:)
-    real,allocatable,public :: spherePosition(:,:)
-    real,allocatable,public :: sphereVelocity(:,:)
-    real,allocatable,public :: sphereSpin(:,:)
+    real,allocatable :: sphereRadius(:),sphereRadius2(:),sphereSurface(:)
+    real,allocatable :: spherePosition(:,:)
+    real,allocatable :: sphereVelocity(:,:)
+    real,allocatable :: sphereSpin(:,:)
     integer,allocatable :: sphereIndex(:)
     logical,allocatable :: sphereMoves(:)
-    real,allocatable,public :: sphereShearForce(:,:),spherePressureForce(:,:),sphereMomentumForce(:,:)
+    real,allocatable :: sphereShearForce(:,:),spherePressureForce(:,:),sphereMomentumForce(:,:)
     ! field vector for visualization
-    real,allocatable,public :: fluidShearForce(:,:,:,:),fluidPressureForce(:,:,:,:),fluidMomentumForce(:,:,:,:)
-    real,allocatable,public :: fluidParticleVel(:,:,:,:)
-    integer,allocatable,public :: forceCaso(:,:,:)
+    real,allocatable :: fluidShearForce(:,:,:,:),fluidPressureForce(:,:,:,:),fluidMomentumForce(:,:,:,:)
+    real,allocatable :: fluidParticleVel(:,:,:,:)
+    integer,allocatable :: forceCaso(:,:,:)
 
+    real :: border_left,border_right
+    real :: deep_border_left,deep_border_right
 
-    public :: pass_geometry,pass_forces,compute_sphere_forces,compute_sphere_force_fields
+    logical,parameter :: print_fields=.false.
 
 contains
 
-
     subroutine compute_sphere_forces()
 
-        use myarrays_metri3, only: giac,ref_length
+        use myarrays_metri3, only: giac,ref_length,ref_area
         use scala3, only: dt
-
-        implicit none
 
         ! for force geometric computation
         ! IP_IB distance
         real :: refDistance
         ! characteristics of fluid element
-        real :: refLengthHere,volumeHere,refVolume
+        real :: refLengthHere,refAreaHere,volumeHere,refVolume
         real,parameter :: sqrt2=sqrt(2.0)
         real,parameter :: sqrt2d2=sqrt(2.0)/2.0
 
         ! for output
         integer :: l,m
         integer :: ierr
-        integer :: solidIndexHere,p,indexHere,indexSizeHere
+        integer :: solidIndexHere,p,indexSizeHere,particleIndex
         integer :: ibCounter
-        integer :: MPI_3_REAL
         real,dimension(3) :: forceShearHere,forceShearTot
         real,dimension(3) :: forcePressureHere,forcePressureTot
         real,dimension(3) :: forceMomentumHere,forceMomentumTot
-
         !
         integer :: i0,j0,k0
 
         ! remove this
-        call compute_sphere_force_fields()
+        if (print_fields) then
+            call compute_sphere_force_fields()
+        end if
 
         ! deallocate previous arrays if necessary
         if (allocated(sphereShearForce)) then
             deallocate(sphereShearForce,spherePressureForce,sphereMomentumForce)
         end if
 
-        allocate(sphereShearForce(3,totParticles))
-        allocate(spherePressureForce(3,totParticles))
-        allocate(sphereMomentumForce(3,totParticles))
+        allocate(sphereShearForce(3,num_part_tot))
+        allocate(spherePressureForce(3,num_part_tot))
+        allocate(sphereMomentumForce(3,num_part_tot))
 
 
         ! Force on particles
-        !call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-
-        !call MPI_TYPE_CONTIGUOUS(3,MPI_REAL_SD,MPI_3_REAL,ierr)
-
         sphereShearForce(:,:)=0.0
         spherePressureForce(:,:)=0.0
         sphereMomentumForce(:,:)=0.0
 
-        do p=1,totParticles
+        do p=1,num_part_tot
+
+            particleIndex=sphereIndex(p)
 
 
             forceShearHere(:)=0.0
@@ -90,52 +86,47 @@ contains
             forcePressureTot(:)=0.0
             forceMomentumTot(:)=0.0
 
-            indexHere=sphereIndex(p)
-
             ibCounter=0
 
             do l=1,num_ib
 
                 ! index ib
-                i0=indici_CELLE_IB(l,1)
-                j0=indici_CELLE_IB(l,2)
-                k0=indici_CELLE_IB(l,3)
+                i0=indici_CELLE_IB(1,l)
+                j0=indici_CELLE_IB(2,l)
+                k0=indici_CELLE_IB(3,l)
 
-                do m=1,indexsize_ib(l)
+                solidIndexHere=index_ib(l)
 
-                    solidIndexHere=index_ib(l,m)
+                if (solidIndexHere==particleIndex) then
 
-                    if (solidIndexHere==indexHere) then
+                    ! momentum needs an estimation of the reference volume of the IB node
+                    ! for ref_distance->0, ref_volume=1/2*cell_volume
 
-                        ! momentum needs an estimation of the reference volume of the IB node
-                        ! for ref_distance->0, ref_volume=1/2*cell_volume
+                    ! distance IP-IB
+                    refDistance=dist_ib_parete(l)
 
-                        ! distance IP-IB
-                        refDistance=dist_ib_parete(l)
+                    ! refence length of fluid element
+                    refLengthHere=ref_length(i0,j0,k0)
+                    refAreaHere=ref_area(i0,j0,k0)
+                    volumeHere=giac(i0,j0,k0)
 
-                        ! refence length of fluid element
-                        refLengthHere=ref_length(i0,j0,k0)
-                        volumeHere=giac(i0,j0,k0)
-
-                        ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                        ! CHECK THIS !!!!!!!!!!!!!!!!!!!!!!
-                        if (refDistance<refLengthHere) then
-                            refVolume=0.5*volumeHere*(1.0+refDistance/refLengthHere)
-                        else
-                            refVolume=volumeHere*(1.0+refDistance/refLengthHere)
-                        end if
-
-                        !write(*,*) 'VOL=',refVolume
-
-                        forceShearHere(:)=forceShearHere(:)+shear_ib(l,:)*refLengthHere**2.0
-                        forcePressureHere(:)=forcePressureHere(:)+pressure_ib(l,:)*refLengthHere**2.0
-                        forceMomentumHere(:)=forceMomentumHere(:)+momentum_ib(l,:)*refVolume/dt
-
-                        ibCounter=ibCounter+1
-
+                    ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    ! CHECK THIS !!!!!!!!!!!!!!!!!!!!!!
+                    if (refDistance<refLengthHere) then
+                        refVolume=0.5*volumeHere*(1.0+refDistance/refLengthHere)
+                    else
+                        refVolume=volumeHere*(1.0+refDistance/refLengthHere)
                     end if
 
-                end do
+                    !write(*,*) 'VOL=',refVolume
+
+                    forceShearHere(:)=forceShearHere(:)+shear_ib(:,l)*refAreaHere
+                    forcePressureHere(:)=forcePressureHere(:)+pressure_ib(:,l)*refAreaHere
+                    forceMomentumHere(:)=forceMomentumHere(:)+momentum_ib(:,l)*refVolume
+
+                    ibCounter=ibCounter+1
+
+                end if
 
             end do
 
@@ -153,9 +144,9 @@ contains
 
             call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
-            sphereShearForce(:,p)=forceShearTot(:)
-            spherePressureForce(:,p)=forcePressureTot(:)
-            sphereMomentumForce(:,p)=forceMomentumTot(:)
+            sphereShearForce(:,particleIndex)=forceShearTot(:)
+            spherePressureForce(:,particleIndex)=forcePressureTot(:)
+            sphereMomentumForce(:,particleIndex)=forceMomentumTot(:)
 
 
         end do
@@ -167,54 +158,48 @@ contains
 
         use scala3
 
-        implicit none
+        integer :: i,j,k,l
 
-        integer :: i0,j0,k0,l
-
-        if (allocated(fluidShearForce)) then
-                    ! Alessandro: interaction force --------------------------------
-            fluidShearForce(:,:,:,:)=0.0
-            fluidPressureForce(:,:,:,:)=0.0
-            fluidMomentumForce(:,:,:,:)=0.0
-            fluidParticleVel(:,:,:,:)=0.0
-            forceCaso(:,:,:)=5
-        else
-            allocate(fluidPressureForce(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr,3))
-            allocate(fluidShearForce(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr,3))
-            allocate(fluidMomentumForce(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr,3))
-            allocate(fluidParticleVel(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr,3))
+        if (.not.allocated(fluidShearForce)) then
+            allocate(fluidPressureForce(3,0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+            allocate(fluidShearForce(3,0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+            allocate(fluidMomentumForce(3,0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+            allocate(fluidParticleVel(3,0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
             allocate(forceCaso(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
+        end if
+
             fluidShearForce(:,:,:,:)=0.0
             fluidPressureForce(:,:,:,:)=0.0
             fluidMomentumForce(:,:,:,:)=0.0
             fluidParticleVel(:,:,:,:)=0.0
-            forceCaso(:,:,:)=5
-        end if
+            forceCaso(:,:,:)=-10
 
         do l=1,num_ib
 
-            i0=indici_CELLE_IB(l,1)
-            j0=indici_CELLE_IB(l,2)
-            k0=indici_CELLE_IB(l,3)
+            i=indici_CELLE_IB(1,l)
+            j=indici_CELLE_IB(2,l)
+            k=indici_CELLE_IB(3,l)
 
-            fluidShearForce(i0,j0,k0,:)=shear_ib(l,:)
+            fluidShearForce(:,i,j,k)=shear_ib(:,l)
 
-            fluidPressureForce(i0,j0,k0,:)=pressure_ib(l,:)
+            fluidPressureForce(:,i,j,k)=pressure_ib(:,l)
 
-            fluidMomentumForce(i0,j0,k0,:)=momentum_ib(l,:)
+            fluidMomentumForce(:,i,j,k)=momentum_ib(:,l)
 
-            fluidParticleVel(i0,j0,k0,:)=surfVel(l,:)
+            fluidParticleVel(:,i,j,k)=surfvel_ib(:,l)
 
-            forceCaso(i0,j0,k0)=caso_ib(l)
+            forceCaso(i,j,k)=caso_ib(l)
 
         end do
+
 
     end subroutine compute_sphere_force_fields
 
     subroutine pass_geometry(totpart,pposx,pposy,pposz,pvelx,pvely,pvelz,pspinx,pspiny,pspinz,prad,pmoves) &
         bind (C, name="pass_geometry")
 
-        implicit none
+        use myarrays_metri3, only: z
+        use scala3
 
         integer(c_int),intent(in) :: totpart
         real(c_double),intent(in) :: pposx(totpart),pposy(totpart),pposz(totpart)
@@ -223,9 +208,22 @@ contains
         real(c_double),intent(in) :: prad(totpart)
         logical(c_bool),intent(in) :: pmoves(totpart)
         integer :: p
-
+        integer :: moving_counter,ierr
+        real :: max_radius
         !-------------------------------------------------
-        totParticles=totpart
+
+
+        ! compute max radius for determination of borders between processors
+        max_radius=maxval(prad)
+        write(*,*) 'Max radius ',max_radius
+        border_left=z(1,1,kparasta-1)
+        border_right=z(1,1,kparaend+1)
+        deep_border_left=border_left-1.5*max_radius
+        deep_border_right=border_right+1.5*max_radius
+        write(*,*) 'Proc ',myid,' left=',deep_border_left,' right=',deep_border_right
+
+        ! total number of particles
+        num_part_tot=totpart
 
         ! deallocate previous arrays if necessary
         if (allocated(sphereIndex)) then
@@ -237,30 +235,36 @@ contains
             deallocate(sphereSurface)
         end if
 
-        allocate(sphereIndex(totParticles),sphereMoves(totParticles))
-        allocate(sphereRadius(totParticles),sphereRadius2(totParticles))
-        allocate(spherePosition(3,totParticles))
-        allocate(sphereVelocity(3,totParticles))
-        allocate(sphereSpin(3,totParticles))
-        allocate(sphereSurface(totParticles))
+        allocate(sphereIndex(num_part_tot))
+        allocate(sphereMoves(num_part_tot))
+        allocate(sphereRadius(num_part_tot),sphereRadius2(num_part_tot))
+        allocate(spherePosition(3,num_part_tot))
+        allocate(sphereVelocity(3,num_part_tot))
+        allocate(sphereSpin(3,num_part_tot))
+        allocate(sphereSurface(num_part_tot))
 
-        do p=1,totParticles
+        moving_counter=0
+
+        do p=1,num_part_tot
             !write(*,*) 'Read',n
             sphereIndex(p)=p
             sphereMoves(p)=pmoves(p)
-            spherePosition(1,p)=pposx(p)
-            spherePosition(2,p)=pposy(p)
-            spherePosition(3,p)=pposz(p)
-            sphereVelocity(1,p)=pvelx(p)
-            sphereVelocity(2,p)=pvely(p)
-            sphereVelocity(3,p)=pvelz(p)
-            sphereSpin(1,p)=pspinx(p)
-            sphereSpin(2,p)=pspiny(p)
-            sphereSpin(3,p)=pspinz(p)
+            if (sphereMoves(p)) then
+                moving_counter=moving_counter+1
+            end if
+            ! directly taken variables
+            spherePosition(:,p)=(/pposx(p),pposy(p),pposz(p)/)
+            sphereVelocity(:,p)=(/pvelx(p),pvely(p),pvelz(p)/)
+            sphereSpin(:,p)=(/pspinx(p),pspiny(p),pspinz(p)/)
             sphereRadius(p)=prad(p)
+            ! computed variables
             sphereRadius2(p)=sphereRadius(p)**2.0
             sphereSurface(p)=4.0*3.1428*sphereRadius(p)*sphereRadius(p)
         end do
+
+        if (moving_counter>0) then
+            update_ibm=.true.
+        end if
 
 !        if (myid==0) then
 !            write(*,'(A,I0.1,A)') ' LES: Got geometry data of ',totParticles,' particle(s) from DEM:'
@@ -276,21 +280,19 @@ contains
 
     subroutine pass_forces(sforx,sfory,sforz,pforx,pfory,pforz,mforx,mfory,mforz) bind (C, name="pass_forces")
 
-        implicit none
-
-        real(c_double),intent(out) :: sforx(totParticles),sfory(totParticles),sforz(totParticles)
-        real(c_double),intent(out) :: pforx(totParticles),pfory(totParticles),pforz(totParticles)
-        real(c_double),intent(out) :: mforx(totParticles),mfory(totParticles),mforz(totParticles)
+        real(c_double),intent(out) :: sforx(num_part_tot),sfory(num_part_tot),sforz(num_part_tot)
+        real(c_double),intent(out) :: pforx(num_part_tot),pfory(num_part_tot),pforz(num_part_tot)
+        real(c_double),intent(out) :: mforx(num_part_tot),mfory(num_part_tot),mforz(num_part_tot)
 
         integer :: p
 
         if (allocated(sphereShearForce)) then
             !-------------------------------------------------
             if (myid==1) then
-                write(*,'(A,I0.1,A)') 'LES: Send force data of ',totParticles,' particle(s) to DEM '
+                write(*,'(A,I0.1,A)') 'LES: Send force data of ',num_part_tot,' particle(s) to DEM '
             end if
 
-            do p=1,totParticles
+            do p=1,num_part_tot
                 sforx(p)=sphereShearForce(1,p)
                 sfory(p)=sphereShearForce(2,p)
                 sforz(p)=sphereShearForce(3,p)
@@ -313,7 +315,7 @@ contains
 
         else
 
-            do p=1,totParticles
+            do p=1,num_part_tot
                 sforx(p)=0.0
                 sfory(p)=0.0
                 sforz(p)=0.0
@@ -335,5 +337,113 @@ contains
 
     end subroutine pass_forces
 
+    function is_inside(point,p_index) result (check)
+
+        use scala3, only: dot
+
+        ! ----------------------------------------------------
+        logical :: check
+        real,dimension(3),intent(in) :: point
+        integer,intent(in) :: p_index
+        ! ----------------------------------------------------
+        real :: iso
+        ! ----------------------------------------------------
+
+        iso=dot(point(:)-spherePosition(:,p_index),point(:)-spherePosition(:,p_index))
+
+        if (iso>sphereRadius2(p_index)) then
+            check=.false.
+            return
+        else
+            check=.true.
+            return
+        end if
+
+    end function is_inside
+
+
+    function is_inprocessor(p_index) result (check)
+
+        ! ----------------------------------------------------
+        logical :: check
+        integer,intent(in) :: p_index
+        ! ----------------------------------------------------
+
+
+        if (spherePosition(3,p_index)>deep_border_left .and. spherePosition(3,p_index)<deep_border_right) then
+            check=.true.
+            return
+        else
+            check=.false.
+            return
+        end if
+
+    end function is_inprocessor
+
+
+    function point_velocity(point,p_index) result (velocity)
+
+        use scala3, only: cross
+
+        ! ----------------------------------------------------
+        real,dimension(3) :: velocity
+        real,dimension(3),intent(in) :: point
+        integer,intent(in) :: p_index
+        ! ----------------------------------------------------
+        real,dimension(3) :: lever,center_distance,normal
+        real :: norm_center_distance
+        ! ----------------------------------------------------
+
+        lever(:)=point(:)-spherePosition(:,p_index)
+
+        velocity(:)=sphereVelocity(:,p_index)+cross(lever,sphereSpin(:,p_index))
+
+    end function point_velocity
+
+    function surface_point(normal,p_index) result (point)
+
+        ! find direction vector passing by the point and pointing outward from
+        ! particle center
+
+        ! ----------------------------------------------------
+        real,dimension(3) :: point
+        real,dimension(3),intent(in) :: normal
+        integer,intent(in) :: p_index
+        ! ----------------------------------------------------
+
+        point(:)=spherePosition(:,p_index)+normal(:)*sphereRadius(p_index)
+
+    end function surface_point
+
+    function surface_normal(point,p_index) result (normal)
+
+        ! find direction vector passing by the point and pointing outward from
+        ! particle center
+
+        ! ----------------------------------------------------
+        real,dimension(3) :: normal
+        real,dimension(3),intent(in) :: point
+        integer,intent(in) :: p_index
+        ! ----------------------------------------------------
+
+        normal(:)=point(:)-spherePosition(:,p_index)
+
+        normal(:)=normal(:)/norm2(normal)
+
+    end function surface_normal
+
+    function surface_distance(point,p_index) result (distance)
+
+        ! ----------------------------------------------------
+        real,dimension(3) :: distance
+        real,dimension(3),intent(in) :: point
+        integer,intent(in) :: p_index
+        ! ----------------------------------------------------
+
+        ! ----------------------------------------------------
+
+        distance(:)=point(:)-spherePosition(:,p_index)-surface_normal(point,p_index)*sphereRadius(p_index)
+
+    end function surface_distance
 
 end module particle_module

@@ -56,10 +56,11 @@ void elmt::initialize(const double& partDensity, std::vector <vecList>& prototyp
 	// initialize forces
 	FParticle.reset();
 	FWall.reset();
+	FObject.reset();
 	FGrav=demF*m;
 	MParticle.reset();
 	MWall.reset();
-
+	MObject.reset();
 }
 
 void elmt::resetVelocity() {

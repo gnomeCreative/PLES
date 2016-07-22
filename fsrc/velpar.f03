@@ -24,17 +24,17 @@ contains
 
     subroutine initialize_velpar()
 
-        use scala3, only: n1,n2,n3,nscal
+        use scala3, only: n1,n2,nscal,kparasta,kparaend
 
         implicit none
 
-        allocate(usn(n2,n3),vsn(n2,n3),wsn(n2,n3))
-        allocate(udx(n2,n3),vdx(n2,n3),wdx(n2,n3))
-        allocate(rhosn(nscal,n2,n3),rhodx(nscal,n2,n3))
+        allocate(usn(1:n2,kparasta:kparaend),vsn(1:n2,kparasta:kparaend),wsn(1:n2,kparasta:kparaend))
+        allocate(udx(1:n2,kparasta:kparaend),vdx(1:n2,kparasta:kparaend),wdx(1:n2,kparasta:kparaend))
+        allocate(rhosn(nscal,1:n2,kparasta:kparaend),rhodx(nscal,1:n2,kparasta:kparaend))
         !
-        allocate(usp(n1,n3),vsp(n1,n3),wsp(n1,n3))
-        allocate(ust(n1,n3),vst(n1,n3),wst(n1,n3))
-        allocate(rhosp(nscal,n1,n3),rhost(nscal,n1,n3))
+        allocate(usp(1:n1,kparasta:kparaend),vsp(1:n1,kparasta:kparaend),wsp(1:n1,kparasta:kparaend))
+        allocate(ust(1:n1,kparasta:kparaend),vst(1:n1,kparasta:kparaend),wst(1:n1,kparasta:kparaend))
+        allocate(rhosp(nscal,1:n1,kparasta:kparaend),rhost(nscal,1:n1,kparasta:kparaend))
         !
         allocate(uav(n1,n2),vav(n1,n2),wav(n1,n2))
         allocate(uin(n1,n2),vin(n1,n2),win(n1,n2))

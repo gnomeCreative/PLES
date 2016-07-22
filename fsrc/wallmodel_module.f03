@@ -1,6 +1,6 @@
 module wallmodel_module
 
-    !      for wall modeling
+    ! for wall modeling
 
     use geometricRoutines
     use iso_c_binding
@@ -52,8 +52,7 @@ contains
 
     subroutine initialize_wallmodel(coef_wall)
 
-        use scala3, only: jx
-        use mysending, only: kparasta,kparaend
+        use scala3, only: n1,kparasta,kparaend
 
         implicit none
 
@@ -68,14 +67,14 @@ contains
             wfp6 = .false.
             att_wm_sgs=.false.
         else if (coef_wall==1) then
-            allocate(att_mod_par(1:jx,2,kparasta:kparaend))
-            allocate(u_t(1:jx,2,kparasta:kparaend))
-            allocate(utangente(1:jx,2,kparasta:kparaend))
+            allocate(att_mod_par(1:n1,2,kparasta:kparaend))
+            allocate(u_t(1:n1,2,kparasta:kparaend))
+            allocate(utangente(1:n1,2,kparasta:kparaend))
             !allocate(punto_wfp3(3,3,jx,kparasta:kparaend))
             !allocate(punto_wfp4(3,3,jx,kparasta:kparaend))
-            allocate(wf_points(3,jx,kparasta:kparaend,2))
-            allocate(wf_projections(3,jx,kparasta:kparaend,2))
-            allocate(wf_distance(jx,kparasta:kparaend,2))
+            allocate(wf_points(3,n1,kparasta:kparaend,2))
+            allocate(wf_projections(3,n1,kparasta:kparaend,2))
+            allocate(wf_distance(n1,kparasta:kparaend,2))
 
             att_mod_par(:,:,:)=.false.
             utangente(:,:,:)=1.0
@@ -94,20 +93,19 @@ contains
   end subroutine initialize_wallmodel
 
 
-    subroutine correggi_walls(ktime,niter,tipo,i_rest)
+    subroutine correggi_walls(ktime,tipo,i_rest)
 
         use myarrays_velo3, only: u,v,w
-        use myarrays_metri3, only: x,y,z,xcd,ycd,zcd
+        use myarrays_metri3, only: x,y,z,centroid
         !
-        use mysending
-        use scala3, only: jx,jy,jz,n1,n2,re
+        use scala3, only: n1,n2,n3,re,deepl,deepr,kparaend,kparasta
         !
         use mpi
 
         implicit none
 
         !-----------------------------------------------------------------------
-        integer,intent(in) :: ktime,niter,i_rest
+        integer,intent(in) :: ktime,i_rest
         integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
         !-----------------------------------------------------------------------
         real,dimension(3) :: p1,p2,p3
@@ -118,7 +116,7 @@ contains
         real :: distanza,alfa
         integer :: i,j0,j1,k,l,ierr
         integer :: start_loop,end_loop
-        integer,dimension(2) :: wallpoint,centroid
+        integer,dimension(2) :: wall_point,wall_centroid
         !-----------------------------------------------------------------------
         att_mod_par(:,:,:)=.true.
 
@@ -126,15 +124,15 @@ contains
         ! being that the array structure is weird, this is a trick to execute the correct indices
         if (wfp3) then
             start_loop=1
-            wallpoint(1)=0
-            centroid(1)=1
+            wall_point(1)=0
+            wall_centroid(1)=1
         else
             start_loop=2
         end if
         if (wfp4) then
             end_loop=2
-            wallpoint(2)=jy
-            centroid(2)=jy
+            wall_point(2)=n2
+            wall_centroid(2)=n2
         else
             end_loop=1
         end if
@@ -149,16 +147,14 @@ contains
             ! la coordinata sulla faccia con la normale al piano !!!!!!
             do l=start_loop,end_loop
 
-                j0=wallpoint(l)
-                j1=centroid(l)
+                j0=wall_point(l)
+                j1=wall_centroid(l)
 
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
 
                         ! point 1, cell centroid
-                        wf_point(1)=xcd(i,j1,k)
-                        wf_point(2)=ycd(i,j1,k)
-                        wf_point(3)=zcd(i,j1,k)
+                        wf_point(:)=centroid(:,i,j1,k)
 
                         ! triangle at the wall
                         p1=(/x(i,j0,k),y(i,j0,k),z(i,j0,k)/)
@@ -189,14 +185,16 @@ contains
 
         else
 
-            att_mod_par(:,:,:)=.true.
+            att_mod_par(:,:,:)=.false.
 
             do l=start_loop,end_loop
 
-                j1=centroid(l)
+                att_mod_par(:,l,:)=.true.
+
+                j1=wall_centroid(l)
 
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
 
                         ! solo su celle fluide
                         if (tipo(i,j1,k)==2) then
@@ -238,91 +236,6 @@ contains
                 end do
             end do
         end if
-        !-----------------------------------------------------------------------
-        !             FACE 4
-        !-----------------------------------------------------------------------
-!
-!        if (wfp4.and.ktime==1) then
-!            do k=kparasta,kparaend
-!                do i=1,jx
-!
-!                    wf_point(1)=xcd(i,jy,k)
-!                    wf_point(2)=ycd(i,jy,k)
-!                    wf_point(3)=zcd(i,jy,k)
-!
-!                    ! triangle at the wall
-!                    p1=(/x(i,jy,k),y(i,jy,k),z(i,jy,k)/)
-!                    p2=(/x(i-1,jy,k),y(i-1,jy,k),z(i-1,jy,k)/)
-!                    p3=(/x(i,jy,k-1),y(i,jy,k-1),z(i,jy,k-1)/)
-!
-!                    call plane_3points(p1,p2,p3,a,b,c,d)
-!
-!                    call find_plane_projection(a,b,c,d,wf_point,wf_projection)
-!
-!                    ! distance between point and projection
-!                    wf_distance(i,k,2)=norm2(wf_point(:)-wf_projection(:))
-!
-!                    wf_points(:,i,k,2)=wf_point(:)
-!                   wf_projections(:,i,k,2)=wf_projection(:)
-!
-!                end do
-!            end do
-!        end if
-!
-!
-!        if (ktime==1 .and. i_rest==0) then
-!            u_t(:,2,:)=1.0
-!            utangente(:,2,:)=1.0
-!            att_mod_par(:,2,:)=.false.
-!        else
-!            if (wfp4) then
-!                do k=kparasta,kparaend
-!                    do i=1,jx
-!
-!                        if (tipo(i,jy,k)==2) then
-!
-!                            p1(:)=wf_points(:,i,k,2)
-!                            p2(:)=wf_projections(:,i,k,2)
-!
-!                            speed=(/ u(i,jy,k),v(i,jy,k),w(i,jy,k) /)
-!
-!                            ! this is a position vector
-!                            p3(:)=p1(:)+speed(:)
-!
-!                            call line_angle(p1,p2,p1,p3,alfa)
-!
-!                            distanza=wf_distance(i,k,2)
-!
-!                            utangente(i,2,k)=norm2(speed)*sin(alfa)
-!
-!                            if (abs(utangente(i,2,k))>0.000001) then
-!                                u_t(i,2,k)=ustar_logprofile(distanza,utangente(i,2,k))
-!
-!                                    ! switch off the wall function if y+<11 or if it is not a fluid node
-!                                    ! in case of ibm
-!                                if (u_t(i,2,k)*distanza*re <= 11. .or.tipo(i,jy,k).ne.2) then
-!                                    att_mod_par(i,2,k)=.false.
-!                                end if
-!                            else
-!                                att_mod_par(i,2,k)=.false.
-!                            end if
-!
-!                        else !punto solido
-!                            u_t(i,2,k)=1.0
-!                            utangente(i,2,k)=1.0
-!                            att_mod_par(i,2,k)=.false.
-!                        end if
-!                    end do
-!                end do
-!            else
-!                do k=kparasta,kparaend
-!                    do i=1,jx
-!                        att_mod_par(i,2,k)=.false.
-!                    end do
-!                end do
-!            end if
-!
-!        end if
 
         return
 
@@ -402,6 +315,7 @@ contains
             !end if
 
             distance_plus=distance*ustar*re
+            !write(*,*) distance,distance_plus
             speed_plus=speed_plus_logprofile(distance_plus)
             ! since transition is not implemented, we use a simplified version
             ! logarithm (so that it's computed only once)

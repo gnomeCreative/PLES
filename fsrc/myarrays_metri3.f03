@@ -1,6 +1,5 @@
-!***********************************************************************
 module myarrays_metri3
-    !***********************************************************************
+
     ! coordinates x,y,z
     ! 19 metric terms, 6 for each face plus the giacobian
     ! fluxes
@@ -8,13 +7,13 @@ module myarrays_metri3
     ! NOTE better to move annit and fluxes in an other module
 
     implicit none
-    !-----------------------------------------------------------------------
+
     real,allocatable :: x(:,:,:),y(:,:,:),z(:,:,:)
     real,allocatable :: csx(:,:,:),csy(:,:,:),csz(:,:,:)
     real,allocatable :: etx(:,:,:),ety(:,:,:),etz(:,:,:)
     real,allocatable :: ztx(:,:,:),zty(:,:,:),ztz(:,:,:)
 
-    real,allocatable :: xcd(:,:,:),ycd(:,:,:),zcd(:,:,:)
+    real,allocatable :: centroid(:,:,:,:)
 
     real,allocatable :: g11(:,:,:),g12(:,:,:),g13(:,:,:)
     real,allocatable :: g21(:,:,:),g22(:,:,:),g23(:,:,:)
@@ -25,10 +24,6 @@ module myarrays_metri3
     real,allocatable :: f1(:,:,:),f2(:,:,:),f3(:,:,:)
     real,allocatable :: annit(:,:,:),annitV(:,:,:)
     real,allocatable :: annit_piano(:,:,:),annitV_piano(:,:,:)
-
-    !CORIOLIS OIL
-    real,allocatable :: g_co11(:,:),g_co12(:,:),g_co13(:,:)
-    real,allocatable :: g_co31(:,:),g_co32(:,:),g_co33(:,:)
 
     real :: box_vol,solid_vol,fluid_vol
 
@@ -47,11 +42,12 @@ contains
 
         integer,intent(inout) :: nlevel
         integer,intent(out) :: nlevmultimax
-
-        integer i,j,k
-        integer var_piani,livello
+        !-----------------------------------------------------------------------
+        integer :: i,j,k
+        integer :: var_piani,livello
 
         !-----------------------------------------------------------------------
+
         ! griglia
 
         !    qui decido la profondita' di allocazione della griglia
@@ -81,8 +77,8 @@ contains
                 write(*,*)'PROBLEM on multigrid level for proc'
                 write(*,*)'level reduced from ',nlevel,' to ',livello
             end if
-            nlevel = livello
-            nlevmultimax = nlevel
+            nlevel=livello
+            nlevmultimax=nlevel
         end if
 
         !-----------------------------------------------------------------------
@@ -105,7 +101,7 @@ contains
         y(:,:,:)=0.0
         z(:,:,:)=0.0
 
-        if (myid==0)write(*,*)myid,'coordinates allocation done'
+        if (myid==0)write(*,*) 'coordinates allocation done'
         !-----------------------------------------------------------------------
         !     metric terms allocation
 
@@ -164,24 +160,8 @@ contains
         ref_length(:,:,:)=0.0
         ref_area(:,:,:)=0.0
 
-        !CORIOLISOIL
-        allocate (g_co11(0:n1,kparasta:kparaend))
-        allocate (g_co12(0:n1,kparasta:kparaend))
-        allocate (g_co13(0:n1,kparasta:kparaend))
 
-        allocate (g_co31(1:n1,kparasta-1:kparaend))
-        allocate (g_co32(1:n1,kparasta-1:kparaend))
-        allocate (g_co33(1:n1,kparasta-1:kparaend))
-
-        g_co11(:,:)=0.0
-        g_co12(:,:)=0.0
-        g_co13(:,:)=0.0
-
-        g_co31(:,:)=0.0
-        g_co32(:,:)=0.0
-        g_co33(:,:)=0.0
-
-        if (myid==0)write(*,*)myid,'metric allocation done'
+        if (myid==0) write(*,*) 'metric allocation done'
         !-----------------------------------------------------------------------
         !     fluxes allocation
 
@@ -193,7 +173,7 @@ contains
         f2(:,:,:)=0.0
         f3(:,:,:)=0.0
 
-        if (myid==0)write(*,*)myid,'fluxes allocation done'
+        if (myid==0) write(*,*) 'fluxes allocation done'
         !-----------------------------------------------------------------------
 
         ! viscosita' turbolenta
@@ -216,7 +196,7 @@ contains
             annitV_piano(:,:,:)=0.0
         end if
 
-        if (myid==0)write(*,*)myid,'eddy viscosity allocation done'
+        if (myid==0) write(*,*) 'eddy viscosity allocation done'
 
         return
 
@@ -225,97 +205,93 @@ contains
     subroutine communication_viscosity()
 
         use mysending
-        use scala3
-        use mpi
 
         implicit none
 
-        integer :: ierror
-        integer :: status(MPI_STATUS_SIZE)
+        !integer :: ierror
+        !integer :: status(MPI_STATUS_SIZE)
 
-        ! send to left
-        if (myid/=0) then
-            call MPI_SEND(annit(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
-        end if
-        if (myid/=nproc-1) then
-            call MPI_RECV(annit(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
-        end if
-        ! send to right
-        if (myid/=nproc-1) then
-            call MPI_SEND(annit(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
-        end if
-        if (myid/=0) then
-            call MPI_RECV(annit(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
-        end if
-        !-----------------------------------------------------------------------
-        ! send to left
-        if (myid/=0) then
-            call MPI_SEND(annitV(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
-        end if
-        if (myid/=nproc-1) then
-            call MPI_RECV(annitV(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
-        end if
-        ! send to right
-        if (myid/=nproc-1) then
-            call MPI_SEND(annitV(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
-        end if
-        if (myid/=0) then
-            call MPI_RECV(annitV(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
-        end if
+
+        call border_exchange_centroids(annit,1)
+        call border_exchange_centroids(annitV,1)
+    !        ! send to left
+    !        if (myid/=0) then
+    !            call MPI_SEND(annit(0,0,kparasta),(n1+2)*(n2+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
+    !        end if
+    !        if (myid/=nproc-1) then
+    !            call MPI_RECV(annit(0,0,kparaend+1),(n1+2)*(n2+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
+    !        end if
+    !        ! send to right
+    !        if (myid/=nproc-1) then
+    !            call MPI_SEND(annit(0,0,kparaend),(n1+2)*(n2+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
+    !        end if
+    !        if (myid/=0) then
+    !            call MPI_RECV(annit(0,0,kparasta-1),(n1+2)*(n2+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
+    !        end if
+    !        !-----------------------------------------------------------------------
+    !        ! send to left
+    !        if (myid/=0) then
+    !            call MPI_SEND(annitV(0,0,kparasta),(n1+2)*(n2+2),MPI_REAL_SD,leftpe,tagls,MPI_COMM_WORLD,ierror)
+    !        end if
+    !        if (myid/=nproc-1) then
+    !            call MPI_RECV(annitV(0,0,kparaend+1),(n1+2)*(n2+2),MPI_REAL_SD,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
+    !        end if
+    !        ! send to right
+    !        if (myid/=nproc-1) then
+    !            call MPI_SEND(annitV(0,0,kparaend),(n1+2)*(n2+2),MPI_REAL_SD,rightpe,tagrs,MPI_COMM_WORLD,ierror)
+    !        end if
+    !        if (myid/=0) then
+    !            call MPI_RECV(annitV(0,0,kparasta-1),(n1+2)*(n2+2),MPI_REAL_SD,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
+    !        end if
 
     end subroutine communication_viscosity
 
-    subroutine compute_centroids() !jx,jy,jz,myid,nproc,kparasta,kparaend
+    subroutine compute_centroids()
 
         use mysending
         use scala3
-        use mpi
+
         implicit none
 
-        !integer,intent(in) :: jx,jy,jz
-        !integer,intent(in) :: myid,nproc,kparasta,kparaend
         !-----------------------------------------------------------------------
         integer i,j,k
         integer ksta,kend
-        integer iprintgrid,ighost,ibound
-
-        integer req1,req2,req3,req4,req5,req6
-        integer ierr,istatus,status(MPI_STATUS_SIZE)
+        integer ierr,status(MPI_STATUS_SIZE)
         !-----------------------------------------------------------------------
-        iprintgrid =1
-        ighost = 1
 
         if (myid==0) then
-            ksta = kparasta
-            kend = kparaend + 1
+            ksta=kparasta
+            kend=kparaend+1
         elseif (myid==nproc-1) then
-            ksta = kparasta - 1
-            kend = kparaend
+            ksta=kparasta-1
+            kend=kparaend
         else
-            ksta = kparasta - 1
-            kend = kparaend + 1
+            ksta=kparasta-1
+            kend=kparaend+1
         end if
 
         ! compute centroids
 
-        allocate(xcd(0:jx+1,0:jy+1,ksta-1:kend+1)) ! fix the periodicity!!!!!!
-        allocate(ycd(0:jx+1,0:jy+1,ksta-1:kend+1))
-        allocate(zcd(0:jx+1,0:jy+1,ksta-1:kend+1))
+        allocate(centroid(3,0:n1+1,0:n2+1,ksta-1:kend+1)) ! fix the periodicity!!!!!!
+
+        !allocate(centroid(1,0:jx+1,0:jy+1,ksta-1:kend+1))
+        !allocate(centroid(2,0:jx+1,0:jy+1,ksta-1:kend+1))
+        !allocate(centroid(3,0:jx+1,0:jy+1,ksta-1:kend+1))
 
 
         !-----------------------------------------------------------------------
         ! centroids
         do k=ksta,kend  !1,jz
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
 
-                    xcd(i,j,k)=0.125*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k) &
+                    centroid(1,i,j,k)=0.125*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k) &
                         +x(i,j-1,k)+x(i,j-1,k-1)+x(i-1,j-1,k-1)+x(i-1,j-1,k))
 
-                    ycd(i,j,k)=0.125*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k) &
+                    centroid(2,i,j,k)=0.125*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k) &
                         +y(i,j-1,k)+y(i,j-1,k-1)+y(i-1,j-1,k-1)+y(i-1,j-1,k))
 
-                    zcd(i,j,k)=0.125*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k) &
+                    centroid(3,i,j,k)=0.125*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k) &
                         +z(i,j-1,k)+z(i,j-1,k-1)+z(i-1,j-1,k-1)+z(i-1,j-1,k))
 
                 end do
@@ -324,111 +300,111 @@ contains
 
         ! side 1 and 2
         do k=ksta,kend  !1,jz
-            do j=1,jy
+            do j=1,n2
 
                 i=0
 
-                xcd(i,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i,j-1,k-1)+x(i,j-1,k))
-                ycd(i,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i,j-1,k-1)+y(i,j-1,k))
-                zcd(i,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i,j-1,k-1)+z(i,j-1,k))
+                centroid(1,i,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i,j-1,k-1)+x(i,j-1,k))
+                centroid(2,i,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i,j-1,k-1)+y(i,j-1,k))
+                centroid(3,i,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i,j-1,k-1)+z(i,j-1,k))
 
-                i=jx
+                i=n1
 
-                xcd(i+1,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i,j-1,k-1)+x(i,j-1,k))
-                ycd(i+1,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i,j-1,k-1)+y(i,j-1,k))
-                zcd(i+1,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i,j-1,k-1)+z(i,j-1,k))
+                centroid(1,i+1,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i,j-1,k-1)+x(i,j-1,k))
+                centroid(2,i+1,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i,j-1,k-1)+y(i,j-1,k))
+                centroid(3,i+1,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i,j-1,k-1)+z(i,j-1,k))
 
             end do
         end do
 
-        do i=1,jx
+        do i=1,n1
             j=0
             k=ksta-1 !0
-            xcd(i,j,k)=0.5*(x(i,j,k)+x(i-1,j,k))
-            ycd(i,j,k)=0.5*(y(i,j,k)+y(i-1,j,k))
-            zcd(i,j,k)=0.5*(z(i,j,k)+z(i-1,j,k))
+            centroid(1,i,j,k)=0.5*(x(i,j,k)+x(i-1,j,k))
+            centroid(2,i,j,k)=0.5*(y(i,j,k)+y(i-1,j,k))
+            centroid(3,i,j,k)=0.5*(z(i,j,k)+z(i-1,j,k))
 
             j=0
             k=kend !jz
-            xcd(i,j,k+1)=0.5*(x(i,j,k)+x(i-1,j,k))
-            ycd(i,j,k+1)=0.5*(y(i,j,k)+y(i-1,j,k))
-            zcd(i,j,k+1)=0.5*(z(i,j,k)+z(i-1,j,k))
+            centroid(1,i,j,k+1)=0.5*(x(i,j,k)+x(i-1,j,k))
+            centroid(2,i,j,k+1)=0.5*(y(i,j,k)+y(i-1,j,k))
+            centroid(3,i,j,k+1)=0.5*(z(i,j,k)+z(i-1,j,k))
 
-            j=jy
+            j=n2
             k=kend !jz
-            xcd(i,j+1,k+1)=0.5*(x(i,j,k)+x(i-1,j,k))
-            ycd(i,j+1,k+1)=0.5*(y(i,j,k)+y(i-1,j,k))
-            zcd(i,j+1,k+1)=0.5*(z(i,j,k)+z(i-1,j,k))
+            centroid(1,i,j+1,k+1)=0.5*(x(i,j,k)+x(i-1,j,k))
+            centroid(2,i,j+1,k+1)=0.5*(y(i,j,k)+y(i-1,j,k))
+            centroid(3,i,j+1,k+1)=0.5*(z(i,j,k)+z(i-1,j,k))
 
-            j=jy
+            j=n2
             k=ksta-1 !0
-            xcd(i,j+1,k)=0.5*(x(i,j,k)+x(i-1,j,k))
-            ycd(i,j+1,k)=0.5*(y(i,j,k)+y(i-1,j,k))
-            zcd(i,j+1,k)=0.5*(z(i,j,k)+z(i-1,j,k))
+            centroid(1,i,j+1,k)=0.5*(x(i,j,k)+x(i-1,j,k))
+            centroid(2,i,j+1,k)=0.5*(y(i,j,k)+y(i-1,j,k))
+            centroid(3,i,j+1,k)=0.5*(z(i,j,k)+z(i-1,j,k))
         end do
         !...........................................................
         ! side 3 and 4 plus corners
         do k=ksta,kend !1,jz
-            do i=1,jx
+            do i=1,n1
 
                 j=0
 
-                xcd(i,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k))
-                ycd(i,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k))
-                zcd(i,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k))
+                centroid(1,i,j,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k))
+                centroid(2,i,j,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k))
+                centroid(3,i,j,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k))
 
-                j=jy
+                j=n2
 
-                xcd(i,j+1,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k))
-                ycd(i,j+1,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k))
-                zcd(i,j+1,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k))
+                centroid(1,i,j+1,k)=0.25*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k))
+                centroid(2,i,j+1,k)=0.25*(y(i,j,k)+y(i,j,k-1)+y(i-1,j,k-1)+y(i-1,j,k))
+                centroid(3,i,j+1,k)=0.25*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k))
 
             end do
         end do
 
-        do j=1,jy
+        do j=1,n2
 
             k=ksta-1 !0
             i=0
-            xcd(i,j,k)=0.5*(x(i,j,k)+x(i,j-1,k))
-            ycd(i,j,k)=0.5*(y(i,j,k)+y(i,j-1,k))
-            zcd(i,j,k)=0.5*(z(i,j,k)+z(i,j-1,k))
+            centroid(1,i,j,k)=0.5*(x(i,j,k)+x(i,j-1,k))
+            centroid(2,i,j,k)=0.5*(y(i,j,k)+y(i,j-1,k))
+            centroid(3,i,j,k)=0.5*(z(i,j,k)+z(i,j-1,k))
 
             k=ksta-1 !0
-            i=jx
-            xcd(i+1,j,k)=0.5*(x(i,j,k)+x(i,j-1,k))
-            ycd(i+1,j,k)=0.5*(y(i,j,k)+y(i,j-1,k))
-            zcd(i+1,j,k)=0.5*(z(i,j,k)+z(i,j-1,k))
+            i=n1
+            centroid(1,i+1,j,k)=0.5*(x(i,j,k)+x(i,j-1,k))
+            centroid(2,i+1,j,k)=0.5*(y(i,j,k)+y(i,j-1,k))
+            centroid(3,i+1,j,k)=0.5*(z(i,j,k)+z(i,j-1,k))
 
             k=kend !jz
-            i=jx
-            xcd(i+1,j,k+1)=0.5*(x(i,j,k)+x(i,j-1,k))
-            ycd(i+1,j,k+1)=0.5*(y(i,j,k)+y(i,j-1,k))
-            zcd(i+1,j,k+1)=0.5*(z(i,j,k)+z(i,j-1,k))
+            i=n1
+            centroid(1,i+1,j,k+1)=0.5*(x(i,j,k)+x(i,j-1,k))
+            centroid(2,i+1,j,k+1)=0.5*(y(i,j,k)+y(i,j-1,k))
+            centroid(3,i+1,j,k+1)=0.5*(z(i,j,k)+z(i,j-1,k))
 
             k=kend !jz
             i=0
-            xcd(i,j,k+1)=0.5*(x(i,j,k)+x(i,j-1,k))
-            ycd(i,j,k+1)=0.5*(y(i,j,k)+y(i,j-1,k))
-            zcd(i,j,k+1)=0.5*(z(i,j,k)+z(i,j-1,k))
+            centroid(1,i,j,k+1)=0.5*(x(i,j,k)+x(i,j-1,k))
+            centroid(2,i,j,k+1)=0.5*(y(i,j,k)+y(i,j-1,k))
+            centroid(3,i,j,k+1)=0.5*(z(i,j,k)+z(i,j-1,k))
 
         end do
         !..........................................................
         ! parete 5 e 6 e spigoli
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
 
                 k=ksta-1 !0
 
-                xcd(i,j,k)=0.25*(x(i,j,k)+x(i,j-1,k)+x(i-1,j-1,k)+x(i-1,j,k))
-                ycd(i,j,k)=0.25*(y(i,j,k)+y(i,j-1,k)+y(i-1,j-1,k)+y(i-1,j,k))
-                zcd(i,j,k)=0.25*(z(i,j,k)+z(i,j-1,k)+z(i-1,j-1,k)+z(i-1,j,k))
+                centroid(1,i,j,k)=0.25*(x(i,j,k)+x(i,j-1,k)+x(i-1,j-1,k)+x(i-1,j,k))
+                centroid(2,i,j,k)=0.25*(y(i,j,k)+y(i,j-1,k)+y(i-1,j-1,k)+y(i-1,j,k))
+                centroid(3,i,j,k)=0.25*(z(i,j,k)+z(i,j-1,k)+z(i-1,j-1,k)+z(i-1,j,k))
 
                 k=kend !jz
 
-                xcd(i,j,k+1)=0.25*(x(i,j,k)+x(i,j-1,k)+x(i-1,j-1,k)+x(i-1,j,k))
-                ycd(i,j,k+1)=0.25*(y(i,j,k)+y(i,j-1,k)+y(i-1,j-1,k)+y(i-1,j,k))
-                zcd(i,j,k+1)=0.25*(z(i,j,k)+z(i,j-1,k)+z(i-1,j-1,k)+z(i-1,j,k))
+                centroid(1,i,j,k+1)=0.25*(x(i,j,k)+x(i,j-1,k)+x(i-1,j-1,k)+x(i-1,j,k))
+                centroid(2,i,j,k+1)=0.25*(y(i,j,k)+y(i,j-1,k)+y(i-1,j-1,k)+y(i-1,j,k))
+                centroid(3,i,j,k+1)=0.25*(z(i,j,k)+z(i,j-1,k)+z(i-1,j-1,k)+z(i-1,j,k))
 
             end do
         end do
@@ -436,240 +412,131 @@ contains
         do k=ksta,kend !1,jz
             j=0
             i=0
-            xcd(i,j,k)=0.5*(x(i,j,k)+x(i,j,k-1))
-            ycd(i,j,k)=0.5*(y(i,j,k)+y(i,j,k-1))
-            zcd(i,j,k)=0.5*(z(i,j,k)+z(i,j,k-1))
+            centroid(1,i,j,k)=0.5*(x(i,j,k)+x(i,j,k-1))
+            centroid(2,i,j,k)=0.5*(y(i,j,k)+y(i,j,k-1))
+            centroid(3,i,j,k)=0.5*(z(i,j,k)+z(i,j,k-1))
 
             j=0
-            i=jx
-            xcd(i+1,j,k)=0.5*(x(i,j,k)+x(i,j,k-1))
-            ycd(i+1,j,k)=0.5*(y(i,j,k)+y(i,j,k-1))
-            zcd(i+1,j,k)=0.5*(z(i,j,k)+z(i,j,k-1))
+            i=n1
+            centroid(1,i+1,j,k)=0.5*(x(i,j,k)+x(i,j,k-1))
+            centroid(2,i+1,j,k)=0.5*(y(i,j,k)+y(i,j,k-1))
+            centroid(3,i+1,j,k)=0.5*(z(i,j,k)+z(i,j,k-1))
 
-            j=jy
-            i=jx
-            xcd(i+1,j+1,k)=0.5*(x(i,j,k)+x(i,j,k-1))
-            ycd(i+1,j+1,k)=0.5*(y(i,j,k)+y(i,j,k-1))
-            zcd(i+1,j+1,k)=0.5*(z(i,j,k)+z(i,j,k-1))
+            j=n2
+            i=n1
+            centroid(1,i+1,j+1,k)=0.5*(x(i,j,k)+x(i,j,k-1))
+            centroid(2,i+1,j+1,k)=0.5*(y(i,j,k)+y(i,j,k-1))
+            centroid(3,i+1,j+1,k)=0.5*(z(i,j,k)+z(i,j,k-1))
 
-            j=jy
+            j=n2
             i=0
-            xcd(i,j+1,k)=0.5*(x(i,j,k)+x(i,j,k-1))
-            ycd(i,j+1,k)=0.5*(y(i,j,k)+y(i,j,k-1))
-            zcd(i,j+1,k)=0.5*(z(i,j,k)+z(i,j,k-1))
+            centroid(1,i,j+1,k)=0.5*(x(i,j,k)+x(i,j,k-1))
+            centroid(2,i,j+1,k)=0.5*(y(i,j,k)+y(i,j,k-1))
+            centroid(3,i,j+1,k)=0.5*(z(i,j,k)+z(i,j,k-1))
         end do
 
 
         i=0
         j=0
         k=ksta-1 !0
-        xcd(i,j,k)=x(i,j,k)
-        ycd(i,j,k)=y(i,j,k)
-        zcd(i,j,k)=z(i,j,k)
+        centroid(1,i,j,k)=x(i,j,k)
+        centroid(2,i,j,k)=y(i,j,k)
+        centroid(3,i,j,k)=z(i,j,k)
 
         i=0
         j=0
         k=kend !jz
-        xcd(i,j,k+1)=x(i,j,k)
-        ycd(i,j,k+1)=y(i,j,k)
-        zcd(i,j,k+1)=z(i,j,k)
+        centroid(1,i,j,k+1)=x(i,j,k)
+        centroid(2,i,j,k+1)=y(i,j,k)
+        centroid(3,i,j,k+1)=z(i,j,k)
 
         i=0
-        j=jy
+        j=n2
         k=kend !jz
-        xcd(i,j+1,k+1)=x(i,j,k)
-        ycd(i,j+1,k+1)=y(i,j,k)
-        zcd(i,j+1,k+1)=z(i,j,k)
+        centroid(1,i,j+1,k+1)=x(i,j,k)
+        centroid(2,i,j+1,k+1)=y(i,j,k)
+        centroid(3,i,j+1,k+1)=z(i,j,k)
 
         i=0
-        j=jy
+        j=n2
         k=ksta-1 !0
-        xcd(i,j+1,k)=x(i,j,k)
-        ycd(i,j+1,k)=y(i,j,k)
-        zcd(i,j+1,k)=z(i,j,k)
+        centroid(1,i,j+1,k)=x(i,j,k)
+        centroid(2,i,j+1,k)=y(i,j,k)
+        centroid(3,i,j+1,k)=z(i,j,k)
         !.....................
-        i=jx
+        i=n1
         j=0
         k=ksta-1 !0
-        xcd(i+1,j,k)=x(i,j,k)
-        ycd(i+1,j,k)=y(i,j,k)
-        zcd(i+1,j,k)=z(i,j,k)
+        centroid(1,i+1,j,k)=x(i,j,k)
+        centroid(2,i+1,j,k)=y(i,j,k)
+        centroid(3,i+1,j,k)=z(i,j,k)
 
-        i=jx
+        i=n1
         j=0
         k=kend !jz
 
-        xcd(i+1,j,k+1)=x(i,j,k)
-        ycd(i+1,j,k+1)=y(i,j,k)
-        zcd(i+1,j,k+1)=z(i,j,k)
+        centroid(1,i+1,j,k+1)=x(i,j,k)
+        centroid(2,i+1,j,k+1)=y(i,j,k)
+        centroid(3,i+1,j,k+1)=z(i,j,k)
 
-        i=jx
-        j=jy
+        i=n1
+        j=n2
         k=kend !jz
-        xcd(i+1,j+1,k+1)=x(i,j,k)
-        ycd(i+1,j+1,k+1)=y(i,j,k)
-        zcd(i+1,j+1,k+1)=z(i,j,k)
+        centroid(1,i+1,j+1,k+1)=x(i,j,k)
+        centroid(2,i+1,j+1,k+1)=y(i,j,k)
+        centroid(3,i+1,j+1,k+1)=z(i,j,k)
 
-        i=jx
-        j=jy
+        i=n1
+        j=n2
         k=ksta-1 !0
-        xcd(i+1,j+1,k)=x(i,j,k)
-        ycd(i+1,j+1,k)=y(i,j,k)
-        zcd(i+1,j+1,k)=z(i,j,k)
+        centroid(1,i+1,j+1,k)=x(i,j,k)
+        centroid(2,i+1,j+1,k)=y(i,j,k)
+        centroid(3,i+1,j+1,k)=z(i,j,k)
 
-
-        !     if (iprintgrid == 1) then
-        !         write(450+myid,*)'zone f=point i=', &
-        !             jx+2,' j=',jy+2,'k=',kend-ksta+3
-        !         do k=ksta-1,kend+1
-        !             do j=0,jy+1
-        !                 do i=0,jx+1
-        !                     write(450+myid,*)xcd(i,j,k),ycd(i,j,k),zcd(i,j,k)
-        !                 end do
-        !             end do
-        !         end do
-        !     end if
-        !
         !-----------------------------------------------------------------------
         !     construct ghost cells
 
-        if (ighost==1) then
-            do k=ksta-1,kend+1
-                do j=0,jy+1
-                    !        side 1
-                    xcd(0,j,k) = 2.*xcd(0,j,k)-xcd(1,j,k)
-                    ycd(0,j,k) = 2.*ycd(0,j,k)-ycd(1,j,k)
-                    zcd(0,j,k) = 2.*zcd(0,j,k)-zcd(1,j,k)
+        do k=ksta-1,kend+1
+            do j=0,n2+1
+                ! side 1
+                centroid(:,0,j,k)=2.0*centroid(:,0,j,k)-centroid(:,1,j,k)
+                ! side 2
+                centroid(:,n1+1,j,k)=2.0*centroid(:,n1+1,j,k)-centroid(:,n1,j,k)
+            end do
+        end do
 
-                    !        side 2
-                    xcd(jx+1,j,k) = 2.*xcd(jx+1,j,k)-xcd(jx,j,k)
-                    ycd(jx+1,j,k) = 2.*ycd(jx+1,j,k)-ycd(jx,j,k)
-                    zcd(jx+1,j,k) = 2.*zcd(jx+1,j,k)-zcd(jx,j,k)
+
+        do k=ksta-1,kend+1 !parasta,kparaend
+            do i=0,n1+1
+                ! side 3
+                centroid(:,i,0,k)=2.0*centroid(:,i,0,k)-centroid(:,i,1,k)
+                ! side 4
+                centroid(:,i,n2+1,k)=2.0*centroid(:,i,n2+1,k)-centroid(:,i,n2,k)
+            end do
+        end do
+
+        if (myid==0) then
+            do j=0,n2+1
+                do i=0,n1+1
+                    ! side 5
+                    centroid(:,i,j,0)=2.0*centroid(:,i,j,0)-centroid(:,i,j,1)
                 end do
             end do
-
-
-            do k=ksta-1,kend+1 !parasta,kparaend
-                do i=0,jx+1
-                    !        side 3
-                    xcd(i,0,k) = 2.*xcd(i,0,k)-xcd(i,1,k)
-                    ycd(i,0,k) = 2.*ycd(i,0,k)-ycd(i,1,k)
-                    zcd(i,0,k) = 2.*zcd(i,0,k)-zcd(i,1,k)
-                    !        side 4
-                    xcd(i,jy+1,k) = 2.*xcd(i,jy+1,k)-xcd(i,jy,k)
-                    ycd(i,jy+1,k) = 2.*ycd(i,jy+1,k)-ycd(i,jy,k)
-                    zcd(i,jy+1,k) = 2.*zcd(i,jy+1,k)-zcd(i,jy,k)
-                end do
-            end do
-
-            if (myid==0) then
-                do j=0,jy+1
-                    do i=0,jx+1
-                        !        side 5
-                        xcd(i,j,0) = 2.*xcd(i,j,0)-xcd(i,j,1)
-                        ycd(i,j,0) = 2.*ycd(i,j,0)-ycd(i,j,1)
-                        zcd(i,j,0) = 2.*zcd(i,j,0)-zcd(i,j,1)
-                    end do
-                end do
-            end if
-
-            if (myid==nproc-1) then
-                do j=0,jy+1
-                    do i=0,jx+1
-                        !        side 6
-                        xcd(i,j,jz+1) = 2.*xcd(i,j,jz+1)-xcd(i,j,jz)
-                        ycd(i,j,jz+1) = 2.*ycd(i,j,jz+1)-ycd(i,j,jz)
-                        zcd(i,j,jz+1) = 2.*zcd(i,j,jz+1)-zcd(i,j,jz)
-                    end do
-                end do
-            end if
-
-
-        !         if (iprintgrid == 1) then
-        !             write(550+myid,*)'zone f=point i=', &
-        !                 jx+2,' j=',jy+2,'k=',kend-ksta+3
-        !             do k=ksta-1,kend+1
-        !                 do j=0,jy+1
-        !                     do i=0,jx+1
-        !                         write(550+myid,*)xcd(i,j,k),ycd(i,j,k),zcd(i,j,k),0,0,0,0,0,0,0
-        !                     end do
-        !                 end do
-        !             end do
-        !         end if
-
         end if
-        !-----------------------------------------------------------------------
-        !     for periodicity I need to know the grid length in z
-        !     if (myid==0 .or. myid==nproc-1) then
-        !         allocate(x_bound(0:jx,0:jy))
-        !         allocate(y_bound(0:jx,0:jy))
-        !         allocate(z_bound(0:jx,0:jy))
-        !         x_bound(:,:,:)=0.0
-        !         y_bound(:,:,:)=0.0
-        !         z_bound(:,:,:)=0.0
-        !     end if
-        !     ibound = 1
-        !     if (ibound == 1) then
-        !         if (myid==nproc-1) then
-        !             call MPI_SEND(x(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 0,1001,MPI_COMM_WORLD,ierr)
-        !             !         call MPI_WAIT(req1,istatus,ierr)
-        !
-        !             call MPI_SEND(y(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 0,1002,MPI_COMM_WORLD,ierr)
-        !             !         call MPI_WAIT(req2,istatus,ierr)
-        !
-        !             call MPI_SEND(z(0,0,jz),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 0,1003,MPI_COMM_WORLD,ierr)
-        !         !         call MPI_WAIT(req3,istatus,ierr)
-        !         elseif (myid==0) then
-        !             call MPI_RECV(x_bound(0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 nproc-1,1001,MPI_COMM_WORLD,status,ierr)
-        !             !         call MPI_WAIT(req4,istatus,ierr)
-        !
-        !             call MPI_RECV(y_bound(0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 nproc-1,1002,MPI_COMM_WORLD,status,ierr)
-        !             !         call MPI_WAIT(req5,istatus,ierr)
-        !
-        !             call MPI_RECV(z_bound(0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 nproc-1,1003,MPI_COMM_WORLD,status,ierr)
-        !         !         call MPI_WAIT(req6,istatus,ierr)
-        !         endif
-        !
-        !
-        !
-        !         if (myid==0) then
-        !             call MPI_SEND(x(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 nproc-1,2001,MPI_COMM_WORLD,ierr)
-        !             !         call MPI_WAIT(req1,istatus,ierr)
-        !
-        !             call MPI_SEND(y(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 nproc-1,2002,MPI_COMM_WORLD,ierr)
-        !             !         call MPI_WAIT(req2,istatus,ierr)
-        !
-        !             call MPI_SEND(z(0,0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 nproc-1,2003,MPI_COMM_WORLD,ierr)
-        !         !         call MPI_WAIT(req3,istatus,ierr)
-        !         endif
-        !         if (myid==nproc-1) then
-        !             call MPI_RECV(x_bound(0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 0,2001,MPI_COMM_WORLD,status,ierr)
-        !             !         call MPI_WAIT(req4,istatus,ierr)
-        !
-        !             call MPI_RECV(y_bound(0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 0,2002,MPI_COMM_WORLD,status,ierr)
-        !             !         call MPI_WAIT(req5,istatus,ierr)
-        !
-        !             call MPI_RECV(z_bound(0,0),(jx+1)*(jy+1),MPI_REAL_SD, &
-        !                 0,2003,MPI_COMM_WORLD,status,ierr)
-        !         !         call MPI_WAIT(req6,istatus,ierr)
-        !         endif
-        !     end if
-        !-----------------------------------------------------------------------
+
+        if (myid==nproc-1) then
+            do j=0,n2+1
+                do i=0,n1+1
+                    ! side 6
+                    centroid(:,i,j,n3+1)=2.0*centroid(:,i,j,n3+1)-centroid(:,i,j,n3)
+                end do
+            end do
+        end if
+
         return
-    end
+    end subroutine compute_centroids
                        
-    subroutine compute_volume(tipo) !n1,n2,deepl,deepr,myid,kparasta,kparaend
+    subroutine compute_volume(tipo)
 
         use mysending
         use scala3
@@ -677,15 +544,14 @@ contains
 
         implicit none
 
+        !-----------------------------------------------------------------------
         integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
-
-        ! for volume coputation
+        !-----------------------------------------------------------------------
         integer :: i,j,k
         integer :: ierr
-
         real :: vol_loc,fluid_loc,solid_loc
+        !-----------------------------------------------------------------------
 
-            !-----------------------------------------------------------------------
         !     compute the volume once
         vol_loc=0.0
         do k=kparasta,kparaend

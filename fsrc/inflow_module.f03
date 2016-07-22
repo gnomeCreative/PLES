@@ -2,7 +2,7 @@ module inflow_module
 
     use orlansky_module
     use scala3
-    use mysending, only: kparasta,kparaend,rightpe,leftpe,nproc,myid
+    use mysending
     !
     use mpi
 
@@ -67,8 +67,8 @@ contains
                     if (myid==0) then
                         write(*,*)'read plane: ',pianoturbo,' side 1'
                     end if
-                    do k=1,jz
-                        do j=1,jy
+                    do k=1,n3
+                        do j=1,n2
                             read(10011,100)up1(j,k),vp1(j,k),wp1(j,k),(rhovp1(isc,j,k),isc=1,nscal)
 
                             up1(j,k)=up1(j,k)*real(index_out1(j,k))
@@ -90,8 +90,8 @@ contains
                     if (myid==0) then
                         write(*,*)'read plane: ',pianoturbo,' side 2'
                     end if
-                    do k=1,jz
-                        do j=1,jy
+                    do k=1,n3
+                        do j=1,n2
                             read(10012,100)up2(j,k),vp2(j,k),wp2(j,k),(rhovp2(isc,j,k),isc=1,nscal)
 
                             up2(j,k)=up2(j,k)*real(index_out2(j,k))
@@ -113,8 +113,8 @@ contains
                     if (myid==0) then
                         write(*,*)'read plane: ',pianoturbo,' side 3'
                     end if
-                    do k=1,jz
-                        do i=1,jx
+                    do k=1,n3
+                        do i=1,n1
                             read(10013,100)up3(i,k),vp3(i,k),wp3(i,k),(rhovp3(isc,i,k),isc=1,nscal)
 
                             up3(i,k)=up3(i,k)*real(index_out3(i,k))
@@ -137,8 +137,8 @@ contains
                     if (myid==0) then
                         write(*,*)'read plane: ',pianoturbo,' side 4'
                     end if
-                    do k=1,jz
-                        do i=1,jx
+                    do k=1,n3
+                        do i=1,n1
                             read(10014,100)up4(i,k),vp4(i,k),wp4(i,k),(rhovp4(isc,i,k),isc=1,nscal)
 
                             up4(i,k)=up4(i,k)*real(index_out4(i,k))
@@ -161,8 +161,8 @@ contains
                     if (myid==0) then
                         write(*,*)'read plane: ',pianoturbo,' side 5'
                     end if
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             read(10015,100)up5(i,j),vp5(i,j),wp5(i,j),(rhovp5(isc,i,j),isc=1,nscal)
 
                             up5(i,j)=up5(i,j)*real(index_out5(i,j))
@@ -185,8 +185,8 @@ contains
                     if (myid==0) then
                         write(*,*)'read plane: ',pianoturbo,' side 6'
                     end if
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             read(10016,100)up6(i,j),vp6(i,j),wp6(i,j),(rhovp6(isc,i,j),isc=1,nscal)
 
                             up6(i,j)=up6(i,j)*real(index_out6(i,j))
@@ -228,7 +228,7 @@ contains
 
         integer cont1,cont2,cont3,cont4,cont5,cont6
 
-        real disct1A(jy,jz)
+        real disct1A(n2,n3)
         real disct1B,disct1,disct2,a1,a2,a3
         real xib,yib,zib,xv,yv,zv,fattore
         integer kk,pianoturbo,npiani
@@ -243,8 +243,8 @@ contains
         !     side 1
         if(ibodybuffer1)then
             open(121,file='tke1.dat',status='unknown')
-            do k=1,jz
-                do j=1,jy
+            do k=1,n3
+                do j=1,n2
                     read(121,*)val_tke1
                     if(k.ge. kparasta-1 .and. k.le. kparaend+1)then
                         tke1(j,k) = val_tke1
@@ -257,8 +257,8 @@ contains
         !     side 2
         if(ibodybuffer2)then
             open(121,file='tke2.dat',status='unknown')
-            do k=1,jz
-                do j=1,jy
+            do k=1,n3
+                do j=1,n2
                     read(122,*)val_tke2
                     if(k.ge. kparasta-1 .and. k.le. kparaend+1)then
                         tke2(j,k) = val_tke2
@@ -272,8 +272,8 @@ contains
         if(myid==0)then
             if(ibodybuffer5)then
                 open(125,file='tke5.dat',status='unknown')
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         read(125,*)val_tke5
                         tke5(i,j) = val_tke5
                     end do
@@ -286,8 +286,8 @@ contains
         if(myid==nproc-1)then
             if(ibodybuffer6)then
                 open(126,file='tke6.dat',status='unknown')
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         read(126,*)val_tke6
                         tke6(i,j) = val_tke6
                     end do
@@ -315,8 +315,8 @@ contains
             read(10011,*)npn1
             read(10011,*)npn
 
-            do k=1,jz
-                do j=1,jy
+            do k=1,n3
+                do j=1,n2
                     read(10011,100)up1(j,k),&
                         vp1(j,k),&
                         wp1(j,k),&
@@ -336,8 +336,8 @@ contains
 	
             if(myid.eq.0) then
                 print*,myid,'inflow plane face 1'
-            endif
-        endif
+            end if
+        end if
 100     format(10e13.5)
 
         if(infout2.eq.0)then
@@ -348,8 +348,8 @@ contains
             read(10012,*)npn2
             read(10012,*)npn
 
-            do k=1,jz
-                do j=1,jy
+            do k=1,n3
+                do j=1,n2
                     read(10012,101)up2(j,k),&
                         vp2(j,k),&
                         wp2(j,k),&
@@ -365,8 +365,8 @@ contains
             enddo
             if(myid.eq.0) then
                 print*,myid,'inflow plane face 2'
-            endif
-        endif
+            end if
+        end if
 101     format(10e13.5)
 
         !     planes at constant eta
@@ -377,8 +377,8 @@ contains
             read(10013,*)nnx,nnz !jx,jz
             read(10013,*)npn3
             read(10013,*)npn
-            do k=1,jz
-                do i=1,jx
+            do k=1,n3
+                do i=1,n1
                     read(10013,102)up3(i,k),&
                         vp3(i,k),&
                         wp3(i,k),&
@@ -394,8 +394,8 @@ contains
             enddo
             if(myid.eq.0) then
                 print*,myid,'inflow plane face 3'
-            endif
-        endif
+            end if
+        end if
 102     format(10e13.5)
  
         if(infout4.eq.0)then
@@ -406,8 +406,8 @@ contains
             read(10014,*)npn4
             read(10014,*)npn
 	
-            do k=1,jz
-                do i=1,jx
+            do k=1,n3
+                do i=1,n1
                     read(10014,103)up4(i,k),&
                         vp4(i,k),&
                         wp4(i,k),&
@@ -423,8 +423,8 @@ contains
             enddo
             if(myid.eq.0) then
                 print*,myid,'inflow plane face 4'
-            endif
-        endif
+            end if
+        end if
 103     format(10e13.5)
 
         !     planes at constant eta
@@ -436,8 +436,8 @@ contains
             read(10015,*)npn5
             read(10015,*)npn
 	
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     read(10015,104)up5(i,j),&
                         vp5(i,j),&
                         wp5(i,j),&
@@ -459,8 +459,8 @@ contains
             enddo
             if(myid.eq.0) then
                 print*,myid,' inflow plane face 5'
-            endif
-        endif
+            end if
+        end if
 104     format(10e13.5)
 
         if(infout6.eq.0)then
@@ -471,8 +471,8 @@ contains
             read(10016,*)npn6
             read(10016,*)npn
 	
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     read(10016,105)up6(i,j),&
                         vp6(i,j),&
                         wp6(i,j),&
@@ -488,8 +488,8 @@ contains
             enddo
             if(myid.eq.0) then
                 print*,myid,'inflow plane face 6'
-            endif
-        endif
+            end if
+        end if
 105     format(10e13.5)
         !-----------------------------------------------------------------------
         return
@@ -519,8 +519,6 @@ contains
         real xf,yf,zf,xc1,yc1,zc1,xc2,yc2,zc2,ddi,dsi,ddj,dsj,ddk,dsk
         !
         integer ierr
-        integer ncolperproc,m
-        integer leftpem,rightpem
         integer kparastal,kparaendl
         integer status(MPI_STATUS_SIZE)
 
@@ -562,26 +560,26 @@ contains
         contatore=0.
         if(infout1.eq.1)then
             contatore=contatore+1.
-        endif
+        end if
         if(infout2.eq.1)then
             contatore=contatore+1.
-        endif
+        end if
         if(infout3.eq.1)then
             contatore=contatore+1.
-        endif
+        end if
         if(infout4.eq.1)then
             contatore=contatore+1.
-        endif
+        end if
         if(infout5.eq.1)then
             contatore=contatore+1.
-        endif
+        end if
         if(infout6.eq.1)then
             contatore=contatore+1.
-        endif
+        end if
         if(myid.eq.0)then
             write(*,*)'INFLOW/OUTFLOW'
             write(info_run_file,*)'contatore pareti orlansky',contatore
-        endif
+        end if
 
         !-----------------------------------------------------------------------
         ! COMPUTE INCOMING MASS
@@ -595,65 +593,64 @@ contains
 
             if(infout1.ne.1)then
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         am_in_loc=am_in_loc+uc(0,j,k)
                     end do
                 end do
-            endif
+            end if
 
             if(infout2.ne.1)then
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        am_in_loc=am_in_loc-uc(jx,j,k)
+                    do j=1,n2
+                        am_in_loc=am_in_loc-uc(n1,j,k)
                     end do
                 end do
-            endif
+            end if
 
         end do
         !
         !     sides 3 and 4 constant eta
-        do jj=1,jp
+        ! direction 2 is always not periodic
 
-            if(infout3.ne.1)then
-                do k=kparasta,kparaend
-                    do i=1,jx
-                        am_in_loc=am_in_loc+vc(i,0,k)
-                    end do
+        if(infout3.ne.1)then
+            do k=kparasta,kparaend
+                do i=1,n1
+                    am_in_loc=am_in_loc+vc(i,0,k)
                 end do
-            endif
+            end do
+        end if
 
-            if(infout4.ne.1)then
-                do k=kparasta,kparaend
-                    do i=1,jx
-                        am_in_loc=am_in_loc-vc(i,jy,k)
-                    end do
+        if(infout4.ne.1)then
+            do k=kparasta,kparaend
+                do i=1,n1
+                    am_in_loc=am_in_loc-vc(i,n2,k)
                 end do
-            endif
+            end do
+        end if
 
-        end do
         !
         !     side 5 and 6 constant zita
         do kk=1,kp
 
             if(myid.eq.0)then
                 if(infout5.ne.1)then
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             am_in_loc=am_in_loc+wc(i,j,0)
                         end do
                     end do
-                endif
+                end if
 
             elseif(myid.eq.nproc-1)then
 
                 if(infout6.ne.1)then
-                    do j=1,jy
-                        do i=1,jx
-                            am_in_loc=am_in_loc-wc(i,j,jz)
+                    do j=1,n2
+                        do i=1,n1
+                            am_in_loc=am_in_loc-wc(i,j,n3)
                         end do
                     end do
-                endif
-            endif
+                end if
+            end if
 
         end do
         !
@@ -706,7 +703,7 @@ contains
 
             if(infout1.eq.1)then
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
 
                         uc(0,j,k)=du_dx1(j,k)*csx(0,j,k)+dv_dx1(j,k)*csy(0,j,k)+dw_dx1(j,k)*csz(0,j,k) !U^(n+1)  with orlansky
 
@@ -714,50 +711,48 @@ contains
                         am1=am1+abs(uc(0,j,k))              ! module outflow
                     end do
                 end do
-            endif
+            end if
 
             if(infout2.eq.1)then
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
 
-                        uc(jx,j,k)=du_dx2(j,k)*csx(jx,j,k)+dv_dx2(j,k)*csy(jx,j,k)+dw_dx2(j,k)*csz(jx,j,k)
+                        uc(n1,j,k)=du_dx2(j,k)*csx(n1,j,k)+dv_dx2(j,k)*csy(n1,j,k)+dw_dx2(j,k)*csz(n1,j,k)
 
-                        am_out_loc2=am_out_loc2+uc(jx,j,k)
-                        am2=am2+abs(uc(jx,j,k))
+                        am_out_loc2=am_out_loc2+uc(n1,j,k)
+                        am2=am2+abs(uc(n1,j,k))
                     end do
                 end do
-            endif
+            end if
 
         end do
         !
         !     sides 3 and 4 constant eta
-        do jj=1,jp
+        ! direction 2 is always not periodic
 
-            if(infout3.eq.1)then
-                do k=kparasta,kparaend
-                    do i=1,jx
+        if(infout3.eq.1)then
+            do k=kparasta,kparaend
+                do i=1,n1
 
-                        vc(i,0,k)=du_dy3(i,k)*etx(i,0,k)+dv_dy3(i,k)*ety(i,0,k)+dw_dy3(i,k)*etz(i,0,k)
+                    vc(i,0,k)=du_dy3(i,k)*etx(i,0,k)+dv_dy3(i,k)*ety(i,0,k)+dw_dy3(i,k)*etz(i,0,k)
 
-                        am_out_loc3=am_out_loc3-vc(i,0,k)
-                        am3=am3+abs(vc(i,0,k))
-                    end do
+                    am_out_loc3=am_out_loc3-vc(i,0,k)
+                    am3=am3+abs(vc(i,0,k))
                 end do
-            endif
+            end do
+        end if
 
-            if(infout4.eq.1)then
-                do k=kparasta,kparaend
-                    do i=1,jx
+        if(infout4.eq.1)then
+            do k=kparasta,kparaend
+                do i=1,n1
 
-                        vc(i,jy,k)=du_dy4(i,k)*etx(i,jy,k)+dv_dy4(i,k)*ety(i,jy,k)+dw_dy4(i,k)*etz(i,jy,k)
+                    vc(i,n2,k)=du_dy4(i,k)*etx(i,n2,k)+dv_dy4(i,k)*ety(i,n2,k)+dw_dy4(i,k)*etz(i,n2,k)
 
-                        am_out_loc4=am_out_loc4+vc(i,jy,k)
-                        am4=am4+abs(vc(i,jy,k))
-                    end do
+                    am_out_loc4=am_out_loc4+vc(i,n2,k)
+                    am4=am4+abs(vc(i,n2,k))
                 end do
-            endif
-
-        end do
+            end do
+        end if
         !
         !     sides 5 and 6 constant zita
         do kk=1,kp
@@ -765,8 +760,8 @@ contains
             if(myid.eq.0)then
 
                 if(infout5.eq.1)then
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
 
                             wc(i,j,0)=du_dz5(i,j)*ztx(i,j,0)+dv_dz5(i,j)*zty(i,j,0)+dw_dz5(i,j)*ztz(i,j,0)
 
@@ -774,23 +769,23 @@ contains
                             am5=am5+abs(wc(i,j,0))
                         end do
                     end do
-                endif
+                end if
 
             elseif(myid.eq.nproc-1)then
 
                 if(infout6.eq.1)then
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
 
-                            wc(i,j,jz)=du_dz6(i,j)*ztx(i,j,jz)+dv_dz6(i,j)*zty(i,j,jz)+dw_dz6(i,j)*ztz(i,j,jz)
+                            wc(i,j,n3)=du_dz6(i,j)*ztx(i,j,n3)+dv_dz6(i,j)*zty(i,j,n3)+dw_dz6(i,j)*ztz(i,j,n3)
 
-                            am_out_loc6=am_out_loc6+wc(i,j,jz)
-                            am6=am6+abs(wc(i,j,jz))
+                            am_out_loc6=am_out_loc6+wc(i,j,n3)
+                            am6=am6+abs(wc(i,j,n3))
                         end do
                     end do
-                endif
+                end if
 
-            endif
+            end if
 
         end do
 
@@ -875,7 +870,7 @@ contains
             write(info_run_file,*)'massa attraverso faccia 4:',am_out4
             write(info_run_file,*)'massa attraverso faccia 5:',am_out5
             write(info_run_file,*)'massa attraverso faccia 6:',am_out6
-        endif
+        end if
         !
         !-----------------------------------------------------------------------
         ! MASS CORRECTION ON CONTROVARIANT FLUX
@@ -901,7 +896,7 @@ contains
             if(infout1 == 1)then
 
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         !
                         coef_massa1=(areola1(j,k)/area_insisto)*fattore_flusso
 
@@ -925,7 +920,7 @@ contains
             else
 
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         !          Uc stored to compute the divg
                         uc1_orl(j,k)=uc(0,j,k)
 
@@ -955,24 +950,24 @@ contains
             if(infout2 == 1)then
 
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         !
                         coef_massa2=(areola2(j,k)/area_insisto)*fattore_flusso
                         !
                         somma=somma+coef_massa2*index_out2(j,k)
 
                         !          Uc^n+1
-                        ucc=uc(jx,j,k)-del_mas*coef_massa2*index_out2(j,k)
+                        ucc=uc(n1,j,k)-del_mas*coef_massa2*index_out2(j,k)
                         !
                         uc2_orl(j,k)=ucc
 
                         !          pressure b.c. = Uc* - Uc^n+1
-                        cs2(j,k)=u(jx+1,j,k)*csx(jx,j,k)+v(jx+1,j,k)*csy(jx,j,k)+w(jx+1,j,k)*csz(jx,j,k)-ucc
+                        cs2(j,k)=u(n1+1,j,k)*csx(n1,j,k)+v(n1+1,j,k)*csy(n1,j,k)+w(n1+1,j,k)*csz(n1,j,k)-ucc
                         if(potenziale)then
                             cs2(j,k)=-ucc
                         end if
                         !       Uc*
-                        uc(jx,j,k) = u(jx+1,j,k)*csx(jx,j,k)+v(jx+1,j,k)*csy(jx,j,k)+w(jx+1,j,k)*csz(jx,j,k)
+                        uc(n1,j,k) = u(n1+1,j,k)*csx(n1,j,k)+v(n1+1,j,k)*csy(n1,j,k)+w(n1+1,j,k)*csz(n1,j,k)
 
                     enddo
                 enddo
@@ -980,17 +975,17 @@ contains
             else
 
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         !          Uc stored to compute the divg
-                        uc2_orl(j,k)=uc(jx,j,k)
+                        uc2_orl(j,k)=uc(n1,j,k)
                         !          pressure b.c. = Uc* - Uc^n+1
-                        cs2(j,k)=u(jx+1,j,k)*csx(jx,j,k)+v(jx+1,j,k)*csy(jx,j,k)+w(jx+1,j,k)*csz(jx,j,k)-uc(jx,j,k)
+                        cs2(j,k)=u(n1+1,j,k)*csx(n1,j,k)+v(n1+1,j,k)*csy(n1,j,k)+w(n1+1,j,k)*csz(n1,j,k)-uc(n1,j,k)
 
                         if(potenziale)then
-                            cs2(j,k)=-uc(jx,j,k)
+                            cs2(j,k)=-uc(n1,j,k)
                         end if
                         !       Uc*
-                        uc(jx,j,k)=u(jx+1,j,k)*csx(jx,j,k)+v(jx+1,j,k)*csy(jx,j,k)+w(jx+1,j,k)*csz(jx,j,k)
+                        uc(n1,j,k)=u(n1+1,j,k)*csx(n1,j,k)+v(n1+1,j,k)*csy(n1,j,k)+w(n1+1,j,k)*csz(n1,j,k)
 
                     enddo
                 enddo
@@ -1000,114 +995,113 @@ contains
         enddo   !end loop ii=1,ip
         !.......................................................................
 
-        do jj=1,jp
+        ! direction 2 is always not periodic
 
-            if(massa_tot .lt. 1.d-8)then
-                area_insisto   =   area_bagnata
-                fattore_flusso =   1.
-            else
-                area_insisto   =   area_bagnata3
-                fattore_flusso =  (abs(am_out3)/massa_tot)
-            end if
+        if(massa_tot .lt. 1.d-8)then
+            area_insisto   =   area_bagnata
+            fattore_flusso =   1.
+        else
+            area_insisto   =   area_bagnata3
+            fattore_flusso =  (abs(am_out3)/massa_tot)
+        end if
 
-            !     side 3 constant eta
-            if(infout3 == 1)then
+        !     side 3 constant eta
+        if(infout3 == 1)then
 
-                do k=kparasta,kparaend
-                    do i=1,jx
+            do k=kparasta,kparaend
+                do i=1,n1
 
-                        coef_massa3=(areola3(i,k)/area_insisto)*fattore_flusso
+                    coef_massa3=(areola3(i,k)/area_insisto)*fattore_flusso
 
-                        somma=somma+coef_massa3*index_out3(i,k)
-                        !          Vc^n+1
-                        vcc=vc(i,0,k)+del_mas*coef_massa3*index_out3(i,k)
+                    somma=somma+coef_massa3*index_out3(i,k)
+                    !          Vc^n+1
+                    vcc=vc(i,0,k)+del_mas*coef_massa3*index_out3(i,k)
 
-                        vc3_orl(i,k)=vcc
-                        !          pressure b.c. = Vc* - Vc^n+1
-                        cs3(i,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)-vcc
+                    vc3_orl(i,k)=vcc
+                    !          pressure b.c. = Vc* - Vc^n+1
+                    cs3(i,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)-vcc
 
-                        if(potenziale)then
-                            cs3(i,k)=-vcc
-                        end if
-                        !       Vc*
-                        vc(i,0,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)
+                    if(potenziale)then
+                        cs3(i,k)=-vcc
+                    end if
+                    !       Vc*
+                    vc(i,0,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)
 
-                    enddo
                 enddo
+            enddo
 
-            else
+        else
 
-                do k=kparasta,kparaend
-                    do i=1,jx
-                        !          Vc stored to compute the divg
-                        vc3_orl(i,k)=vc(i,0,k)
-                        !          pressure b.c. = Vc* - Vc^n+1
-                        cs3(i,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)-vc(i,0,k)
+            do k=kparasta,kparaend
+                do i=1,n1
+                    !          Vc stored to compute the divg
+                    vc3_orl(i,k)=vc(i,0,k)
+                    !          pressure b.c. = Vc* - Vc^n+1
+                    cs3(i,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)-vc(i,0,k)
 
-                        if(potenziale)then
-                            cs3(i,k)=-vc(i,0,k)
-                        end if
-                        !       Vc*
-                        vc(i,0,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)
+                    if(potenziale)then
+                        cs3(i,k)=-vc(i,0,k)
+                    end if
+                    !       Vc*
+                    vc(i,0,k)=u(i,0,k)*etx(i,0,k)+v(i,0,k)*ety(i,0,k)+w(i,0,k)*etz(i,0,k)
 
-                    enddo
                 enddo
+            enddo
 
-            end if !infout3
-            !     ..................................................................
-            !     side 4 constant eta
-            if(massa_tot .lt. 1.d-8)then
-                area_insisto   =   area_bagnata
-                fattore_flusso =   1.
-            else
-                area_insisto   =   area_bagnata4
-                fattore_flusso =  (abs(am_out4)/massa_tot)
-            end if
+        end if !infout3
+        !     ..................................................................
+        !     side 4 constant eta
+        if(massa_tot .lt. 1.d-8)then
+            area_insisto   =   area_bagnata
+            fattore_flusso =   1.
+        else
+            area_insisto   =   area_bagnata4
+            fattore_flusso =  (abs(am_out4)/massa_tot)
+        end if
 
-            if(infout4 == 1)then
+        if(infout4 == 1)then
 
-                do k=kparasta,kparaend
-                    do i=1,jx
+            do k=kparasta,kparaend
+                do i=1,n1
 
-                        coef_massa4=(areola4(i,k)/area_insisto)*fattore_flusso
+                    coef_massa4=(areola4(i,k)/area_insisto)*fattore_flusso
 
-                        somma=somma+coef_massa4*index_out4(i,k)
-                        !          Vc^n+1
-                        vcc=vc(i,jy,k)-del_mas*coef_massa4*index_out4(i,k)
+                    somma=somma+coef_massa4*index_out4(i,k)
+                    !          Vc^n+1
+                    vcc=vc(i,n2,k)-del_mas*coef_massa4*index_out4(i,k)
 
-                        vc4_orl(i,k)=vcc
-                        !          pressure b.c. = Vc* - Vc^n+1
-                        cs4(i,k)=u(i,jy+1,k)*etx(i,jy,k)+v(i,jy+1,k)*ety(i,jy,k)+w(i,jy+1,k)*etz(i,jy,k)-vcc
-                        if(potenziale)then
-                            cs4(i,k)=-vcc
-                        end if
-                        !       Vc*
-                        vc(i,jy,k)=u(i,jy+1,k)*etx(i,jy,k)+v(i,jy+1,k)*ety(i,jy,k)+w(i,jy+1,k)*etz(i,jy,k)
+                    vc4_orl(i,k)=vcc
+                    !          pressure b.c. = Vc* - Vc^n+1
+                    cs4(i,k)=u(i,n2+1,k)*etx(i,n2,k)+v(i,n2+1,k)*ety(i,n2,k)+w(i,n2+1,k)*etz(i,n2,k)-vcc
+                    if(potenziale)then
+                        cs4(i,k)=-vcc
+                    end if
+                    !       Vc*
+                    vc(i,n2,k)=u(i,n2+1,k)*etx(i,n2,k)+v(i,n2+1,k)*ety(i,n2,k)+w(i,n2+1,k)*etz(i,n2,k)
 
-                    enddo
                 enddo
+            enddo
 
-            else
+        else
 
-                do k=kparasta,kparaend
-                    do i=1,jx
-                        !          Vc stored to compute the divg
-                        vc4_orl(i,k)=vc(i,jy,k)
-                        !          pressure b.c. = Vc* - Vc^n+1
-                        cs4(i,k)=u(i,jy+1,k)*etx(i,jy,k)+v(i,jy+1,k)*ety(i,jy,k)+w(i,jy+1,k)*etz(i,jy,k)-vc(i,jy,k)
+            do k=kparasta,kparaend
+                do i=1,n1
+                    !          Vc stored to compute the divg
+                    vc4_orl(i,k)=vc(i,n2,k)
+                    !          pressure b.c. = Vc* - Vc^n+1
+                    cs4(i,k)=u(i,n2+1,k)*etx(i,n2,k)+v(i,n2+1,k)*ety(i,n2,k)+w(i,n2+1,k)*etz(i,n2,k)-vc(i,n2,k)
 
-                        if(potenziale)then
-                            cs4(i,k)=-vc(i,jy,k)
-                        end if
-                        !       Vc*
-                        vc(i,jy,k)=u(i,jy+1,k)*etx(i,jy,k)+v(i,jy+1,k)*ety(i,jy,k)+w(i,jy+1,k)*etz(i,jy,k)
+                    if(potenziale)then
+                        cs4(i,k)=-vc(i,n2,k)
+                    end if
+                    !       Vc*
+                    vc(i,n2,k)=u(i,n2+1,k)*etx(i,n2,k)+v(i,n2+1,k)*ety(i,n2,k)+w(i,n2+1,k)*etz(i,n2,k)
 
-                    enddo
                 enddo
+            enddo
 
-            end if !infout4
+        end if !infout4
 
-        enddo    !end loop jj=1,jp
         !.....................................
 
         do kk=1,kp
@@ -1124,8 +1118,8 @@ contains
 
                 if(infout5 == 1)then
 
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             !
                             coef_massa5=(areola5(i,j)/area_insisto)*fattore_flusso
                             !
@@ -1147,8 +1141,8 @@ contains
 
                 else
 
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             !          wc stored to compute the divg
                             wc5_orl(i,j)=wc(i,j,0)
                             !          pressure b.c. = Wc* - Wc^n+1
@@ -1180,40 +1174,40 @@ contains
 
                 if(infout6 == 1)then
 
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
 
                             coef_massa6=(areola6(i,j)/area_insisto)*fattore_flusso
                             !
                             somma=somma+coef_massa6*index_out6(i,j)
                             !          Wc^n+1
-                            wcc=wc(i,j,jz)-del_mas*coef_massa6*index_out6(i,j)
+                            wcc=wc(i,j,n3)-del_mas*coef_massa6*index_out6(i,j)
 
                             wc6_orl(i,j)=wcc
                             !          pressure b.c. = Wc* - Wc^n+1
-                            cs6(i,j)=u(i,j,jz+1)*ztx(i,j,jz)+v(i,j,jz+1)*zty(i,j,jz)+w(i,j,jz+1)*ztz(i,j,jz)-wc(i,j,jz)
+                            cs6(i,j)=u(i,j,n3+1)*ztx(i,j,n3)+v(i,j,n3+1)*zty(i,j,n3)+w(i,j,n3+1)*ztz(i,j,n3)-wc(i,j,n3)
                             if(potenziale)then
                                 cs6(i,j)=-wcc
                             end if
                             !    Wc*
-                            wc(i,j,jz)=u(i,j,jz+1)*ztx(i,j,jz)+v(i,j,jz+1)*zty(i,j,jz)+w(i,j,jz+1)*ztz(i,j,jz)
+                            wc(i,j,n3)=u(i,j,n3+1)*ztx(i,j,n3)+v(i,j,n3+1)*zty(i,j,n3)+w(i,j,n3+1)*ztz(i,j,n3)
                         end do
                     end do
 
                 else
 
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             !          Wc stored to compute the divg
-                            wc6_orl(i,j)=wc(i,j,jz)
+                            wc6_orl(i,j)=wc(i,j,n3)
                             !          pressure b.c. = Wc* - Wc^n+1
-                            cs6(i,j)=u(i,j,jz+1)*ztx(i,j,jz)+v(i,j,jz+1)*zty(i,j,jz)+w(i,j,jz+1)*ztz(i,j,jz)-wc(i,j,jz)
+                            cs6(i,j)=u(i,j,n3+1)*ztx(i,j,n3)+v(i,j,n3+1)*zty(i,j,n3)+w(i,j,n3+1)*ztz(i,j,n3)-wc(i,j,n3)
 
                             if(potenziale)then
-                                cs6(i,j)=-wc(i,j,jz)
+                                cs6(i,j)=-wc(i,j,n3)
                             end if
                             !    Wc*
-                            wc(i,j,jz)=u(i,j,jz+1)*ztx(i,j,jz)+v(i,j,jz+1)*zty(i,j,jz)+w(i,j,jz+1)*ztz(i,j,jz)
+                            wc(i,j,n3)=u(i,j,n3+1)*ztx(i,j,n3)+v(i,j,n3+1)*zty(i,j,n3)+w(i,j,n3+1)*ztz(i,j,n3)
                         !
                         enddo
                     enddo
@@ -1241,8 +1235,8 @@ contains
         !
         !     compute Uc*
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
                     !
                     uinter=.5*(u(i,j,k)+u(i+1,j,k))
@@ -1257,8 +1251,8 @@ contains
 
         !     compute Vc*
         do k=kparasta,kparaend
-            do j=jp,jy-jp
-                do i=1,jx
+            do j=1,n2-1
+                do i=1,n1
 
                     !
                     uinter=.5*(u(i,j,k)+u(i,j+1,k))
@@ -1281,12 +1275,12 @@ contains
         else
             kparastal=kparasta
             kparaendl=kparaend
-        endif
+        end if
 
         do k=kparastal,kparaendl
 
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     !
                     !
                     uinter=.5*(u(i,j,k)+u(i,j,k+1))
@@ -1305,20 +1299,8 @@ contains
         !-----------------------------------------------------------------------
         ! send kparaend plane to closer proc in order to compute rhs in diver
         !
-        if(myid.eq.0)then
-            leftpem=MPI_PROC_NULL
-            rightpem=rightpe
-        else if(myid.eq.nproc-1)then
-            leftpem=leftpe
-            rightpem=MPI_PROC_NULL
-        else if((myid.ne.0).and.(myid.ne.nproc-1))then
-            leftpem=leftpe
-            rightpem=rightpe
-        endif
-
-
-        call MPI_SENDRECV(wc(1,1,kparaend),jx*jy,MPI_REAL_SD,rightpem,51+myid,&
-            wc(1,1,kparasta-1),jx*jy,MPI_REAL_SD,leftpem,50+myid,MPI_COMM_WORLD,status,ierr)
+        call MPI_SENDRECV(wc(1,1,kparaend),n1*n2,MPI_REAL_SD,rightpem,51+myid,&
+            wc(1,1,kparasta-1),n1*n2,MPI_REAL_SD,leftpem,50+myid,MPI_COMM_WORLD,status,ierr)
         !
         !-----------------------------------------------------------------------
         ! MASS CHECK
@@ -1347,50 +1329,49 @@ contains
 
             if(infout1==1)then
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
 
                         am_out_loc1=am_out_loc1-uc1_orl(j,k)
 
                     end do
                 end do
-            endif
+            end if
 
             if(infout2==1)then
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
 
                         am_out_loc2=am_out_loc2+uc2_orl(j,k)
 
                     end do
                 end do
-            endif
+            end if
 
         end do
         !
         !     sides 3 and 4 constant eta
-        do jj=1,jp
+        ! direction 2 is always not periodic
 
-            if(infout3==1)then
-                do k=kparasta,kparaend
-                    do i=1,jx
+        if(infout3==1)then
+            do k=kparasta,kparaend
+                do i=1,n1
 
-                        am_out_loc3=am_out_loc3-vc3_orl(i,k)
+                    am_out_loc3=am_out_loc3-vc3_orl(i,k)
 
-                    end do
                 end do
-            endif
+            end do
+        end if
 
-            if(infout4==1)then
-                do k=kparasta,kparaend
-                    do i=1,jx
+        if(infout4==1)then
+            do k=kparasta,kparaend
+                do i=1,n1
 
-                        am_out_loc4=am_out_loc4+vc4_orl(i,k)
+                    am_out_loc4=am_out_loc4+vc4_orl(i,k)
 
-                    end do
                 end do
-            endif
+            end do
+        end if
 
-        end do
         !
         !     sides 5 and 6 constant zita
         do kk=1,kp
@@ -1398,28 +1379,28 @@ contains
             if(myid==0)then
 
                 if(infout5==1)then
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
 
                             am_out_loc5=am_out_loc5-wc5_orl(i,j)
 
                         end do
                     end do
-                endif
+                end if
 
             elseif(myid==nproc-1)then
 
                 if(infout6==1)then
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
 
                             am_out_loc6=am_out_loc6+wc6_orl(i,j)
 
                         end do
                     end do
-                endif
+                end if
 
-            endif
+            end if
 
         end do
 
@@ -1444,7 +1425,7 @@ contains
             !        write(*,*)'verifica massa entrante',am_in
             !        write(*,*)'verifica distribuzione massa uscente',am_out
             write(*,*)'check delta ',am_out-am_in
-        endif
+        end if
 
 
         return
@@ -1484,7 +1465,7 @@ contains
         ! put to zero fluxes at faces 3 and 4
         !
         vc(:, 0,kparasta:kparaend)=0.
-        vc(:,jy,kparasta:kparaend)=0.
+        vc(:,n2,kparasta:kparaend)=0.
 
         !-----------------------------------------------------------------------
         ! mass check
@@ -1492,7 +1473,7 @@ contains
         ar1 = 0.
         massa1=0.
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 massa1=massa1+uc(0,j,k)*index_out1(j,k)
                 if(uc(0,j,k).lt.0.)ar1 = ar1 + areola1(j,k)*index_out1(j,k)
             end do
@@ -1501,9 +1482,9 @@ contains
         ar2 = 0.
         massa2=0.
         do k=kparasta,kparaend
-            do j=1,jy
-                massa2=massa2-uc(jx,j,k)*index_out2(j,k)
-                if(uc(jx,j,k).gt.0.)ar2 = ar2 + areola2(j,k)*index_out2(j,k)
+            do j=1,n2
+                massa2=massa2-uc(n1,j,k)*index_out2(j,k)
+                if(uc(n1,j,k).gt.0.)ar2 = ar2 + areola2(j,k)*index_out2(j,k)
             end do
         end do
 
@@ -1516,8 +1497,8 @@ contains
         ar5 = 0.
         massa5=0.
         if(myid.eq.0)then
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     massa5=massa5+wc(i,j,0)*index_out5(i,j)
                     if(wc(i,j,0).lt.0.)ar5 = ar5 + areola5(i,j)*index_out5(i,j)
                 end do
@@ -1527,10 +1508,10 @@ contains
         ar6 = 0.
         massa6=0.
         if(myid.eq.nproc-1)then
-            do j=1,jy
-                do i=1,jx
-                    massa6=massa6-wc(i,j,jz)*index_out6(i,j)
-                    if(wc(i,j,jz).gt.0.)ar6 = ar6 + areola6(i,j)*index_out6(i,j)
+            do j=1,n2
+                do i=1,n1
+                    massa6=massa6-wc(i,j,n3)*index_out6(i,j)
+                    if(wc(i,j,n3).gt.0.)ar6 = ar6 + areola6(i,j)*index_out6(i,j)
                 end do
             end do
         end if
@@ -1587,7 +1568,7 @@ contains
         !     face 1
         if(infout1 /= 0)then
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     if(uc(0,j,k).lt.0.)then
                         uc(0,j,k)=uc(0,j,k)-bilancio*areola1(j,k)/artot
                         uc(0,j,k)=uc(0,j,k)*index_out1(j,k)
@@ -1599,11 +1580,11 @@ contains
         !     face 2
         if(infout2 /= 0)then
             do k=kparasta,kparaend
-                do j=1,jy
-                    if(uc(jx,j,k).gt.0.)then
-                        uc(jx,j,k)=uc(jx,j,k)+bilancio*areola2(j,k)/artot
-                        uc(jx,j,k)=uc(jx,j,k)*index_out2(j,k)
-                        ucp2(j,k)=uc(jx,j,k)
+                do j=1,n2
+                    if(uc(n1,j,k).gt.0.)then
+                        uc(n1,j,k)=uc(n1,j,k)+bilancio*areola2(j,k)/artot
+                        uc(n1,j,k)=uc(n1,j,k)*index_out2(j,k)
+                        ucp2(j,k)=uc(n1,j,k)
                     end if
                 end do
             end do
@@ -1611,8 +1592,8 @@ contains
         !     face 5
         if(infout5 /= 0)then
             if(myid.eq.0)then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         if(wc(i,j,0).lt.0.)then
                             wc(i,j,0)=wc(i,j,0)-bilancio*areola5(i,j)/artot
                             wc(i,j,0)=wc(i,j,0)*index_out5(i,j)
@@ -1625,12 +1606,12 @@ contains
         !     face 6
         if(infout6 /= 0)then
             if(myid.eq.nproc-1)then
-                do j=1,jy
-                    do i=1,jx
-                        if(wc(i,j,jz).gt.0.)then
-                            wc(i,j,jz)=wc(i,j,jz)+bilancio*areola6(i,j)/artot
-                            wc(i,j,jz)=wc(i,j,jz)*index_out6(i,j)
-                            wcp6(i,j)=wc(i,j,jz)
+                do j=1,n2
+                    do i=1,n1
+                        if(wc(i,j,n3).gt.0.)then
+                            wc(i,j,n3)=wc(i,j,n3)+bilancio*areola6(i,j)/artot
+                            wc(i,j,n3)=wc(i,j,n3)*index_out6(i,j)
+                            wcp6(i,j)=wc(i,j,n3)
                         end if
                     end do
                 end do
@@ -1642,15 +1623,15 @@ contains
         !     faces 1 and 2
         massa1=0.
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 massa1=massa1+uc(0,j,k)
             end do
         end do
 
         massa2=0.
         do k=kparasta,kparaend
-            do j=1,jy
-                massa2=massa2-uc(jx,j,k)
+            do j=1,n2
+                massa2=massa2-uc(n1,j,k)
             end do
         end do
 
@@ -1661,8 +1642,8 @@ contains
         !     faces 5 and 6
         massa5=0.
         if(myid.eq.0)then
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     massa5=massa5+wc(i,j,0)
                 end do
             end do
@@ -1670,9 +1651,9 @@ contains
 
         massa6=0.
         if(myid.eq.nproc-1)then
-            do j=1,jy
-                do i=1,jx
-                    massa6=massa6-wc(i,j,jz)
+            do j=1,n2
+                do i=1,n1
+                    massa6=massa6-wc(i,j,n3)
                 end do
             end do
         end if
@@ -2214,8 +2195,8 @@ contains
         parziale5 = 0.
         parziale6 = 0.
 
-        do k=1,jz
-            do j=1,jy
+        do k=1,n3
+            do j=1,n2
                 index_out1(j,k)=1
                 index_out2(j,k)=1
 
@@ -2224,8 +2205,8 @@ contains
             end do
         end do
 
-        do k=1,jz
-            do i=1,jx
+        do k=1,n3
+            do i=1,n1
                 index_out3(i,k)=1
                 index_out4(i,k)=1
 
@@ -2234,8 +2215,8 @@ contains
             end do
         end do
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 index_out5(i,j)=1
                 index_out6(i,j)=1
 
@@ -2261,9 +2242,9 @@ contains
             end if
             do l=1,num_solide
                 if (particles) then
-                    i=indici_celle_bloccate(l,1)
-                    j=indici_celle_bloccate(l,2)
-                    k=indici_celle_bloccate(l,3)
+                    i=indici_celle_bloccate(1,l)
+                    j=indici_celle_bloccate(2,l)
+                    k=indici_celle_bloccate(3,l)
                 else
                     read(22,*)i,j,k
                 end if
@@ -2274,7 +2255,7 @@ contains
                     cont1=cont1+1
                 end if
                 !         face 2
-                if(i.eq.jx)then
+                if(i.eq.n1)then
                     index_out2(j,k)=0
                     cont2=cont2+1
                 end if
@@ -2284,7 +2265,7 @@ contains
                     cont3=cont3+1
                 end if
                 !         face 4
-                if(j.eq.jy)then
+                if(j.eq.n2)then
                     index_out4(i,k)=0
                     cont4=cont4+1
                 end if
@@ -2294,7 +2275,7 @@ contains
                     cont5=cont5+1
                 end if
                 !         face 6
-                if(k.eq.jz)then
+                if(k.eq.n3)then
                     index_out6(i,j)=0
                     cont6=cont6+1
                 end if
@@ -2310,9 +2291,9 @@ contains
             end if
             do l=1,num_ib
                 if (particles) then
-                    i = indici_CELLE_IB(l,1)
-                    j = indici_CELLE_IB(l,2)
-                    k = indici_CELLE_IB(l,3)
+                    i = indici_CELLE_IB(1,l)
+                    j = indici_CELLE_IB(2,l)
+                    k = indici_CELLE_IB(3,l)
                 else
                     read(22,*)i,j,k
                 end if
@@ -2322,7 +2303,7 @@ contains
                     cont1=cont1+1
                 end if
                 !         face 2
-                if(i.eq.jx)then
+                if(i.eq.n1)then
                     index_out2(j,k)=1 !0
                     cont2=cont2+1
                 end if
@@ -2332,7 +2313,7 @@ contains
                     cont3=cont3+1
                 end if
                 !         face 4
-                if(j.eq.jy)then
+                if(j.eq.n2)then
                     index_out4(i,k)=1 !0
                     cont4=cont4+1
                 end if
@@ -2342,7 +2323,7 @@ contains
                     cont5=cont5+1
                 end if
                 !         face 6
-                if(k.eq.jz)then
+                if(k.eq.n3)then
                     index_out6(i,j)=1 !0
                     cont6=cont6+1
                 end if
@@ -2360,7 +2341,7 @@ contains
             parziale1=0.
             area_bagnata1=0.
             do k=kparasta,kparaend  !1,jz
-                do j=1,jy
+                do j=1,n2
                     parziale1 = parziale1+areola1(j,k)*real(index_out1(j,k))
                 end do
             end do
@@ -2373,7 +2354,7 @@ contains
             parziale2=0.
             area_bagnata2=0.
             do k=kparasta,kparaend  !1,jz
-                do j=1,jy
+                do j=1,n2
                     parziale2 = parziale2+areola2(j,k)*real(index_out2(j,k))
                 end do
             end do
@@ -2387,7 +2368,7 @@ contains
             parziale3=0.
             area_bagnata3=0.
             do k=kparasta,kparaend  !1,jz
-                do i=1,jx
+                do i=1,n1
                     parziale3 = parziale3+areola3(i,k)*real(index_out3(i,k))
                 end do
             end do
@@ -2400,7 +2381,7 @@ contains
             parziale4=0.
             area_bagnata4=0.
             do k=kparasta,kparaend  !1,jz
-                do i=1,jx
+                do i=1,n1
                     parziale4 = parziale4+areola4(i,k)*real(index_out4(i,k))
                 end do
             end do
@@ -2414,8 +2395,8 @@ contains
             if(myid.eq.0)then
                 parziale5=0.
                 area_bagnata5=0.
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         parziale5 = parziale5+areola5(i,j)*real(index_out5(i,j))
                     end do
                 end do
@@ -2428,8 +2409,8 @@ contains
             if(myid.eq.nproc-1)then
                 parziale6=0.
                 area_bagnata6=0.
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         parziale6 = parziale6+areola6(i,j)*real(index_out6(i,j))
                     end do
                 end do

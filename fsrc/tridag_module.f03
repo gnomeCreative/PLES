@@ -48,7 +48,7 @@ contains
 
         use mysettings, only: pran
         use myarrays_metri3, only: annit
-        use myarrays_velo3, only: akapt,akapt_piano
+        use myarrays_velo3, only: akapt
 
         implicit none
 
@@ -61,26 +61,26 @@ contains
 
         !  upload csi
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 ! coefficent construction
                 if (scalar) then
                     call coed1(j,k,delx,aaa,rh,isc)
                 else
                     call coef1_par(j,k,delx,aaa,rh)
                 end if
-                do ii=1,jx
+                do ii=1,n1
                     aa(ii)=aaa(1,ii)
                     bb(ii)=aaa(2,ii)
                     cc(ii)=aaa(3,ii)
                 end do
                 do ii=1,1-ip
-                    call triper(aa,bb,cc,rh,jx-1)
+                    call triper(aa,bb,cc,rh,n1-1)
                 end do
                 do ii=1,ip
-                    call tridag(aa,bb,cc,rh,jx)
+                    call tridag(aa,bb,cc,rh,n1)
                 end do
                 ! put out in delu
-                do i=1,jx
+                do i=1,n1
                     delx(i,j,k)=rh(i)
                 end do
             end do
@@ -88,32 +88,28 @@ contains
 
         !  upload eta
         do k=kparasta,kparaend
-            do i=1,jx
+            do i=1,n1
                 !coefficent construction upload eta
                 if (scalar) then
                     call coed2(i,k,delx,aaa,rh,isc)
                 else
                     call coef2_par(i,k,delx,aaa,rh)
                 end if
-                do ii=1,jy
+                do ii=1,n2
                     aa(ii)=aaa(1,ii)
                     bb(ii)=aaa(2,ii)
                     cc(ii)=aaa(3,ii)
                 end do
-                do jj=1,1-jp
-                    call triper(aa,bb,cc,rh,jy-1)
-                end do
-                do jj=1,jp
-                    call tridag(aa,bb,cc,rh,jy)
-                end do
-                do j=1,jy
+                ! always not periodic
+                call tridag(aa,bb,cc,rh,n2)
+                do j=1,n2
                     delx(i,j,k)=rh(j)          ! put out in delu
                 end do
             end do
         end do
 
         if (scalar) then
-            call tridiag_trasp_para_rho(akapt,g33_tr,giac_tr,delx,akapt_piano,pran,isc)
+            call tridiag_trasp_para_rho(akapt,g33_tr,giac_tr,delx,pran,isc)
         else
             call tridiag_trasp_para(annit,g33_tr,giac_tr,delx,ktime)!annit_piano,
         end if
@@ -149,7 +145,7 @@ contains
             iparasta_tmp= (n* int(n1/nproc)  +1)
             iparaend_tmp= ((n+1)* int(n1/nproc))
 
-            count = jy*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
+            count = n2*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
 
             if(n==0)then
                 allocate(buffer(count))
@@ -163,7 +159,7 @@ contains
 
             m = 0
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=iparasta_tmp,iparaend_tmp
                         m = m + 1
                         buffer(m) = giac(i,j,k)
@@ -178,8 +174,8 @@ contains
             if(myid == n)then
 
                 m = 0
-                do k=1,jz
-                    do j=1,jy
+                do k=1,n3
+                    do j=1,n2
                         do i=iparasta,iparaend
                             m = m +1
                             giac_tr(k,j,i)=buffer_tot(m)
@@ -202,7 +198,7 @@ contains
             iparasta_tmp= (n* int(n1/nproc)  +1)
             iparaend_tmp= ((n+1)* int(n1/nproc))
 
-            count = jy*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
+            count = n2*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
 
             if(n==0)then
                 allocate(buffer(count))
@@ -216,7 +212,7 @@ contains
 
             m = 0
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=iparasta_tmp,iparaend_tmp
                         m = m + 1
                         buffer(m) = g33(i,j,k)
@@ -231,8 +227,8 @@ contains
             if(myid == n)then
 
                 m = 0
-                do k=1,jz
-                    do j=1,jy
+                do k=1,n3
+                    do j=1,n2
                         do i=iparasta,iparaend
                             m = m +1
                             g33_tr(k,j,i)=buffer_tot(m)
@@ -285,7 +281,7 @@ contains
         !      g33_tr = 0.
 
         if(myid==0)then
-            do j=1,jy
+            do j=1,n2
                 do i=1,iparasta,iparaend !jx
                     m = m + 1
                     g33_tr(0,j,i) = g33(i,j,0)
@@ -293,7 +289,7 @@ contains
             end do
         end if
 
-        count_plane = jy*(iparaend-iparasta+1)
+        count_plane = n2*(iparaend-iparasta+1)
 
         allocate(buffer_plane(count_plane))
         allocate(buffer_plane_loc(count_plane))
@@ -309,7 +305,7 @@ contains
 
             if(myid==0)then
                 m=0
-                do j=1,jy
+                do j=1,n2
                     do i=1,iparasta_tmp,iparaend_tmp !jx
                         m = m + 1
                         buffer_plane(m) = g33(i,j,0)
@@ -333,7 +329,7 @@ contains
 
             if(myid==n)then
                 m=0
-                do j=1,jy
+                do j=1,n2
                     do i=iparasta_tmp,iparaend_tmp
                         m = m + 1
                         g33_tr(0,j,i)=buffer_plane_loc(m)
@@ -381,7 +377,7 @@ contains
         return
     end subroutine tridag
 
-    subroutine tridiag_trasp_para_rho(akapt,g33_tr,giac_tr,del,akapt_piano,pran,isc)
+    subroutine tridiag_trasp_para_rho(akapt,g33_tr,giac_tr,del,pran,isc)
         !*************************************************************************
         ! transpose operation for matrix.
         ! each plane XZ it is seen as two dimensional matrix and it is transposed,
@@ -397,7 +393,6 @@ contains
         !     array declaration
         real pran(nscal)
         real akapt(nscal,0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr) !0:n3+1)
-        real akapt_piano(nscal,0:n1+1,0:n2+1,1)
 
         real del(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
         real aa(n1+n2+n3),bb(n1+n2+n3),cc(n1+n2+n3)
@@ -441,8 +436,8 @@ contains
             iparasta_tmp= (n* int(n1/nproc)  +1)
             iparaend_tmp= ((n+1)* int(n1/nproc))
 
-            count=jy*(iparaend_tmp-iparasta_tmp+1+2)*(kparaend-kparasta+1)
-            count_plane = jy*(iparaend_tmp-iparasta_tmp+1)
+            count=n2*(iparaend_tmp-iparasta_tmp+1+2)*(kparaend-kparasta+1)
+            count_plane = n2*(iparaend_tmp-iparasta_tmp+1)
 
             if(n==0)then
                 allocate(buffer(count))
@@ -456,7 +451,7 @@ contains
 
             m = 0
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=iparasta_tmp-1,iparaend_tmp+1
                         m = m + 1
                         buffer(m) = akapt(isc,i,j,k)
@@ -470,8 +465,8 @@ contains
 
             if(myid==n)then
                 m = 0
-                do k=1,jz
-                    do j=1,jy
+                do k=1,n3
+                    do j=1,n2
                         do i=iparasta-1,iparaend+1
                             m = m +1
                             akapt_tr(k,j,i) = buffer_tot(m)
@@ -486,7 +481,7 @@ contains
         !..................................................................
 
         !     proc 0 send the data
-        count_plane = jy*jx
+        count_plane = n2*n1
 
         allocate(buffer_plane(count_plane))
         allocate(buffer_plane_loc(count_plane/nproc))
@@ -495,8 +490,8 @@ contains
 
         if(myid==0)then
             m=0
-            do i=1,jx
-                do j=1,jy
+            do i=1,n1
+                do j=1,n2
                     m = m + 1
                     buffer_plane(m) = akapt(isc,i,j,0)
                 end do
@@ -509,7 +504,7 @@ contains
 
         m=0
         do i=iparasta,iparaend
-            do j=1,jy
+            do j=1,n2
                 m = m + 1
                 akapt_tr(0,j,i)=buffer_plane_loc(m)
             end do
@@ -518,7 +513,7 @@ contains
         deallocate(buffer_plane,buffer_plane_loc)
 
         !     nproc-1 send the data
-        count_plane = jy*jx
+        count_plane = n2*n1
 
         allocate(buffer_plane(count_plane))
         allocate(buffer_plane_loc(count_plane/nproc))
@@ -527,10 +522,10 @@ contains
 
         if(myid==nproc-1)then
             m=0
-            do i=1,jx
-                do j=1,jy
+            do i=1,n1
+                do j=1,n2
                     m = m + 1
-                    buffer_plane(m) = akapt(isc,i,j,jz+1)
+                    buffer_plane(m) = akapt(isc,i,j,n3+1)
                 end do
             end do
         end if
@@ -541,9 +536,9 @@ contains
 
         m=0
         do i=iparasta,iparaend
-            do j=1,jy
+            do j=1,n2
                 m = m + 1
-                akapt_tr(jz+1,j,i)=buffer_plane_loc(m)
+                akapt_tr(n3+1,j,i)=buffer_plane_loc(m)
             end do
         end do
 
@@ -562,8 +557,8 @@ contains
             iparasta_tmp= (n* int(n1/nproc)  +1)
             iparaend_tmp= ((n+1)* int(n1/nproc))
 
-            count = jy*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
-            count_plane = jy*(iparaend_tmp-iparasta_tmp+1)
+            count = n2*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
+            count_plane = n2*(iparaend_tmp-iparasta_tmp+1)
 
             if(n==0)then
                 allocate(buffer(count))
@@ -577,7 +572,7 @@ contains
 
             m = 0
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=iparasta_tmp,iparaend_tmp
                         m = m + 1
                         buffer(m) = del(i,j,k)
@@ -591,8 +586,8 @@ contains
 
             if(myid==n)then
                 m = 0
-                do k=1,jz
-                    do j=1,jy
+                do k=1,n3
+                    do j=1,n2
                         do i=iparasta,iparaend
                             m = m +1
 
@@ -610,8 +605,8 @@ contains
         !----------------------------------------------------------------------
         !----------------------------------------------------------------------
         !----------------------------------------------------------------------
-        ncoljx=jx/nproc
-        ncoljz=jz/nproc
+        ncoljx=n1/nproc
+        ncoljz=n3/nproc
         ! now del_tr is ready to be accepted in the tridiag system resolution,
         ! del_tr is subdivided according to 1st coordinate
         !
@@ -622,23 +617,23 @@ contains
         !     take up zita ---> in reality is csi
         !
         do kt=1+myid*ncoljx,(myid+1)*ncoljx
-            do jt=1,jy
+            do jt=1,n2
                 !
                 call coed3_tr(jt,kt,akapt_tr,del_tr, &
                     aaa,rh,myid,g33_tr,giac_tr,iparasta,iparaend)
                 !
-                do ii=1,jz
+                do ii=1,n3
                     aa(ii)=aaa(1,ii)
                     bb(ii)=aaa(2,ii)
                     cc(ii)=aaa(3,ii)
                 end do
                 do ii=1,1-kp
-                    call triper(aa,bb,cc,rh,jz-1)
+                    call triper(aa,bb,cc,rh,n3-1)
                 end do
                 do ii=1,kp
-                    call tridag(aa,bb,cc,rh,jz)
+                    call tridag(aa,bb,cc,rh,n3)
                 end do
-                do it=1,jz
+                do it=1,n3
                     del_tr(it,jt,kt)=rh(it)          ! put output in del_tr
                 end do
 
@@ -649,13 +644,13 @@ contains
         !
         ! 6 - now transpose again the computed quantities
         !
-        allocate (del_cols(jx*jy*ncoljz))
-        allocate (del_colr(jx*jy*ncoljz))
+        allocate (del_cols(n1*n2*ncoljz))
+        allocate (del_colr(n1*n2*ncoljz))
 
         do n=1,nproc
 
             do kt=1+myid*ncoljx,(myid+1)*ncoljx
-                do jt=1,jy
+                do jt=1,n2
                     do it=1+(n-1)*ncoljz,n*ncoljz
 
                         k=kt+(n-1-myid)*ncoljx
@@ -671,11 +666,11 @@ contains
             !
 
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=1+(n-1)*ncoljx,n*ncoljx
 
-                        m=i-(n-1)*ncoljx+ncoljx*(j-1+jy*(k-kparasta))
-                        m=m+(n-1)*jy*ncoljx*ncoljz
+                        m=i-(n-1)*ncoljx+ncoljx*(j-1+n2*(k-kparasta))
+                        m=m+(n-1)*n2*ncoljx*ncoljz
                         del_cols(m)=del(i,j,k)
 
                     enddo
@@ -687,8 +682,8 @@ contains
         !
         ! 8 - call ALLTOALL for exchange between procs
         !
-        call MPI_ALLTOALL(del_cols,ncoljx*jy*ncoljz,MPI_REAL_SD, &
-            del_colr,ncoljx*jy*ncoljz,MPI_REAL_SD, &
+        call MPI_ALLTOALL(del_cols,ncoljx*n2*ncoljz,MPI_REAL_SD, &
+            del_colr,ncoljx*n2*ncoljz,MPI_REAL_SD, &
             MPI_COMM_WORLD,ierr)
         !
         ! 9 - re construct matrix exchanged between procs
@@ -696,11 +691,11 @@ contains
         do n=1,nproc
 
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=1+(n-1)*ncoljx,n*ncoljx
 
-                        m=i-(n-1)*ncoljx+ncoljx*(j-1+jy*(k-kparasta))
-                        m=m+(n-1)*jy*ncoljx*ncoljz
+                        m=i-(n-1)*ncoljx+ncoljx*(j-1+n2*(k-kparasta))
+                        m=m+(n-1)*n2*ncoljx*ncoljz
                         del(i,j,k)=del_colr(m)
 
 
@@ -786,8 +781,8 @@ contains
             iparasta_tmp= (n* int(n1/nproc)  +1)
             iparaend_tmp= ((n+1)* int(n1/nproc))
 
-            count=jy*(iparaend_tmp-iparasta_tmp+1+2)*(kparaend-kparasta+1)
-            count_plane = jy*(iparaend_tmp-iparasta_tmp+1)
+            count=n2*(iparaend_tmp-iparasta_tmp+1+2)*(kparaend-kparasta+1)
+            count_plane = n2*(iparaend_tmp-iparasta_tmp+1)
 
             if(n==0)then
                 allocate(buffer(count))
@@ -801,7 +796,7 @@ contains
 
             m = 0
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=iparasta_tmp-1,iparaend_tmp+1
                         m = m + 1
                         buffer(m) = akapt(i,j,k)
@@ -815,8 +810,8 @@ contains
 
             if(myid==n)then
                 m = 0
-                do k=1,jz
-                    do j=1,jy
+                do k=1,n3
+                    do j=1,n2
                         do i=iparasta-1,iparaend+1
                             m = m +1
                             akapt_tr(k,j,i) = buffer_tot(m)
@@ -831,7 +826,7 @@ contains
         !..................................................................
 
         !     proc 0 send the data
-        count_plane = jy*jx
+        count_plane = n2*n1
 
         allocate(buffer_plane(count_plane))
         allocate(buffer_plane_loc(count_plane/nproc))
@@ -840,8 +835,8 @@ contains
 
         if(myid==0)then
             m=0
-            do i=1,jx
-                do j=1,jy
+            do i=1,n1
+                do j=1,n2
                     m = m + 1
                     buffer_plane(m) = akapt(i,j,0)
                 end do
@@ -854,7 +849,7 @@ contains
 
         m=0
         do i=iparasta,iparaend
-            do j=1,jy
+            do j=1,n2
                 m = m + 1
                 akapt_tr(0,j,i)=buffer_plane_loc(m)
             end do
@@ -863,7 +858,7 @@ contains
         deallocate(buffer_plane,buffer_plane_loc)
 
         !     nproc-1 send the data
-        count_plane = jy*jx
+        count_plane = n2*n1
 
         allocate(buffer_plane(count_plane))
         allocate(buffer_plane_loc(count_plane/nproc))
@@ -872,10 +867,10 @@ contains
 
         if(myid==nproc-1)then
             m=0
-            do i=1,jx
-                do j=1,jy
+            do i=1,n1
+                do j=1,n2
                     m = m + 1
-                    buffer_plane(m) = akapt(i,j,jz+1)
+                    buffer_plane(m) = akapt(i,j,n3+1)
                 end do
             end do
         end if
@@ -886,9 +881,9 @@ contains
 
         m=0
         do i=iparasta,iparaend
-            do j=1,jy
+            do j=1,n2
                 m = m + 1
-                akapt_tr(jz+1,j,i)=buffer_plane_loc(m)
+                akapt_tr(n3+1,j,i)=buffer_plane_loc(m)
             end do
         end do
 
@@ -907,8 +902,8 @@ contains
             iparasta_tmp= (n* int(n1/nproc)  +1)
             iparaend_tmp= ((n+1)* int(n1/nproc))
 
-            count = jy*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
-            count_plane = jy*(iparaend_tmp-iparasta_tmp+1)
+            count = n2*(iparaend_tmp-iparasta_tmp+1)*(kparaend-kparasta+1)
+            count_plane = n2*(iparaend_tmp-iparasta_tmp+1)
 
             if(n==0)then
                 allocate(buffer(count))
@@ -922,7 +917,7 @@ contains
 
             m = 0
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=iparasta_tmp,iparaend_tmp
                         m = m + 1
                         buffer(m) = del(i,j,k)
@@ -936,8 +931,8 @@ contains
 
             if(myid==n)then
                 m = 0
-                do k=1,jz
-                    do j=1,jy
+                do k=1,n3
+                    do j=1,n2
                         do i=iparasta,iparaend
                             m = m +1
 
@@ -958,8 +953,8 @@ contains
         !----------------------------------------------------------------------
         !----------------------------------------------------------------------
         !
-        ncoljx=jx/nproc
-        ncoljz=jz/nproc
+        ncoljx=n1/nproc
+        ncoljz=n3/nproc
 
         ! now del_tr is ready to be accepted in the tridiag system resolution,
         ! del_tr is subdivided according to 1st coordinate
@@ -972,23 +967,23 @@ contains
         !
         do kt=1+myid*ncoljx,(myid+1)*ncoljx
 
-            do jt=1,jy
+            do jt=1,n2
                 !
                 call coed3_tr(jt,kt,akapt_tr,del_tr, &
                     aaa,rh,myid,g33_tr,giac_tr,iparasta,iparaend)
                 !
-                do ii=1,jz
+                do ii=1,n3
                     aa(ii)=aaa(1,ii)
                     bb(ii)=aaa(2,ii)
                     cc(ii)=aaa(3,ii)
                 end do
                 do ii=1,1-kp
-                    call triper(aa,bb,cc,rh,jz-1)
+                    call triper(aa,bb,cc,rh,n3-1)
                 end do
                 do ii=1,kp
-                    call tridag(aa,bb,cc,rh,jz)
+                    call tridag(aa,bb,cc,rh,n3)
                 end do
-                do it=1,jz
+                do it=1,n3
                     del_tr(it,jt,kt)=rh(it)      ! put output in del_tr
                 end do
 
@@ -999,13 +994,13 @@ contains
         !
         ! 6 - now transpose again the computed quantities
         !
-        allocate (del_cols(jx*jy*ncoljz))
-        allocate (del_colr(jx*jy*ncoljz))
+        allocate (del_cols(n1*n2*ncoljz))
+        allocate (del_colr(n1*n2*ncoljz))
 
         do n=1,nproc
 
             do kt=1+myid*ncoljx,(myid+1)*ncoljx
-                do jt=1,jy
+                do jt=1,n2
                     do it=1+(n-1)*ncoljz,n*ncoljz
 
                         k=kt+(n-1-myid)*ncoljx
@@ -1021,11 +1016,11 @@ contains
             !
 
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=1+(n-1)*ncoljx,n*ncoljx
 
-                        m=i-(n-1)*ncoljx+ncoljx*(j-1+jy*(k-kparasta))
-                        m=m+(n-1)*jy*ncoljx*ncoljz
+                        m=i-(n-1)*ncoljx+ncoljx*(j-1+n2*(k-kparasta))
+                        m=m+(n-1)*n2*ncoljx*ncoljz
                         del_cols(m)=del(i,j,k)
 
                     enddo
@@ -1037,8 +1032,8 @@ contains
         !
         ! 8 - call ALLTOALL for exchange between procs
         !
-        call MPI_ALLTOALL(del_cols,ncoljx*jy*ncoljz,MPI_REAL_SD, &
-            del_colr,ncoljx*jy*ncoljz,MPI_REAL_SD, &
+        call MPI_ALLTOALL(del_cols,ncoljx*n2*ncoljz,MPI_REAL_SD, &
+            del_colr,ncoljx*n2*ncoljz,MPI_REAL_SD, &
             MPI_COMM_WORLD,ierr)
         !
         ! 9 - re construct matrix exchanged between procs
@@ -1046,11 +1041,11 @@ contains
         do n=1,nproc
 
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     do i=1+(n-1)*ncoljx,n*ncoljx
 
-                        m=i-(n-1)*ncoljx+ncoljx*(j-1+jy*(k-kparasta))
-                        m=m+(n-1)*jy*ncoljx*ncoljz
+                        m=i-(n-1)*ncoljx+ncoljx*(j-1+n2*(k-kparasta))
+                        m=m+(n-1)*n2*ncoljx*ncoljz
                         del(i,j,k)=del_colr(m)
 
                     enddo
@@ -1131,7 +1126,7 @@ contains
         ! along csi of the scalar eq.
         !
         use myarrays_metri3, only: annit,g11,g22,g33,giac
-        use myarrays_velo3, only: akapt,akapt_piano,rhs
+        use myarrays_velo3, only: akapt,rhs
 
         implicit none
         !-----------------------------------------------------------------------
@@ -1159,7 +1154,7 @@ contains
             rh(i)=rhs(i,j,k)
             !
             !     computation on right side
-            i=jx
+            i=n1
             !
             aa(1,i)=akapt(isc,i+1,j,k)*g11(i,j,k)/3.+ &
                 .5*(akapt(isc,i,j,k)+akapt(isc,i-1,j,k))*g11(i-1,j,k)
@@ -1176,7 +1171,7 @@ contains
         enddo
         !
         !     computation into the field
-        do i=1+ip,jx-ip
+        do i=1+ip,n1-ip
             !
             aa(1,i)=.5*(akapt(isc,i,j,k)+akapt(isc,i-1,j,k))*g11(i-1,j,k)
             aa(1,i)=-dt*aa(1,i)/giac(i,j,k)/2.
@@ -1210,40 +1205,39 @@ contains
         !-----------------------------------------------------------------------
         !
         !
-        do jj=1,jp
-            !     computation on bottom side
-            j=1
-            !
-            aa(1,j)=0.
-            !
-            aa(2,j)=.5*(akaptV(isc,i,j,k)+akaptV(isc,i,j+1,k))*g22(i,j,k)+ &
-                3.*akaptV(isc,i,j-1,k)*g22(i,j-1,k)
-            aa(2,j)=1.+aa(2,j)*dt/giac(i,j,k)/2.
-            !
-            aa(3,j)=.5*(akaptV(isc,i,j,k)+akaptV(isc,i,j+1,k))*g22(i,j,k)+ &
-                akaptV(isc,i,j-1,k)*g22(i,j-1,k)/3.
-            aa(3,j)=-dt*aa(3,j)/giac(i,j,k)/2.
-            !
-            rh(j)=del(i,j,k)
-            !
-            !     computation on upper side
-            j=jy
-            !
-            aa(1,j)=akaptV(isc,i,j+1,k)*g22(i,j,k)/3.+ &
-                .5*(akaptV(isc,i,j,k)+akaptV(isc,i,j-1,k))*g22(i,j-1,k)
-            aa(1,j)=-dt*aa(1,j)/giac(i,j,k)/2.
-            !
-            aa(2,j)=akaptV(isc,i,j+1,k)*g22(i,j,k)*3.+ &
-                .5*(akaptV(isc,i,j,k)+akaptV(isc,i,j-1,k))*g22(i,j-1,k)
-            aa(2,j)=1.+dt*aa(2,j)/giac(i,j,k)/2.
-            !
-            aa(3,j)=0.
-            rh(j)=del(i,j,k)
+        ! always not periodic
+        !     computation on bottom side
+        j=1
         !
-        enddo
+        aa(1,j)=0.
+        !
+        aa(2,j)=.5*(akaptV(isc,i,j,k)+akaptV(isc,i,j+1,k))*g22(i,j,k)+ &
+            3.*akaptV(isc,i,j-1,k)*g22(i,j-1,k)
+        aa(2,j)=1.+aa(2,j)*dt/giac(i,j,k)/2.
+        !
+        aa(3,j)=.5*(akaptV(isc,i,j,k)+akaptV(isc,i,j+1,k))*g22(i,j,k)+ &
+            akaptV(isc,i,j-1,k)*g22(i,j-1,k)/3.
+        aa(3,j)=-dt*aa(3,j)/giac(i,j,k)/2.
+        !
+        rh(j)=del(i,j,k)
+        !
+        !     computation on upper side
+        j=n2
+        !
+        aa(1,j)=akaptV(isc,i,j+1,k)*g22(i,j,k)/3.+ &
+            .5*(akaptV(isc,i,j,k)+akaptV(isc,i,j-1,k))*g22(i,j-1,k)
+        aa(1,j)=-dt*aa(1,j)/giac(i,j,k)/2.
+        !
+        aa(2,j)=akaptV(isc,i,j+1,k)*g22(i,j,k)*3.+ &
+            .5*(akaptV(isc,i,j,k)+akaptV(isc,i,j-1,k))*g22(i,j-1,k)
+        aa(2,j)=1.+dt*aa(2,j)/giac(i,j,k)/2.
+        !
+        aa(3,j)=0.
+        rh(j)=del(i,j,k)
+
         !
         !     computation into the field
-        do j=1+jp,jy-jp
+        do j=2,n2-1
             !
             aa(1,j)=.5*(akaptV(isc,i,j,k) &
                 +akaptV(isc,i,j-1,k))*g22(i,j-1,k)
@@ -1281,7 +1275,7 @@ contains
         !
         !     inside the field
         !
-        do i=1,jz
+        do i=1,n3
             !
             aa(1,i)=.5*(aka_tr(i,j,k)+aka_tr(i-1,j,k))*g33_tr(i-1,j,k)
             aa(1,i)=-dt*aa(1,i)/giac_tr(i,j,k)/2.
@@ -1304,7 +1298,7 @@ contains
         ! along csi for equation u,v,  w
         !
         use myarrays_metri3, only: annit,g11,g22,g33,giac
-        use myarrays_velo3, only: akapt,akapt_piano,rhs
+        use myarrays_velo3, only: akapt,rhs
 
         implicit none
         !-----------------------------------------------------------------------
@@ -1332,7 +1326,7 @@ contains
                 del(i-1,j,k)*8.*dt/giac(i,j,k)/6.
             !
             !     side right
-            i=jx
+            i=n1
             !
             aa(1,i)=annit(i+1,j,k)*g11(i,j,k)/3.+ &
                 .5*(annit(i,j,k)+annit(i-1,j,k))*g11(i-1,j,k)
@@ -1351,7 +1345,7 @@ contains
         enddo
         !
         !     into the field
-        do i=1+ip,jx-ip
+        do i=1+ip,n1-ip
             !
             aa(1,i)=.5*(annit(i,j,k)+annit(i-1,j,k))*g11(i-1,j,k)
             aa(1,i)=-dt*aa(1,i)/giac(i,j,k)/2.
@@ -1374,7 +1368,7 @@ contains
         ! along eta for equations in u,v,w
         !
         use myarrays_metri3, only: annitV,g11,g22,g33,giac
-        use myarrays_velo3, only: akapt,akapt_piano,rhs
+        use myarrays_velo3, only: akapt,rhs
 
         implicit none
         !-----------------------------------------------------------------------
@@ -1383,8 +1377,8 @@ contains
         real del(0:n1+1,0:n2+1,kparasta-1:kparaend+1),aa(3,*),rh(*)
         !-----------------------------------------------------------------------
         !
-        do jj=1,jp
-            !
+        ! always not periodic
+        !
             !     side bottom
             j=1
             !
@@ -1403,7 +1397,7 @@ contains
                 del(i,j-1,k)*8.*dt/giac(i,j,k)/6.
             !
             !     side upper
-            j=jy
+            j=n2
             !
             aa(1,j)=annitV(i,j+1,k)*g22(i,j,k)/3.+ &
                 .5*(annitV(i,j,k)+annitV(i,j-1,k))*g22(i,j-1,k)
@@ -1419,10 +1413,9 @@ contains
                 annitV(i,j+1,k)*g22(i,j,k) &
                 *del(i,j+1,k)*8.*dt/giac(i,j,k)/6.
         !
-        enddo
         !
         !     into the field
-        do j=1+jp,jy-jp
+        do j=2,n2-1
             !
             aa(1,j)=.5*(annitV(i,j,k) &
                 +annitV(i,j-1,k))*g22(i,j-1,k)

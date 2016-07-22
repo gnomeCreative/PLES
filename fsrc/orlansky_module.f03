@@ -2,7 +2,7 @@ module orlansky_module
 
     use,intrinsic :: iso_c_binding
 
-    use myarrays_velo3, only: delu, delv, delw, rhov, u, uc, v, w
+    use myarrays_velo3, only: delu,delv,delw,rhov,u,uc,v,w
     use mysending
     !
     use scala3
@@ -98,14 +98,14 @@ contains
         integer i,j,k,ii,iii,isc
         integer ierr
         integer,parameter :: i_ob = 1
-        double precision c_orl ,amass,amass_loc
-        double precision vol,vol_loc,c_orlansky(n2)
+        real c_orl ,amass,amass_loc
+        real vol,vol_loc,c_orlansky(n2)
         real deltax
         !-----------------------------------------------------------------------
 
         ! initialization
-        do k=1,jz
-            do j=1,jy
+        do k=1,n3
+            do j=1,n2
                 du_dx1(j,k)=0.
                 dv_dx1(j,k)=0.
                 dw_dx1(j,k)=0.
@@ -120,8 +120,8 @@ contains
             end do
         end do
 
-        do k=1,jz
-            do i=1,jx
+        do k=1,n3
+            do i=1,n1
                 du_dy3(i,k)=0.
                 dv_dy3(i,k)=0.
                 dw_dy3(i,k)=0.
@@ -136,8 +136,8 @@ contains
             end do
         end do
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 du_dz5(i,j)=0.
                 dv_dz5(i,j)=0.
                 dw_dz5(i,j)=0.
@@ -164,7 +164,7 @@ contains
                 if(infout1.eq.1)then
 
                     do k=kparasta,kparaend
-                        do j=1,jy
+                        do j=1,n2
 
                             du_dx1(j,k)=u(1,j,k)+delu(1,j,k)
                             dv_dx1(j,k)=v(1,j,k)+delv(1,j,k)
@@ -191,35 +191,35 @@ contains
                     vol_loc = 0.
                     vol = 0.
 
-                    do j=1,jy
+                    do j=1,n2
                         do k=kparasta,kparaend
-                            amass_loc = amass_loc + uc(jx,j,k)
-                            vol_loc = vol_loc + giac(jx,j,k)
+                            amass_loc = amass_loc + uc(n1,j,k)
+                            vol_loc = vol_loc + giac(n1,j,k)
                         end do
                     end do
 
-                    call MPI_ALLREDUCE(amass_loc,amass,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-                    call MPI_ALLREDUCE(vol_loc,vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+                    call MPI_ALLREDUCE(amass_loc,amass,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
+                    call MPI_ALLREDUCE(vol_loc,vol,1,MPI_REAL_SD,MPI_SUM,MPI_COMM_WORLD,ierr)
                     call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
                     !      c_orl = amass/( (z(1,1,jz)-z(1,1,0)) * (y(1,jy,1)-y(1,0,1))  )
                     !      if(myid.eq.0)write(*,*)'C_ORL',c_orl
 
                     do k=kparasta,kparaend
-                        do j=1,jy
+                        do j=1,n2
 
                             !      c_orl=c_orlansky(j) !uc(jx,j,k)/giac(jx,j,k)
-                            c_orl=uc(jx,j,k)/giac(jx,j,k)
+                            c_orl=uc(n1,j,k)/giac(n1,j,k)
 
                             if(c_orl.gt.0) then
-                                du_dx2(j,k)=u(jx+1,j,k)-2.*dt*c_orl*(u(jx+1,j,k)-u(jx,j,k)) ! /deltax
-                                dv_dx2(j,k)=v(jx,j,k)    !v(jx+1,j,k)-2.*dt*c_orl*(v(jx+1,j,k)-v(jx,j,k)) ! /deltax
-                                dw_dx2(j,k)=w(jx,j,k)    !w(jx+1,j,k)-2.*dt*c_orl*(w(jx+1,j,k)-w(jx,j,k)) ! /deltax
+                                du_dx2(j,k)=u(n1+1,j,k)-2.*dt*c_orl*(u(n1+1,j,k)-u(n1,j,k)) ! /deltax
+                                dv_dx2(j,k)=v(n1,j,k)    !v(jx+1,j,k)-2.*dt*c_orl*(v(jx+1,j,k)-v(jx,j,k)) ! /deltax
+                                dw_dx2(j,k)=w(n1,j,k)    !w(jx+1,j,k)-2.*dt*c_orl*(w(jx+1,j,k)-w(jx,j,k)) ! /deltax
                             ! drho_dx2(j,k)=rho(jx+1,j,k)  ! -2.*dt*c_orl*(rho(jx+1,j,k)-rho(jx,j,k))
                             else
-                                du_dx2(j,k)=u(jx+1,j,k)-2.*dt*c_orl*(u(jx,j,k)-u(jx+1,j,k)) ! /deltax
-                                dv_dx2(j,k)=v(jx+1,j,k)-2.*dt*c_orl*(v(jx,j,k)-v(jx+1,j,k)) ! /deltax
-                                dw_dx2(j,k)=w(jx+1,j,k)-2.*dt*c_orl*(w(jx,j,k)-w(jx+1,j,k)) ! /deltax
+                                du_dx2(j,k)=u(n1+1,j,k)-2.*dt*c_orl*(u(n1,j,k)-u(n1+1,j,k)) ! /deltax
+                                dv_dx2(j,k)=v(n1+1,j,k)-2.*dt*c_orl*(v(n1,j,k)-v(n1+1,j,k)) ! /deltax
+                                dw_dx2(j,k)=w(n1+1,j,k)-2.*dt*c_orl*(w(n1,j,k)-w(n1+1,j,k)) ! /deltax
                             ! drho_dx2(j,k)=rho(jx+1,j,k) ! -2.*dt*c_orl*(rho(jx,j,k)-rho(jx+1,j,k))
                             end if
 
@@ -229,7 +229,7 @@ contains
 
 
                             do isc=1,nscal
-                                drho_dx2(isc,j,k)=rhov(isc,jx,j,k)
+                                drho_dx2(isc,j,k)=rhov(isc,n1,j,k)
                                 drho_dx2(isc,j,k)=index_out2(j,k)*drho_dx2(isc,j,k)
                             end do
                         enddo
@@ -239,11 +239,11 @@ contains
             enddo !fine loop ii=1,ip
             !-----------------------------------------------------------------------
             ! side 3 constant eta
-            do iii=1,jp
+            ! always not periodic
                 if(infout3.eq.1)then
 
                     do k=kparasta,kparaend
-                        do i=1,jx
+                        do i=1,n1
 
                             du_dy3(i,k)=u(i,1,k)+delu(i,1,k)
                             dv_dy3(i,k)=v(i,1,k)+delv(i,1,k)
@@ -266,11 +266,11 @@ contains
                 if(infout4.eq.1)then
 
                     do k=kparasta,kparaend
-                        do i=1,jx
+                        do i=1,n1
 
-                            du_dy4(i,k)=u(i,jy,k)+delu(i,jy,k)
-                            dv_dy4(i,k)=v(i,jy,k)+delv(i,jy,k)
-                            dw_dy4(i,k)=w(i,jy,k)+delw(i,jy,k)
+                            du_dy4(i,k)=u(i,n2,k)+delu(i,n2,k)
+                            dv_dy4(i,k)=v(i,n2,k)+delv(i,n2,k)
+                            dw_dy4(i,k)=w(i,n2,k)+delw(i,n2,k)
 
 
                             du_dy4(i,k)=index_out4(i,k)*du_dy4(i,k)
@@ -278,14 +278,13 @@ contains
                             dw_dy4(i,k)=index_out4(i,k)*dw_dy4(i,k)
 
                             do isc=1,nscal
-                                drho_dy4(isc,i,k)=rhov(isc,i,jy,k)
+                                drho_dy4(isc,i,k)=rhov(isc,i,n2,k)
                                 drho_dy4(isc,i,k)=index_out4(i,k)*drho_dy4(isc,i,k)
                             end do
                         enddo
                     enddo
 
                 endif
-            enddo !end loop jj=1,jp
             !-----------------------------------------------------------------------
             ! side 5 constant zita
             do iii=1,kp
@@ -293,8 +292,8 @@ contains
                 if(myid.eq.0)then
                     if(infout5.eq.1)then
 
-                        do j=1,jy
-                            do i=1,jx
+                        do j=1,n2
+                            do i=1,n1
 
                                 du_dz5(i,j)=u(i,j,1)+delu(i,j,1)
                                 dv_dz5(i,j)=v(i,j,1)+delv(i,j,1)
@@ -319,12 +318,12 @@ contains
                 if(myid.eq.nproc-1)then
                     if(infout6.eq.1)then
 
-                        do j=1,jy
-                            do i=1,jx
+                        do j=1,n2
+                            do i=1,n1
 
-                                du_dz6(i,j)=u(i,j,jz)+delu(i,j,jz)
-                                dv_dz6(i,j)=v(i,j,jz)+delv(i,j,jz)
-                                dw_dz6(i,j)=w(i,j,jz)+delw(i,j,jz)
+                                du_dz6(i,j)=u(i,j,n3)+delu(i,j,n3)
+                                dv_dz6(i,j)=v(i,j,n3)+delv(i,j,n3)
+                                dw_dz6(i,j)=w(i,j,n3)+delw(i,j,n3)
 
 
                                 du_dz6(i,j)=index_out6(i,j)*du_dz6(i,j)
@@ -332,7 +331,7 @@ contains
                                 dw_dz6(i,j)=index_out6(i,j)*dw_dz6(i,j)
 
                                 do isc=1,nscal
-                                    drho_dz6(isc,i,j)=rhov(isc,i,j,jz)
+                                    drho_dz6(isc,i,j)=rhov(isc,i,j,n3)
                                     drho_dz6(isc,i,j)=index_out6(i,j)*drho_dz6(isc,i,j)
                                 end do
                             enddo
@@ -360,7 +359,7 @@ contains
                 if(infout1==1)then
 
                     do k=kparasta,kparaend
-                        do j=1,jy
+                        do j=1,n2
 
                             du_dx1(j,k)=u(1,j,k)+delu(1,j,k)
                             dv_dx1(j,k)=v(1,j,k)+delv(1,j,k)
@@ -383,11 +382,11 @@ contains
                 if(infout2==1)then
 
                     do k=kparasta,kparaend
-                        do j=1,jy
+                        do j=1,n2
 
-                            du_dx2(j,k)=u(jx,j,k)+delu(jx,j,k)
-                            dv_dx2(j,k)=v(jx,j,k)+delv(jx,j,k)
-                            dw_dx2(j,k)=w(jx,j,k)+delw(jx,j,k)
+                            du_dx2(j,k)=u(n1,j,k)+delu(n1,j,k)
+                            dv_dx2(j,k)=v(n1,j,k)+delv(n1,j,k)
+                            dw_dx2(j,k)=w(n1,j,k)+delw(n1,j,k)
 
 
                             du_dx2(j,k)=index_out2(j,k)*du_dx2(j,k)
@@ -395,7 +394,7 @@ contains
                             dw_dx2(j,k)=index_out2(j,k)*dw_dx2(j,k)
 
                             do isc=1,nscal
-                                drho_dx2(isc,j,k)=rhov(isc,jx,j,k)
+                                drho_dx2(isc,j,k)=rhov(isc,n1,j,k)
                                 drho_dx2(isc,j,k)=index_out2(j,k)*drho_dx2(isc,j,k)
                             end do
 
@@ -406,11 +405,11 @@ contains
             enddo !fine loop ii=1,ip
             !-----------------------------------------------------------------------
             ! side 3 constant eta
-            do iii=1,jp
+            ! alwayws not periodic
                 if(infout3==1)then
 
                     do k=kparasta,kparaend
-                        do i=1,jx
+                        do i=1,n1
 
                             du_dy3(i,k)=u(i,1,k)+delu(i,1,k)
                             dv_dy3(i,k)=v(i,1,k)+delv(i,1,k)
@@ -433,11 +432,11 @@ contains
                 if(infout4==1)then
 
                     do k=kparasta,kparaend
-                        do i=1,jx
+                        do i=1,n1
 
-                            du_dy4(i,k)=u(i,jy,k)+delu(i,jy,k)
-                            dv_dy4(i,k)=v(i,jy,k)+delv(i,jy,k)
-                            dw_dy4(i,k)=w(i,jy,k)+delw(i,jy,k)
+                            du_dy4(i,k)=u(i,n2,k)+delu(i,n2,k)
+                            dv_dy4(i,k)=v(i,n2,k)+delv(i,n2,k)
+                            dw_dy4(i,k)=w(i,n2,k)+delw(i,n2,k)
 
 
                             du_dy4(i,k)=index_out4(i,k)*du_dy4(i,k)
@@ -445,14 +444,13 @@ contains
                             dw_dy4(i,k)=index_out4(i,k)*dw_dy4(i,k)
 
                             do isc=1,nscal
-                                drho_dy4(isc,i,k)=rhov(isc,i,jy,k)
+                                drho_dy4(isc,i,k)=rhov(isc,i,n2,k)
                                 drho_dy4(isc,i,k)=index_out4(i,k)*drho_dy4(isc,i,k)
                             end do
                         enddo
                     enddo
 
                 endif
-            enddo !end loop jj=1,jp
             !-----------------------------------------------------------------------
             ! side 5 constant zita
             do iii=1,kp
@@ -460,8 +458,8 @@ contains
                 if(myid==0)then
                     if(infout5==1)then
 
-                        do j=1,jy
-                            do i=1,jx
+                        do j=1,n2
+                            do i=1,n1
 
                                 du_dz5(i,j)=u(i,j,1)+delu(i,j,1)
                                 dv_dz5(i,j)=v(i,j,1)+delv(i,j,1)
@@ -486,12 +484,12 @@ contains
                 if(myid==nproc-1)then
                     if(infout6==1)then
 
-                        do j=1,jy
-                            do i=1,jx
+                        do j=1,n2
+                            do i=1,n1
 
-                                du_dz6(i,j)=u(i,j,jz)+delu(i,j,jz)
-                                dv_dz6(i,j)=v(i,j,jz)+delv(i,j,jz)
-                                dw_dz6(i,j)=w(i,j,jz)+delw(i,j,jz)
+                                du_dz6(i,j)=u(i,j,n3)+delu(i,j,n3)
+                                dv_dz6(i,j)=v(i,j,n3)+delv(i,j,n3)
+                                dw_dz6(i,j)=w(i,j,n3)+delw(i,j,n3)
 
 
                                 du_dz6(i,j)=index_out6(i,j)*du_dz6(i,j)
@@ -499,7 +497,7 @@ contains
                                 dw_dz6(i,j)=index_out6(i,j)*dw_dz6(i,j)
 
                                 do isc=1,nscal
-                                    drho_dz6(isc,i,j)=rhov(isc,i,j,jz)
+                                    drho_dz6(isc,i,j)=rhov(isc,i,j,n3)
                                     drho_dz6(isc,i,j)=index_out6(i,j)*drho_dz6(isc,i,j)
                                 end do
                             enddo

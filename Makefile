@@ -44,20 +44,18 @@ LDFLAGS	= $(FFLAGS) $(CFLAGS)
 
 # List of Fortran code files 
 FOBJS   =  \
- scala3.o mysending.o period.o mysettings.o subgrid.o velpar.o geometricRoutines.o\
+ period.o scala3.o mysending.o mysettings.o subgrid.o velpar.o geometricRoutines.o\
  \
- myarrays_velo3.o myarrays_metri3.o wind_module.o \
- orlansky_module.o turbo_module.o wallmodel_module.o trilinear.o\
- ibm_module.o tridag_module.o particle_module.o  multigrid_module.o  \
+ myarrays_velo3.o myarrays_metri3.o wind_module.o orlansky_module.o turbo_module.o wallmodel_module.o \
+ trilinear.o ibm_module.o tridag_module.o particle_module.o multigrid_module.o \
  contour_module.o ricerca_module.o output_module.o buffer_bodyforce_module.o inflow_module.o jord_module.o \
  filtro_module.o filter_module.o flu_module.o nesting_module.o \
  \
  ada_rho.o adams.o cellep.o check_divergence.o voronoi.o\
- contra.o contrin.o correggi_ib.o courant.o diver.o \
+ contra.o contrin.o courant.o diver.o \
  fmassa.o gradie.o indy.o inverse_para2.o \
  metrica.o mix_para.o mixrho_para.o \
- restart.o rhs1_rho.o turbo_lagrdin.o \
- vel_up.o turbo_statico.o \
+ restart.o rhs1_rho.o turbo_lagrdin.o vel_up.o turbo_statico.o \
  \
  stratiParticle.o
 

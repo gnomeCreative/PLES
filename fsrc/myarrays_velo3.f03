@@ -43,10 +43,8 @@ contains
 
     subroutine iniz(f1ve,f2ve,f3ve,bcsi,beta,bzet)
 
+        use scala3, only: n1,n2,n3,nscal,kparasta,kparaend,deepl,deepr
         use mysending
-        use scala3, only: n1,n2,n3,nscal
-
-        use mpi
 
         ! matrixes allocation and initialization
 
@@ -61,9 +59,6 @@ contains
         real,intent(out) :: beta(n1,n2,kparasta:kparaend)
         real,intent(out) :: bzet(n1,n2,kparasta:kparaend)
         !-----------------------------------------------------------------------
-        integer :: i,j,k
-        integer :: kpsta_alloc,kpend_alloc
-        !-----------------------------------------------------------------------
 
         allocate(delu(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
         allocate(delv(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
@@ -77,33 +72,23 @@ contains
         allocate(akapt (nscal,0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
         akaptV=0.0
         akapt=0.0
-        if (myid.eq.0) then
+        if (myid==0) then
             allocate( akapt_piano(nscal,0:n1+1,0:n2+1,n3:n3))
             allocate(akaptV_piano(nscal,0:n1+1,0:n2+1,n3:n3))
-            akapt_piano  = 0.0
-            akaptV_piano = 0.0
-        else if (myid.eq. nproc-1) then
+            akapt_piano=0.0
+            akaptV_piano=0.0
+        else if (myid== nproc-1) then
             allocate( akapt_piano(nscal,0:n1+1,0:n2+1,1:1))
             allocate(akaptV_piano(nscal,0:n1+1,0:n2+1,1:1))
-            akapt_piano  = 0.0
-            akaptV_piano = 0.0
+            akapt_piano=0.0
+            akaptV_piano=0.0
         else
             allocate( akapt_piano(nscal,0:n1+1,0:n2+1,1:1))
             allocate(akaptV_piano(nscal,0:n1+1,0:n2+1,1:1))
-            akapt_piano  = 0.0
-            akaptV_piano = 0.0
+            akapt_piano=0.0
+            akaptV_piano=0.0
         end if
-        !-----------------------------------------------------------------------
-        !    if (imoist==1) then
-        !        allocate(tpotm(1:n2))
-        !        allocate(qm(1:n2))
-        !    end if
-        !-----------------------------------------------------------------------
-        !
-        kpsta_alloc=kparasta
-        kpend_alloc=kparaend
-        if (myid==0) kpsta_alloc = kparasta-1
-        !
+
         !-----------------------------------------------------------------------
         allocate(cs1(n2,n3))
         allocate(cs2(n2,n3))
@@ -112,12 +97,12 @@ contains
         allocate(cs5(n1,n2))
         allocate(cs6(n1,n2))
 
-        cs1=0.0
-        cs2=0.0
-        cs3=0.0
-        cs4=0.0
-        cs5=0.0
-        cs6=0.0
+        cs1(:,:)=0.0
+        cs2(:,:)=0.0
+        cs3(:,:)=0.0
+        cs4(:,:)=0.0
+        cs5(:,:)=0.0
+        cs6(:,:)=0.0
 
         !-----------------------------------------------------------------------
         allocate(uc1_orl(n2,n3))
@@ -127,12 +112,12 @@ contains
         allocate(wc5_orl(n1,n2))
         allocate(wc6_orl(n1,n2))
 
-        uc1_orl=0.0
-        uc2_orl=0.0
-        vc3_orl=0.0
-        vc4_orl=0.0
-        wc5_orl=0.0
-        wc6_orl=0.0
+        uc1_orl(:,:)=0.0
+        uc2_orl(:,:)=0.0
+        vc3_orl(:,:)=0.0
+        vc4_orl(:,:)=0.0
+        wc5_orl(:,:)=0.0
+        wc6_orl(:,:)=0.0
 
         !-----------------------------------------------------------------------c
         allocate(rhs(1:n1,1:n2,kparasta:kparaend))
@@ -144,155 +129,106 @@ contains
         allocate(next_prs(0:n1+1,kparasta-deepl:kparaend+deepr))
         allocate(rhov(1:nscal,0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr))
 
-        allocate( uc(0:n1,1:n2,kparasta  :kparaend))
-        allocate( vc(1:n1,0:n2,kparasta  :kparaend))
-        allocate( wc(1:n1,1:n2,kparasta-1:kparaend))
+        allocate(uc(0:n1,1:n2,kparasta:kparaend))
+        allocate(vc(1:n1,0:n2,kparasta:kparaend))
+        allocate(wc(1:n1,1:n2,kparasta-1:kparaend))
 
 
-        u = 0.0
-        v = 0.0
-        w = 0.0
-        fi = 0.0
-        next_prs=0.0
-        rhov = 0.0
-        uc = 0.0
-        vc = 0.0
-        wc = 0.0
-        rhs = 0.0
+        u(:,:,:)=0.0
+        v(:,:,:)=0.0
+        w(:,:,:)=0.0
+        fi(:,:,:)=0.0
+        next_prs(:,:)=0.0
+        rhov(:,:,:,:)=0.0
+        uc(:,:,:)=0.0
+        vc(:,:,:)=0.0
+        wc(:,:,:)=0.0
+        rhs(:,:,:)=0.0
 
-        if (myid.eq.0) then
+        if (myid==0) then
             allocate(u_piano(0:n1+1,0:n2+1,n3:n3))
             allocate(v_piano(0:n1+1,0:n2+1,n3:n3))
             allocate(w_piano(0:n1+1,0:n2+1,n3:n3))
             allocate(rhov_piano(1:nscal,0:n1+1,0:n2+1,n3:n3))
 
-            u_piano=0.0
-            v_piano=0.0
-            w_piano=0.0
+            u_piano(:,:,:)=0.0
+            v_piano(:,:,:)=0.0
+            w_piano(:,:,:)=0.0
 
             allocate(wc_piano(1:n1,1:n2,n3:n3))
 
-            wc_piano=0.0
+            wc_piano(:,:,:)=0.0
 
-        else if (myid.eq.nproc-1) then
+        else if (myid==nproc-1) then
 
             allocate(u_piano(0:n1+1,0:n2+1,1:1))
             allocate(v_piano(0:n1+1,0:n2+1,1:1))
             allocate(w_piano(0:n1+1,0:n2+1,1:1))
             allocate(rhov_piano(1:nscal,0:n1+1,0:n2+1,1:1))
 
-            u_piano=0.0
-            v_piano=0.0
-            w_piano=0.0
+            u_piano(:,:,:)=0.0
+            v_piano(:,:,:)=0.0
+            w_piano(:,:,:)=0.0
 
             allocate(wc_piano(1:n1,1:n2,0:0))
 
-            wc_piano=0.0
+            wc_piano(:,:,:)=0.0
 
         end if
         !
         !-----------------------------------------------------------------------
         !
-        if (myid.eq.0) then
+        if (myid==0) then
             allocate(gra1_appoggio(n1,n2,n3:n3))
             allocate(gra2_appoggio(n1,n2,n3:n3))
             allocate(gra3_appoggio(n1,n2,n3:n3))
 
-            do i=1,n1
-                do j=1,n2
-                    do k=n3,n3
-                        gra1_appoggio(i,j,k)=0.
-                        gra2_appoggio(i,j,k)=0.
-                        gra3_appoggio(i,j,k)=0.
-                    end do
-                end do
-            end do
-        else if (myid.eq.nproc-1) then
+
+            gra1_appoggio(:,:,:)=0.
+            gra2_appoggio(:,:,:)=0.
+            gra3_appoggio(:,:,:)=0.
+
+        else if (myid==nproc-1) then
             allocate(gra1_appoggio(n1,n2,1:1))
             allocate(gra2_appoggio(n1,n2,1:1))
             allocate(gra3_appoggio(n1,n2,1:1))
 
-            do i=1,n1
-                do j=1,n2
-                    do k=1,1
-                        gra1_appoggio(i,j,k)=0.
-                        gra2_appoggio(i,j,k)=0.
-                        gra3_appoggio(i,j,k)=0.
-                    end do
-                end do
-            end do
+
+            gra1_appoggio(:,:,:)=0.
+            gra2_appoggio(:,:,:)=0.
+            gra3_appoggio(:,:,:)=0.
+
         end if
 
-        allocate(cgra1(0:n1,  n2,kparasta-1:kparaend+1))
-        allocate(cgra2(  n1,0:n2,kparasta-1:kparaend+1))
-        allocate(cgra3(  n1,  n2,kparasta-1:kparaend+1))
+        allocate(cgra1(0:n1,n2,kparasta-1:kparaend+1))
+        allocate(cgra2(n1,0:n2,kparasta-1:kparaend+1))
+        allocate(cgra3(n1,n2,kparasta-1:kparaend+1))
 
         allocate(gra1(n1,n2,kparasta-1:kparaend+1))
         allocate(gra2(n1,n2,kparasta-1:kparaend+1))
         allocate(gra3(n1,n2,kparasta-1:kparaend+1))
 
-        do k=kparasta-1,kparaend+1
-            do j=1,n2
-                do i=0,n1
-                    cgra1(i,j,k) = 0.0
-                end do
-            end do
-        end do
+        cgra1(:,:,:)=0.0
+        cgra2(:,:,:)=0.0
+        cgra3(:,:,:)=0.0
 
-        do k=kparasta-1,kparaend+1
-            do j=0,n2
-                do i=1,n1
-                    cgra2(i,j,k) = 0.0
-                end do
-            end do
-        end do
+        gra1(:,:,:)=0.0
+        gra2(:,:,:)=0.0
+        gra3(:,:,:)=0.0
 
-        do k=kparasta-1,kparaend+1
-            do j=1,n2
-                do i=1,n1
-                    cgra3(i,j,k) = 0.0
-                end do
-            end do
-        end do
+        f1ve(:,:,:)=0.0
+        f2ve(:,:,:)=0.0
+        f3ve(:,:,:)=0.0
+        bcsi(:,:,:)=0.0
+        beta(:,:,:)=0.0
+        bzet(:,:,:)=0.0
 
-        do k=kparasta-1,kparaend+1
-            do j=1,n2
-                do i=1,n1
-                    !
-                    gra1(i,j,k)=0.0
-                    gra2(i,j,k)=0.0
-                    gra3(i,j,k)=0.0
-                !
-                end do
-            end do
-        end do
-
-        do k=kparasta,kparaend
-            do j=1,n2
-                do i=1,n1
-                    !
-                    f1ve(i,j,k)=0.0
-                    f2ve(i,j,k)=0.0
-                    f3ve(i,j,k)=0.0
-                    bcsi(i,j,k)=0.0
-                    beta(i,j,k)=0.0
-                    bzet(i,j,k)=0.0
-                !
-                end do
-            end do
-        end do
 
         ! matrix defined in the field and out
-        !
-        do  i=0,n1+1
-            do  j=0,n2+1
-                do  k=kparasta-1,kparaend+1
-                    delu(i,j,k)=0.0
-                    delv(i,j,k)=0.0
-                    delw(i,j,k)=0.0
-                end do
-            end do
-        end do
+
+        delu(:,:,:)=0.0
+        delv(:,:,:)=0.0
+        delw(:,:,:)=0.0
 
         !
         return
@@ -303,77 +239,17 @@ contains
 
         use mysettings, only: insc
         use mysending
-        use scala3, only: jx,jy,jz
-
-        use mpi
 
         implicit none
 
-        integer :: ierr
-        integer :: status(MPI_STATUS_SIZE)
-
-        ! send u
-        if (leftpem /= MPI_PROC_NULL) then
-            call MPI_SEND(u(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-            !    quick
-            if (insc==1) then
-                call MPI_SEND(u(0,0,kparasta+1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-            end if
-        end if
-        if (rightpem /= MPI_PROC_NULL) then
-            call MPI_RECV(u(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-            !    quick
-            if (insc==1) then
-                call MPI_RECV(u(0,0,kparaend+2),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-            end if
-        end if
-        if (rightpem /= MPI_PROC_NULL) then
-            call MPI_SEND(u(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
-        end if
-        if (leftpem /= MPI_PROC_NULL) then
-            call MPI_RECV(u(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
-        end if
-        ! send v
-        if (leftpem /= MPI_PROC_NULL) then
-            call MPI_SEND(v(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-            !    quick
-            if (insc==1) then
-                call MPI_SEND(v(0,0,kparasta+1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-            end if
-        end if
-        if (rightpem /= MPI_PROC_NULL) then
-            call MPI_RECV(v(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-            !    quick
-            if (insc==1) then
-                call MPI_RECV(v(0,0,kparaend+2),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-            end if
-        end if
-        if (rightpem /= MPI_PROC_NULL) then
-            call MPI_SEND(v(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
-        end if
-        if (leftpem /= MPI_PROC_NULL) then
-            call MPI_RECV(v(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
-        end if
-        ! send w
-        if (leftpem /= MPI_PROC_NULL) then
-            call MPI_SEND(w(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-            !    quick
-            if (insc==1) then
-                call MPI_SEND(w(0,0,kparasta+1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-            end if
-        end if
-        if (rightpem /= MPI_PROC_NULL) then
-            call MPI_RECV(w(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-            !    quick
-            if (insc==1) then
-                call MPI_RECV(w(0,0,kparaend+2),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-            end if
-        end if
-        if (rightpem /= MPI_PROC_NULL) then
-            call MPI_SEND(w(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
-        end if
-        if (leftpem /= MPI_PROC_NULL) then
-            call MPI_RECV(w(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
+        if (insc==1) then
+            call border_exchange_centroids(u,2)
+            call border_exchange_centroids(v,2)
+            call border_exchange_centroids(w,2)
+        else
+            call border_exchange_centroids(u,1)
+            call border_exchange_centroids(v,1)
+            call border_exchange_centroids(w,1)
         end if
 
     end subroutine communication_velocity
@@ -381,34 +257,17 @@ contains
     subroutine communication_pressure()
 
         use mysending
-        use scala3, only: jx,jy,jz
-
-        use mpi
 
         implicit none
 
-        integer :: ierr
-        integer :: status(MPI_STATUS_SIZE)
-
-        if (leftpem /= MPI_PROC_NULL) then
-            call MPI_SEND(fi(0,0,kparasta),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,tagls,MPI_COMM_WORLD,ierr)
-        end if
-        if (rightpem /= MPI_PROC_NULL) then
-            call MPI_RECV(fi(0,0,kparaend+1),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrr,MPI_COMM_WORLD,status,ierr)
-        end if
-        if (rightpem /= MPI_PROC_NULL) then
-            call MPI_SEND(fi(0,0,kparaend),(jx+2)*(jy+2),MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
-        end if
-        if (leftpem /= MPI_PROC_NULL) then
-            call MPI_RECV(fi(0,0,kparasta-1),(jx+2)*(jy+2),MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
-        end if
+        call border_exchange_centroids(fi,1)
 
     end subroutine communication_pressure
 
     subroutine communication_velpiano()
 
         use mysending
-        use scala3, only: jx,jy,jz
+        use scala3, only: n1,n2,n3,kparasta,kparaend
 
         use mpi
 
@@ -417,39 +276,39 @@ contains
         integer :: ierr,status(MPI_STATUS_SIZE)
 
         if (myid==nproc-1) then
-            call MPI_SEND(u(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(u(0,0,n3),(n1+2)*(n2+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
         else if (myid==0) then
-            call MPI_RECV(u_piano(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(u_piano(0,0,n3),(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
         end if
         if (myid==0) then
-            call MPI_SEND(u(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(u(0,0,1),(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
         end if
         if (myid==nproc-1) then
-            call MPI_RECV(u_piano(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(u_piano(0,0,1),(n1+2)*(n2+2),MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
         end if
 
         if (myid==nproc-1) then
-            call MPI_SEND(v(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(v(0,0,n3),(n1+2)*(n2+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
         else if (myid==0) then
-            call MPI_RECV(v_piano(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(v_piano(0,0,n3),(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
         end if
         if (myid==0) then
-            call MPI_SEND(v(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(v(0,0,1),(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
         end if
         if (myid==nproc-1) then
-            call MPI_RECV(v_piano(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(v_piano(0,0,1),(n1+2)*(n2+2),MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
         end if
 
         if (myid==nproc-1) then
-            call MPI_SEND(w(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(w(0,0,n3),(n1+2)*(n2+2),MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
         else if (myid==0) then
-            call MPI_RECV(w_piano(0,0,jz),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(w_piano(0,0,n3),(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
         end if
         if (myid==0) then
-            call MPI_SEND(w(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(w(0,0,1),(n1+2)*(n2+2),MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
         end if
         if (myid==nproc-1) then
-            call MPI_RECV(w_piano(0,0,1),(jx+2)*(jy+2),MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(w_piano(0,0,1),(n1+2)*(n2+2),MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
         end if
 
     end subroutine communication_velpiano
@@ -457,7 +316,7 @@ contains
     subroutine average_periodicfluxes()
 
         use mysending
-        use scala3, only: jx,jy,jz
+        use scala3, only: n1,n2,n3,kparasta,kparaend
         use period
 
         use mpi
@@ -471,39 +330,38 @@ contains
         ! average on fluxes in periodicity direction
         do ii=1,1-ip
             do k=kparasta,kparaend
-                do j=1,jy
-                    uc(0,j,k)=.5*(uc(0,j,k)+uc(jx,j,k))
-                    uc(jx,j,k)=uc(0,j,k)
+                do j=1,n2
+                    uc(0,j,k)=.5*(uc(0,j,k)+uc(n1,j,k))
+                    uc(n1,j,k)=uc(0,j,k)
                 end do
             end do
         end do
 
-        do jj=1,1-jp
-            do k=kparasta,kparaend
-                do i=1,jx
-                    vc(i,0,k)=.5*(vc(i,0,k)+vc(i,jy,k))
-                    vc(i,jy,k)=vc(i,0,k)
-                end do
+        ! in direction j always not periodic
+        do k=kparasta,kparaend
+            do i=1,n1
+                vc(i,0,k)=.5*(vc(i,0,k)+vc(i,n2,k))
+                vc(i,n2,k)=vc(i,0,k)
             end do
         end do
 
         ! send wc(i,j,jz) to P0 in wc_piano of myid=0
         if (kp==0) then
             if (myid==nproc-1) then
-                call MPI_SEND(wc(1,1,jz),jx*jy,MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(wc(1,1,n3),n1*n2,MPI_REAL_SD,0,1001,MPI_COMM_WORLD,ierr)
             else if (myid==0) then
-                call MPI_RECV(wc_piano(1,1,jz),jx*jy,MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
+                call MPI_RECV(wc_piano(1,1,n3),n1*n2,MPI_REAL_SD,nproc-1,1001,MPI_COMM_WORLD,status,ierr)
             end if
             if (myid==0) then
-                do i=1,jx
-                    do j=1,jy
-                        wc(i,j,0)=.5*(wc(i,j,0)+wc_piano(i,j,jz))
+                do i=1,n1
+                    do j=1,n2
+                        wc(i,j,0)=.5*(wc(i,j,0)+wc_piano(i,j,n3))
                     end do
                 end do
-                call MPI_SEND(wc(1,1,0),jx*jy,MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
+                call MPI_SEND(wc(1,1,0),n1*n2,MPI_REAL_SD,nproc-1,2001,MPI_COMM_WORLD,ierr)
             end if
             if (myid==nproc-1) then
-                call MPI_RECV(wc(1,1,jz),jx*jy,MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
+                call MPI_RECV(wc(1,1,n3),n1*n2,MPI_REAL_SD,0,2001,MPI_COMM_WORLD,status,ierr)
             end if
         end if
 

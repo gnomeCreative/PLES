@@ -20,12 +20,7 @@ contains
 
         ! wind from file is read, file written as wind amplitude and angle
         ! in radians
-        !
-        use mysending, only: kparasta,kparaend,myid,nproc
-        !
-        use scala3, only: jx, n1
-        !
-        use mpi
+        use scala3, only: n1,kparasta,kparaend
 
         implicit none
         !-----------------------------------------------------------------------
@@ -35,7 +30,7 @@ contains
         integer ktime
         real rhoa,rhow,pi,ang
 
-        real cf_i(1:jx,kparasta:kparaend)
+        real cf_i(1:n1,kparasta:kparaend)
         !-----------------------------------------------------------------------
         !
         pi = acos(-1.)
@@ -46,12 +41,12 @@ contains
         a_wind = 3.45
         ang= 45.
         betaw =(-ang+270)*pi/180. ! wind angle, meteorological convention: clockwise, 0° N axis.
-        if(myid.eq.0)write(*,*)'wind',a_wind,ang
+        !if(myid.eq.0)write(*,*)'wind',a_wind,ang
 
         !------------------------------Wind computation-------
 
         do k=kparasta,kparaend
-            do i=1,jx
+            do i=1,n1
                 cf_i(i,k) = cf(i,k)
             enddo
         enddo

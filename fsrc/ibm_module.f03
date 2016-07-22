@@ -7,66 +7,83 @@ module ibm_module
     use mysettings, only: particles,bodyforce
     use myarrays_velo3, only: fi,rhov,u,v,w
     use wallmodel_module
+    use scala3
+
+    implicit none
 
     ! --------------------------------------------------
 
-    integer(kind=c_int),bind(C) :: num_iter
-    !MN,MP matrix dimension to store mesh: points and triangle
-    !integer :: MN,MP
-    integer :: numero_celle_IB,numero_celle_bloccate,numero_celle_bloccate_real
-    integer :: num_ib,num_solide
+    ! trigger for updating ibm (i.e. ricerca for particles) at every time step
+    logical,public :: update_ibm
 
+    ! IBM iterations, from imput file
+    integer(kind=c_int),bind(C) :: num_iter
+    ! number of IB points (= number of PP, V and IP points), all processors
+    integer :: numero_celle_IB
+    ! number of IB points (= number of PP, V and IP points), local processor
+    integer :: num_ib
+    ! number of solid points, all processors
+    integer :: numero_celle_bloccate
+    ! number of solid points, local processor
+    integer :: num_solide
+
+    ! indices of IB points and V points (6,num_ib)
     integer,allocatable :: indici_CELLE_IB(:,:)
+    ! indices of solid points (3,num_solide)
     integer,allocatable :: indici_celle_bloccate(:,:)
 
-    !real,allocatable :: distanze_CELLE_IB(:,:) ! apparently useless
-
+    ! distance between projection points (PP) and IB points
     real,allocatable :: dist_pp_ib(:)
+    ! distance between projection points (IP, on the surface) and IB points (num_ib)
     real,allocatable :: dist_ib_parete(:)
+    ! shear velocity at IB points
     real,allocatable :: ustar(:)
+    ! used locally wall model for every IB point, determined in correggi
     integer,allocatable :: caso_ib(:)
+    ! location in space of IP points (3,num_ib)
     real,allocatable :: proiezioni(:,:)
-    real,allocatable :: surfVel(:,:)
+    ! velocity of the immersed solid wall at IP points (3,num_ib)
+    real,allocatable :: surfvel_ib(:,:)
+    ! velocity of the immersed body at solid points (3,num_solide)
+    real,allocatable :: solidvel_ib(:,:)
       
-    ! array for rotation with eulerian angles c$
+    ! array for rotation with eulerian angles (direct and inverse)
     ! PROBLEMATIC, left hand convention
-    real, allocatable :: rot(:,:,:)
-    real, allocatable :: rot_inverse(:,:,:)
+    real,allocatable :: rot(:,:,:),rot_inverse(:,:,:)
       
-    ! array for trilinear
-    real, allocatable :: tricoef(:,:)
-    integer, allocatable :: trind(:,:,:)
+    ! trilinear interpolation: interpolation points
+    integer,allocatable :: trind(:,:,:)
+    ! trilinear interpolation: interpolation coefficients
+    real,allocatable :: tricoef(:,:)
       
     ! buffer
-    real, allocatable :: sbuff_ibm(:)
-    real, allocatable :: rbuff_ibm(:)
+    real,allocatable :: sbuff_ibm(:)
+    real,allocatable :: rbuff_ibm(:)
 
     ! to send the ib stencil
     integer :: num_left_snd,num_right_snd
     integer :: num_left_rcv,num_right_rcv
-    integer, allocatable :: stencil_left_snd(:,:)
-    integer, allocatable :: stencil_left_rcv(:,:)
-    integer, allocatable :: stencil_right_snd(:,:)
-    integer, allocatable :: stencil_right_rcv(:,:)
-    integer, allocatable :: tipo_spedito(:,:,:)
+    integer,allocatable :: stencil_left_snd(:,:)
+    integer,allocatable :: stencil_left_rcv(:,:)
+    integer,allocatable :: stencil_right_snd(:,:)
+    integer,allocatable :: stencil_right_rcv(:,:)
+    integer,allocatable :: tipo_spedito(:,:,:)
 
     ! to send the solid cells
     integer :: numsolid_left_snd,numsolid_right_snd
     integer :: numsolid_left_rcv,numsolid_right_rcv
-    integer, allocatable :: solid_left_snd(:,:)
-    integer, allocatable :: solid_left_rcv(:,:)
-    integer, allocatable :: solid_right_snd(:,:)
-    integer, allocatable :: solid_right_rcv(:,:)
-
-    integer :: ipressione_ibm
+    integer,allocatable :: solid_left_snd(:,:)
+    integer,allocatable :: solid_left_rcv(:,:)
+    integer,allocatable :: solid_right_snd(:,:)
+    integer,allocatable :: solid_right_rcv(:,:)
 
     ! ----------------------------------------------------
     ! For particles
     real,allocatable :: pressure_ib(:,:),shear_ib(:,:),momentum_ib(:,:)
     real,allocatable :: position_ib(:,:)
-    integer,allocatable :: index_ib(:,:),indexsize_ib(:)
-    ! move this to the subroutine in ricerca
-    real,allocatable :: normalVector(:,:)
+    integer,allocatable :: index_ib(:),indexsize_ib(:)
+    ! move this to the subroutine in ricerca (3,num_ib)
+    real,allocatable :: surfnormal_ib(:,:)
 
 contains
 
@@ -86,12 +103,9 @@ contains
         ! correggi_ib(ktime,coef_wall,visualizzo,integrale,correggo_rho,correggo_delu,delrhov,tipo,z0,ti,nfinale)
         !
         use mysending
-        use scala3
         use period
         !
         use mpi
-
-        implicit none
 
         !-----------------------------------------------------------------------
         ! input stuff
@@ -109,21 +123,30 @@ contains
         ! check for errors
         integer :: ierr
         real :: errore,errore_max,errore_max_loc
-        real :: variazione1,variazione2,variazione3
 
         ! velocity at ib points
         real,dimension(3) :: vel_ib
         real,dimension(3) :: vel_ib_old
-        real,allocatable :: vel_ib_array(:,:)
+        real,dimension(3) :: vel_solido
+        real,dimension(3) :: delta_vel
+        ! velocity values at the end of ib_procedure
+        real,allocatable :: vel_ib_final(:,:)
+        ! intermediate velocity values at the end of every iteration
+        real,allocatable :: vel_ib_iter(:,:)
         ! velocity values before ib_procedure
         real,allocatable :: vel_ib_oldarray(:,:)
+
+        ! to check conditions
+        integer :: caso0_loc,caso1_loc,caso2_loc,notok_loc
+        integer :: caso0_tot,caso1_tot,caso2_tot,notok_tot
+
 
         !-----------------------------------------------------------------------
         ! check call subroutine
 
         if (myid==0) then
             write(*,*)'-----------------------------------------------'
-            write(*,*)'       IMMERSED BOUNDARY'
+            write(*,*)'       IMMERSED BOUNDARY ~ CORREGGI '
 
             if (ktime==1) then
                 write(*,*)'IB proc0',num_ib,'su',numero_celle_IB
@@ -131,8 +154,9 @@ contains
             end if
         end if
 
-        allocate(vel_ib_array(num_ib,3))
-        allocate(vel_ib_oldarray(num_ib,3))
+        allocate(vel_ib_final(3,num_ib))
+        allocate(vel_ib_iter(3,num_ib))
+        allocate(vel_ib_oldarray(3,num_ib))
 
 
         ! intialize stuff
@@ -144,40 +168,43 @@ contains
 
         ! intialize ib properties specific for particles
         !if (particles) then
-            if (allocated(shear_ib)) then
-                deallocate(shear_ib)
-                deallocate(pressure_ib)
-                deallocate(momentum_ib)
-                deallocate(caso_ib)
-            end if
-            allocate(shear_ib(num_ib,3))
-            allocate(pressure_ib(num_ib,3))
-            allocate(momentum_ib(num_ib,3))
-            allocate(caso_ib(num_ib))
-            shear_ib(:,:)=0.0
-            pressure_ib(:,:)=0.0
-            momentum_ib(:,:)=0.0
-            caso_ib(:)=5
+        if (allocated(shear_ib)) then
+            deallocate(shear_ib)
+            deallocate(pressure_ib)
+            deallocate(momentum_ib)
+            deallocate(caso_ib)
+        end if
+        allocate(shear_ib(3,num_ib))
+        allocate(pressure_ib(3,num_ib))
+        allocate(momentum_ib(3,num_ib))
+        allocate(caso_ib(num_ib))
+        shear_ib(:,:)=0.0
+        pressure_ib(:,:)=0.0
+        momentum_ib(:,:)=0.0
+        caso_ib(:)=-10
         !end if
 
         !-----------------------------------------------------------------------
         !     solid border
-        do j=1,jy
-            do i=1,jx
-                k=kparasta-1
-                if (tipo(i,j,k)==0) then
-                    u(i,j,k)=0.0
-                    v(i,j,k)=0.0
-                    w(i,j,k)=0.0
-                end if
-                k=kparaend+1
-                if (tipo(i,j,k)==0) then
-                    u(i,j,k)=0.0
-                    v(i,j,k)=0.0
-                    w(i,j,k)=0.0
-                end if
-            end do
-        end do
+        !        do j=1,jy
+        !            do i=1,jx
+        !                k=kparasta-1
+        !                if (tipo(i,j,k)==0) then
+        !                    vel_solido(:)=point_velocity(centroid(:,i,j,k),solid_index(1,i,j,k))
+        !                    u(i,j,k)=vel_solido(1)
+        !            v(i,j,k)=vel_solido(2)
+        !            w(i,j,k)=vel_solido(3)
+        !                end if
+        !                k=kparaend+1
+        !                if (tipo(i,j,k)==0) then
+        !                vel_solido(:)=point_velocity(centroid(:,i,j,k),solid_index(1,i,j,k))
+        !                    u(i,j,k)=vel_solido(1)
+        !            v(i,j,k)=vel_solido(2)
+        !            w(i,j,k)=vel_solido(3)
+        !                end if
+        !            end do
+        !        end do
+
 
         !-----------------------------------------------------------------------
         ! correction to solid for IB without V
@@ -185,14 +212,14 @@ contains
         do l=1,num_ib
 
             ! index ib
-            i0=indici_CELLE_IB(l,1)
-            j0=indici_CELLE_IB(l,2)
-            k0=indici_CELLE_IB(l,3)
+            i0=indici_CELLE_IB(1,l)
+            j0=indici_CELLE_IB(2,l)
+            k0=indici_CELLE_IB(3,l)
 
             ! index V
-            i=indici_CELLE_IB(l,4)
-            j=indici_CELLE_IB(l,5)
-            k=indici_CELLE_IB(l,6)
+            i=indici_CELLE_IB(4,l)
+            j=indici_CELLE_IB(5,l)
+            k=indici_CELLE_IB(6,l)
 
             coincide_check=(i0-i)*(i0-i)+(j0-j)*(j0-j)+(k0-k)*(k0-k)
 
@@ -201,6 +228,7 @@ contains
                 v(i0,j0,k0)=0.0
                 w(i0,j0,k0)=0.0
                 node_is_ok(l)=.false.
+                !write(*,*) 'node ',l,' is not ok'
             else
                 node_is_ok(l)=.true.
             end if
@@ -213,18 +241,19 @@ contains
         ! initialize
         do l=1,num_ib
 
-            i0=indici_CELLE_IB(l,1)
-            j0=indici_CELLE_IB(l,2)
-            k0=indici_CELLE_IB(l,3)
+            i0=indici_CELLE_IB(1,l)
+            j0=indici_CELLE_IB(2,l)
+            k0=indici_CELLE_IB(3,l)
 
-            vel_ib_array(l,1)=u(i0,j0,k0)
-            vel_ib_array(l,2)=v(i0,j0,k0)
-            vel_ib_array(l,3)=w(i0,j0,k0)
+            !this is the value before the IBM cycle, used for computing momentum exchange
+            vel_ib_oldarray(1,l)=u(i0,j0,k0)
+            vel_ib_oldarray(2,l)=v(i0,j0,k0)
+            vel_ib_oldarray(3,l)=w(i0,j0,k0)
 
         end do
 
-        ! this is the value before the IBM cycle, used for computing momentum exchange
-        vel_ib_oldarray(:,:)=vel_ib_array(:,:)
+        ! first iteration: take old value
+        vel_ib_iter(:,:)=vel_ib_oldarray(:,:)
 
         !-----------------------------------------------------------------------
         ! iterative procedure, necessary if the stencil has IB nodes
@@ -240,19 +269,6 @@ contains
             errore_max_loc=errore_max
             errore=errore_max
 
-            do l=1,num_ib
-
-                i0=indici_CELLE_IB(l,1)
-                j0=indici_CELLE_IB(l,2)
-                k0=indici_CELLE_IB(l,3)
-
-                ! get velocity from last iteration step
-                u(i0,j0,k0)=vel_ib_array(l,1)
-                v(i0,j0,k0)=vel_ib_array(l,2)
-                w(i0,j0,k0)=vel_ib_array(l,3)
-
-            end do
-
             ! exchange planes between procs:
             ! - to compute derivative for Taylor
             ! - to coorect IB values in the iterative procedure
@@ -262,28 +278,19 @@ contains
 
                 if (node_is_ok(l)) then !only for IB /= V
 
-                    ! index IB
-                    i0=indici_CELLE_IB(l,1)
-                    j0=indici_CELLE_IB(l,2)
-                    k0=indici_CELLE_IB(l,3)
 
-                    vel_ib_old(:)=vel_ib_oldarray(l,:)
-
-                    errore=0.0
+                    vel_ib_old(:)=vel_ib_oldarray(:,l)
+                    vel_ib(:)=0.0
 
                     ! compute u_ib and ustar
-                    call compute_u_ib(kiter,ktime,l,i0,j0,k0,vel_ib_old,vel_ib)
-
-                    ! chicco mettere errore adimensionale !!!!
-                    ! error at ib
-                    variazione1=vel_ib(1)-u(i0,j0,k0)
-                    variazione2=vel_ib(2)-v(i0,j0,k0)
-                    variazione3=vel_ib(3)-w(i0,j0,k0)
-
-                    errore=max(abs(variazione1),abs(variazione2),abs(variazione3))
+                    call compute_u_ib(kiter,ktime,l,vel_ib_old,vel_ib,tipo)
 
                     ! update velocity at IB
-                    vel_ib_array(l,:)=vel_ib(:)
+                    vel_ib_final(:,l)=vel_ib(:)
+
+                    ! error at ib
+                    delta_vel(:)=vel_ib_final(:,l)-vel_ib_iter(:,l)
+                    errore=max(abs(delta_vel(1)),abs(delta_vel(2)),abs(delta_vel(3)))
 
                     ! update error
                     if (errore>=errore_max) then
@@ -294,6 +301,36 @@ contains
                 end if
 
             end do !fine loop su celle ib
+
+            ! reset velocity at IB points
+            ! get velocity at IB points from last iteration step
+            do l=1,num_ib
+
+                i0=indici_CELLE_IB(1,l)
+                j0=indici_CELLE_IB(2,l)
+                k0=indici_CELLE_IB(3,l)
+
+                u(i0,j0,k0)=0.0
+                v(i0,j0,k0)=0.0
+                w(i0,j0,k0)=0.0
+
+            end do
+
+            ! get velocity at IB points from last iteration step
+            do l=1,num_ib
+
+                i0=indici_CELLE_IB(1,l)
+                j0=indici_CELLE_IB(2,l)
+                k0=indici_CELLE_IB(3,l)
+
+                u(i0,j0,k0)=vel_ib_final(1,l)/real(indexsize_ib(l))
+                v(i0,j0,k0)=vel_ib_final(2,l)/real(indexsize_ib(l))
+                w(i0,j0,k0)=vel_ib_final(3,l)/real(indexsize_ib(l))
+
+            end do
+
+            ! for next time step
+            vel_ib_iter(:,:)=vel_ib_final(:,:)
 
             ! ----------------------------------------------------------------
 
@@ -308,43 +345,50 @@ contains
 
         end do ! end loop correzione
 
+
         do l=1,num_solide
 
-            i=indici_celle_bloccate(l,1)
-            j=indici_celle_bloccate(l,2)
-            k=indici_celle_bloccate(l,3)
+            i=indici_celle_bloccate(1,l)
+            j=indici_celle_bloccate(2,l)
+            k=indici_celle_bloccate(3,l)
 
-            u(i,j,k)=0.0
-            v(i,j,k)=0.0
-            w(i,j,k)=0.0
+
+            vel_solido=solidvel_ib(:,l)
+
+            u(i,j,k)=vel_solido(1)
+            v(i,j,k)=vel_solido(2)
+            w(i,j,k)=vel_solido(3)
+
+            ! set also pressure to zero
+            !fi(i,j,k)=0.0
 
             ! giulia
             if (i==1) then
-                u(i-1,j,k)=0.0
-                v(i-1,j,k)=0.0
-                w(i-1,j,k)=0.0
-            else if (i==jx) then
-                u(i+1,j,k)=0.0
-                v(i+1,j,k)=0.0
-                w(i+1,j,k)=0.0
+                u(i-1,j,k)=vel_solido(1)
+                v(i-1,j,k)=vel_solido(2)
+                w(i-1,j,k)=vel_solido(3)
+            else if (i==n1) then
+                u(i+1,j,k)=vel_solido(1)
+                v(i+1,j,k)=vel_solido(2)
+                w(i+1,j,k)=vel_solido(3)
             end if
             if (j==1) then
-                u(i,j-1,k)=0.0
-                v(i,j-1,k)=0.0
-                w(i,j-1,k)=0.0
-            else if (j==jy) then
-                u(i,j+1,k)=0.0
-                v(i,j+1,k)=0.0
-                w(i,j+1,k)=0.0
+                u(i,j-1,k)=vel_solido(1)
+                v(i,j-1,k)=vel_solido(2)
+                w(i,j-1,k)=vel_solido(3)
+            else if (j==n2) then
+                u(i,j+1,k)=vel_solido(1)
+                v(i,j+1,k)=vel_solido(2)
+                w(i,j+1,k)=vel_solido(3)
             end if
             if (myid==0.and.k==1) then
-                u(i,j,k-1)=0.0
-                v(i,j,k-1)=0.0
-                w(i,j,k-1)=0.0
-            else if (myid==(nproc-1).and.k==jz) then
-                u(i,j,k+1)=0.0
-                v(i,j,k+1)=0.0
-                w(i,j,k+1)=0.0
+                u(i,j,k-1)=vel_solido(1)
+                v(i,j,k-1)=vel_solido(2)
+                w(i,j,k-1)=vel_solido(3)
+            else if (myid==(nproc-1).and.k==n3) then
+                u(i,j,k+1)=vel_solido(1)
+                v(i,j,k+1)=vel_solido(2)
+                w(i,j,k+1)=vel_solido(3)
             end if
 
         !        fi(i,j,k)=0.
@@ -352,51 +396,84 @@ contains
 
         !-----------------------------------------------------------------------
         !     solid border
-        do j=1,jy
-            do i=1,jx
-                k = kparasta -1
-                if (tipo(i,j,k)==0) then
-                    u(i,j,k)=0.
-                    v(i,j,k)=0.
-                    w(i,j,k)=0.
-                end if
-                k = kparaend +1
-                if (tipo(i,j,k)==0) then
-                    u(i,j,k)=0.
-                    v(i,j,k)=0.
-                    w(i,j,k)=0.
-                end if
-            end do
-        end do
-        !
-        !-----------------------------------------------------------------------
+        !        do j=1,jy
+        !            do i=1,jx
+        !                k=kparasta-1
+        !                if (tipo(i,j,k)==0) then
+        !                    vel_solido(:)=point_velocity(centroid(:,i,j,k),solid_index(1,i,j,k))
+        !                    u(i,j,k)=vel_solido(1)
+        !            v(i,j,k)=vel_solido(2)
+        !            w(i,j,k)=vel_solido(3)
+        !                end if
+        !                k=kparaend+1
+        !                if (tipo(i,j,k)==0) then
+        !                vel_solido(:)=point_velocity(centroid(:,i,j,k),solid_index(1,i,j,k))
+        !                    u(i,j,k)=vel_solido(1)
+        !            v(i,j,k)=vel_solido(2)
+        !            w(i,j,k)=vel_solido(3)
+        !                end if
+        !            end do
+        !        end do
+
         !     pass data
         call passo_ibm()
 
-
-
-        !-----------------------------------------------------------------------
-        deallocate(vel_ib_array)
+        deallocate(vel_ib_final)
+        deallocate(vel_ib_iter)
         deallocate(vel_ib_oldarray)
-        !-----------------------------------------------------------------------
+
+                ! check conditions
+        caso0_loc=0
+        caso1_loc=0
+        caso2_loc=0
+        notok_loc=0
+        caso0_tot=0
+        caso1_tot=0
+        caso2_tot=0
+        notok_tot=0
+        do l=1,num_ib
+            if (caso_ib(l)==0) then
+                caso0_loc=caso0_loc+1
+            else if (caso_ib(l)==1) then
+                caso1_loc=caso1_loc+1
+            else if (caso_ib(l)==2) then
+                caso2_loc=caso2_loc+1
+            end if
+            if (.not.node_is_ok(l)) then
+                notok_loc=notok_loc+1
+            end if
+        end do
+        call MPI_ALLREDUCE(caso0_loc,caso0_tot,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(caso1_loc,caso1_tot,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(caso2_loc,caso2_tot,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLREDUCE(notok_loc,notok_tot,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+
+        if (myid==0) then
+            write(*,*) 'statistics'
+            write(*,*) '   not ok: ',notok_tot
+            write(*,*) '   caso=0: ',caso0_tot
+            write(*,*) '   caso=1: ',caso1_tot
+            write(*,*) '   caso=2: ',caso2_tot
+            write(*,*)'-----------------------------------------------'
+        end if
 
         return
+
     end subroutine correggi_ib
 
-    subroutine compute_u_ib(kiter,ktime,l,i0,j0,k0,vel_ib_old,vel_ib)
+    subroutine compute_u_ib(kiter,ktime,l,vel_ib_old,vel_ib,tipo)
 
         use mysettings, only: coef_wall
-        use scala3, only: re,dt
 
-        implicit none
-
-        integer,intent(in) :: l,i0,j0,k0
+        integer,intent(in) :: l
         integer,intent(in) :: kiter,ktime
         real,dimension(3),intent(in) :: vel_ib_old
         ! output of the function: new IB point velocity
         real,dimension(3),intent(out) :: vel_ib
+        integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
 
         !-----------------------------------------------------------------------
+        integer :: i0,j0,k0
         ! IP_PP distance
         real :: distanza,fattore_distanza
         ! pressure values
@@ -404,6 +481,7 @@ contains
         integer :: caso
         !real :: pro1,pro2,pro3
         real :: local_shear1,local_shear2
+        real :: local_ustar1,local_ustar2
         ! velocities at PP - Projection Point
         real,dimension(3) :: vel_pp,vloc_pp
         real :: vtan_pp
@@ -421,14 +499,19 @@ contains
 
         ! ---------------------------------------------------------------------
 
+        ! index IB
+        i0=indici_CELLE_IB(1,l)
+        j0=indici_CELLE_IB(2,l)
+        k0=indici_CELLE_IB(3,l)
+
         ! distance IP-PP
         distanza=dist_ib_parete(l)+dist_pp_ib(l)
         fattore_distanza=dist_ib_parete(l)/distanza
 
         ! velocity at interpolation points (PP, V?)
-        vel_pp(1)=trilinear_interpolation(u,l)
-        vel_pp(2)=trilinear_interpolation(v,l)
-        vel_pp(3)=trilinear_interpolation(w,l)
+        vel_pp(1)=trilinear_interpolation(u,l,tipo)
+        vel_pp(2)=trilinear_interpolation(v,l,tipo)
+        vel_pp(3)=trilinear_interpolation(w,l,tipo)
 
         ! velocity at IB points (initial, global)
         vel_ib(1)=u(i0,j0,k0)
@@ -444,7 +527,7 @@ contains
 
         ! compute velocities (global)= at IP  (/=0 only if particles are active)
         if (particles) then
-            vel_ip(:)=surfVel(l,:)
+            vel_ip(:)=surfvel_ib(:,l)
         else
             vel_ip(:)=(/0.0,0.0,0.0/)
         end if
@@ -466,9 +549,11 @@ contains
         if (coef_wall==0) then
             ! linear profile
             caso=1
-        else if ((dist_ib_parete(l)<1.e-9).or.(vtan_pp_rel<1.e-9)) then
+        else if ((dist_ib_parete(l)<1.0e-9).or.(vtan_pp_rel<1.0e-9)) then
             ! values too small: zero velocity
             caso=0
+            !write(*,*) ' vel_ib=(',vel_ib(1),' ',vel_ib(2),' ',vel_ib(3),')'
+            !write(*,*) 'caso=0, l=',l
         else
             ! full law of the wall
             caso=2
@@ -526,31 +611,43 @@ contains
 
         ! other things necessary for particles
         !if (particles) then
+        caso_ib(l)=caso
 
-            caso_ib(l)=caso
+        if (caso==2) then
 
-            ! compute components of shear stress (conserve sign)
-            local_shear1=sign((vloc_pp_rel(1)*(ustarHere/vtan_pp_rel))**2,vloc_pp_rel(1))
-            local_shear2=sign((vloc_pp_rel(2)*(ustarHere/vtan_pp_rel))**2,vloc_pp_rel(2))
+            ! find the two components of ustar (ustar is aligned with vtan_rel)
+            local_ustar1=vloc_pp_rel(1)*ustarHere/vtan_pp_rel
+            local_ustar2=vloc_pp_rel(2)*ustarHere/vtan_pp_rel
 
-            f_pp=trilinear_interpolation(fi,l)
-
-            f_ib=fi(i0,j0,k0)
-
-            ! this assumes a linear behavior of pressure along the normal line
-            fi_pro=((dist_ib_parete(l)+dist_pp_ib(l))*f_ib-f_pp*dist_ib_parete(l))/dist_pp_ib(l)
+            ! compute components of shear stress (conserve sign) tau=rho*ustar^2
+            local_shear1=sign((local_ustar1)**2,local_ustar1)
+            local_shear2=sign((local_ustar2)**2,local_ustar2)
 
             ! force on solid objects are made up of two components: pressure and shear (2,3 INVERTED)
-            shear_ib(l,1)=local_shear1*rot_inverse(l,1,1)+local_shear2*rot_inverse(l,1,2)
-            shear_ib(l,3)=local_shear1*rot_inverse(l,2,1)+local_shear2*rot_inverse(l,2,2)
-            shear_ib(l,2)=local_shear1*rot_inverse(l,3,1)+local_shear2*rot_inverse(l,3,2)
+            shear_ib(1,l)=local_shear1*rot_inverse(1,1,l)+local_shear2*rot_inverse(1,2,l)
+            shear_ib(3,l)=local_shear1*rot_inverse(2,1,l)+local_shear2*rot_inverse(2,2,l)
+            shear_ib(2,l)=local_shear1*rot_inverse(3,1,l)+local_shear2*rot_inverse(3,2,l)
 
-            ! pressure has a minus sign because the normal is directed outwards (2,3 INVERTED)
-            pressure_ib(l,1)=-1.0*fi_pro*rot_inverse(l,1,3)
-            pressure_ib(l,3)=-1.0*fi_pro*rot_inverse(l,2,3)
-            pressure_ib(l,2)=-1.0*fi_pro*rot_inverse(l,3,3)
+        end if
 
-            momentum_ib(l,:)=(vel_ib_old(:)-vel_ib(:))/dt
+
+
+        ! pressure is independent of caso
+        f_ib=fi(i0,j0,k0)
+
+        ! OLD: this assumes a linear behavior of pressure along the normal line
+        !f_pp=trilinear_interpolation(fi,l)
+        !fi_pro=((dist_ib_parete(l)+dist_pp_ib(l))*f_ib-f_pp*dist_ib_parete(l))/dist_pp_ib(l)
+
+        ! NEW: we take the pressure value at the IB node
+        fi_pro=f_ib
+
+        ! pressure has a minus sign because the normal is directed outwards (2,3 INVERTED)
+        pressure_ib(1,l)=-1.0*fi_pro*rot_inverse(1,3,l)
+        pressure_ib(3,l)=-1.0*fi_pro*rot_inverse(2,3,l)
+        pressure_ib(2,l)=-1.0*fi_pro*rot_inverse(3,3,l)
+
+        momentum_ib(:,l)=(vel_ib_old(:)-vel_ib(:))/dt
 
         !   the following is valid if rotationAle is used!!!!
         ! force on solid objects are made up of two components: pressure and shear
@@ -574,6 +671,8 @@ contains
         !    pressure_ib(l,3)=fluidPressureForce(i0,j0,k0,3)
         !end if
 
+
+
         return
 
     end subroutine compute_u_ib
@@ -586,13 +685,9 @@ contains
         !***********************************************************************
         ! send IB at the border between the procs
         use mysending
-        use scala3
         use period
         !
         use mpi
-
-
-        implicit none
 
         !-----------------------------------------------------------------------
         !     array declaration
@@ -640,7 +735,6 @@ contains
 
                 call MPI_SEND(sbuff_ibm(1),(3+nscal)*num_left_snd,MPI_REAL_SD, &
                     leftpe,tagls,MPI_COMM_WORLD,ierror)
-            !      call MPI_WAIT (ireq1,status,ierror)
             end if
         end if
 
@@ -648,7 +742,6 @@ contains
             if(myid.ne.nproc-1)then
                 call MPI_RECV(rbuff_ibm(1),(3+nscal)*num_right_rcv,MPI_REAL_SD, &
                     rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
-                !      call MPI_WAIT (ireq2,status,ierror)
 
                 do l=1,num_right_rcv
                     i = stencil_right_rcv(l,1)
@@ -686,7 +779,6 @@ contains
 
                     call MPI_SEND(sbuff_ibm(1),(3+nscal)*num_left_snd, &
                         MPI_REAL_SD,nproc-1,tagls,MPI_COMM_WORLD,ierror)
-                !          call MPI_WAIT (ireq1,status,ierror)
                 end if
             end if
 
@@ -755,7 +847,6 @@ contains
 
                 call MPI_SEND(sbuff_ibm(1),(3+nscal)*num_right_snd,MPI_REAL_SD, &
                     rightpe,tagrs,MPI_COMM_WORLD,ierror)
-            !      call MPI_WAIT (ireq3,status,ierror)
             end if
         end if
 
@@ -763,7 +854,6 @@ contains
             if(myid.ne.0)then
                 call MPI_RECV(rbuff_ibm(1),(3+nscal)*num_left_rcv,MPI_REAL_SD, &
                     leftpe,taglr,MPI_COMM_WORLD,status,ierror)
-                !      call MPI_WAIT (ireq4,status,ierror)
 
                 do l=1,num_left_rcv
                     i = stencil_left_rcv(l,1)
@@ -801,7 +891,6 @@ contains
 
                     call MPI_SEND(sbuff_ibm(1),(3+nscal)*num_right_snd, &
                         MPI_REAL_SD,0,tagrs,MPI_COMM_WORLD,ierror)
-                !           call MPI_WAIT (ireq3,status,ierror)
                 end if
             end if
 
@@ -809,7 +898,6 @@ contains
                 if(myid.eq.0)then
                     call MPI_RECV(rbuff_ibm(1),(3+nscal)*num_left_rcv, &
                         MPI_REAL_SD,nproc-1,taglr,MPI_COMM_WORLD,status,ierror)
-                    !           call MPI_WAIT (ireq4,status,ierror)
 
                     do l=1,num_left_rcv
                         i = stencil_left_rcv(l,1)
@@ -876,14 +964,14 @@ contains
             !     periodicity
             !
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
 
-                    u(0   ,j,k)=u(jx,j,k)
-                    v(0   ,j,k)=v(jx,j,k)
-                    w(0   ,j,k)=w(jx,j,k)
-                    u(jx+1,j,k)=u(1 ,j,k)
-                    v(jx+1,j,k)=v(1 ,j,k)
-                    w(jx+1,j,k)=w(1 ,j,k)
+                    u(0   ,j,k)=u(n1,j,k)
+                    v(0   ,j,k)=v(n1,j,k)
+                    w(0   ,j,k)=w(n1,j,k)
+                    u(n1+1,j,k)=u(1 ,j,k)
+                    v(n1+1,j,k)=v(1 ,j,k)
+                    w(n1+1,j,k)=w(1 ,j,k)
                 !
                 end do
             end do
@@ -894,8 +982,8 @@ contains
         !     j direction, impose periodicity or wall
         !
         !     parabolic extrapolation y=ax2+bx+c
-        if(jp==1)then
-            !
+        ! direction 2 is always not periodic
+        !
         !        if(correggo_delu==1)then
         !            do k=kparasta,kparaend
         !                do i=1,jx
@@ -925,24 +1013,6 @@ contains
         !                end do
         !            end do
         !        end if
-
-        else
-            !
-            !     periodicity on eta
-            do k=kparasta,kparaend
-                do i=1,jx
-
-                    u(i,   0,k)=u(i,jy,k)
-                    v(i,   0,k)=v(i,jy,k)
-                    w(i,   0,k)=w(i,jy,k)
-                    u(i,jy+1,k)=u(i, 1,k)
-                    v(i,jy+1,k)=v(i, 1,k)
-                    w(i,jy+1,k)=w(i, 1,k)
-                !
-                end do
-            end do
-
-        end if
         !
         !-----------------------------------------------------------------------------
         !    k direction, impose periodicity or wall
@@ -996,29 +1066,29 @@ contains
         if(icheck)then
 
             k=kparasta
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     write(4500+myid,*)u(i,j,k),v(i,j,k),w(i,j,k)
                 end do
             end do
 
             k=kparasta-1
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     write(4600+myid,*)u(i,j,k),v(i,j,k),w(i,j,k)
                 end do
             end do
 
             k=kparaend
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     write(4700+myid,*)u(i,j,k),v(i,j,k),w(i,j,k)
                 end do
             end do
 
             k=kparaend+1
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     write(4800+myid,*)u(i,j,k),v(i,j,k),w(i,j,k)
                 end do
             end do
@@ -1029,476 +1099,15 @@ contains
         return
     end
 
-    subroutine carico_immb(tipo)
-        !***********************************************************************
-        !     read ibm input file
-        use mysending
-        !
-        use scala3
-        use period
-        !
-        use mpi
-
-        implicit none
-
-        !-----------------------------------------------------------------------
-        integer,intent(out) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
-
-        !     array declaration
-        integer l,i,j,k,in,jn,kn
-        integer iloop,jloop,kloop
-
-        integer status(MPI_STATUS_SIZE),ierror
-
-        integer contatore,num_solide_real
-        integer ib_totali,solide_totali
-
-        real a1,a2,a3
-        real dist1,dist2
-
-        real rot11,rot12,rot13
-        real rot21,rot22,rot23
-        real rot31,rot32,rot33
-
-        real irot11,irot12,irot13
-        real irot21,irot22,irot23
-        real irot31,irot32,irot33
-
-        real tri1,tri2,tri3,tri4
-        integer i_tri1,i_tri2,i_tri3,i_tri4
-        integer j_tri1,j_tri2,j_tri3,j_tri4
-        integer k_tri1,k_tri2,k_tri3,k_tri4
-
-        integer np
-
-        integer :: ierr
-        !-----------------------------------------------------------------------
-        allocate(tipo_spedito(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-        !-----------------------------------------------------------------------
-        if(myid.eq.0)then
-            WRITE(*,*)' '
-            write(*,*)'*****************************************'
-            write(*,*)'     LOAD IBM'
-        end if
-        !-----------------------------------------------------------------------
-        !     initialization
-        do k=kparasta-deepl,kparaend+deepr !0,jz+1
-            do j=0,jy+1
-                do i=0,jx+1
-                    tipo(i,j,k)=2
-                end do
-            end do
-        end do
-
-        do i=1,num_ib
-            do j=1,6
-                indici_CELLE_IB(i,j)=0
-            end do
-        end do
-
-        !   do i=1,MN
-        !      do j=1,3
-        !         distanze_CELLE_IB(i,j)=0
-        !      end do
-        !   end do
-
-        do i=1,num_solide
-            do j=1,3
-                indici_celle_bloccate(i,j)=0
-            end do
-        end do
-
-        if(myid.eq.0)then
-            write(*,*)'matrix ---> OK'
-        end if
-
-        !-----------------------------------------------------------------------
-        !     read input files for ibm
-
-
-        !     ib point
-        open (20,file='Celle_IB_indici.inp',status='old')
-        !open (21,file='Celle_IB_distanze.inp',status='old')
-        open (23,file='distanze_interpolazioni.inp',status='old')
-        open (24,file='rotazione.inp',status='old')
-
-        open (25,file='trilinear_ibm.inp',status='old')
-        open (26,file='trilinear_i.inp',status='old')
-        open (27,file='trilinear_j.inp',status='old')
-        open (28,file='trilinear_k.inp',status='old')
-
-        read (20,*) numero_celle_IB
-
-        num_ib=0
-
-        do l=1,numero_celle_IB
-
-            read(20,*)i,j,k,in,jn,kn
-
-            !read(21,310)dist_x,dist_y,dist_z
-
-
-            read(23,320)dist1,dist2,a1,a2,a3
-
-            read(24,350)rot11,rot12,rot13, &
-                rot21,rot22,rot23, &
-                rot31,rot32,rot33
-
-            read(24,350)irot11,irot12,irot13, &
-                irot21,irot22,irot23, &
-                irot31,irot32,irot33
-
-            read(25,360)tri1,tri2,tri3,tri4
-
-            read(26,370)i_tri1,i_tri2,i_tri3,i_tri4
-
-            read(27,370)j_tri1,j_tri2,j_tri3,j_tri4
-
-            read(28,370)k_tri1,k_tri2,k_tri3,k_tri4
-
-            if((k.ge.kparasta-deepl).and.(k.le.kparaend+deepr))tipo(i,j,k)=1
-
-            if((k.ge.kparasta).and.(k.le.kparaend))then
-
-                tipo(i,j,k)=1
-
-                num_ib=num_ib+1
-
-                indici_CELLE_IB(num_ib,1)=i
-                indici_CELLE_IB(num_ib,2)=j
-                indici_CELLE_IB(num_ib,3)=k
-                indici_CELLE_IB(num_ib,4)=in
-                indici_CELLE_IB(num_ib,5)=jn
-                indici_CELLE_IB(num_ib,6)=kn
-
-                !         distanze_CELLE_IB(num_ib,1)=dist_x
-                !         distanze_CELLE_IB(num_ib,2)=dist_y
-                !         distanze_CELLE_IB(num_ib,3)=dist_z
-
-                dist_pp_ib(num_ib)=dist1
-                dist_ib_parete(num_ib)=dist2
-
-                proiezioni(num_ib,1)=a1
-                proiezioni(num_ib,2)=a2
-                proiezioni(num_ib,3)=a3
-
-
-                !         rotation matrix (to construct tangential and normal velocity)
-                rot(num_ib,1,1)=rot11
-                rot(num_ib,1,2)=rot12
-                rot(num_ib,1,3)=rot13
-
-                rot(num_ib,2,1)=rot21
-                rot(num_ib,2,2)=rot22
-                rot(num_ib,2,3)=rot23
-
-                rot(num_ib,3,1)=rot31
-                rot(num_ib,3,2)=rot32
-                rot(num_ib,3,3)=rot33
-
-
-                !         inverse rotation matrix
-                rot_inverse(num_ib,1,1)=irot11
-                rot_inverse(num_ib,1,2)=irot12
-                rot_inverse(num_ib,1,3)=irot13
-
-                rot_inverse(num_ib,2,1)=irot21
-                rot_inverse(num_ib,2,2)=irot22
-                rot_inverse(num_ib,2,3)=irot23
-
-                rot_inverse(num_ib,3,1)=irot31
-                rot_inverse(num_ib,3,2)=irot32
-                rot_inverse(num_ib,3,3)=irot33
-
-                !         trilinear coefficent
-                tricoef(num_ib,1)=tri1
-                tricoef(num_ib,2)=tri2
-                tricoef(num_ib,3)=tri3
-                tricoef(num_ib,4)=tri4
-
-
-                !         trilinear index
-                trind(num_ib,1,1)=i_tri1
-                trind(num_ib,2,1)=i_tri2
-                trind(num_ib,3,1)=i_tri3
-                trind(num_ib,4,1)=i_tri4
-
-
-                trind(num_ib,1,2)=j_tri1
-                trind(num_ib,2,2)=j_tri2
-                trind(num_ib,3,2)=j_tri3
-                trind(num_ib,4,2)=j_tri4
-
-
-                trind(num_ib,1,3)=k_tri1
-                trind(num_ib,2,3)=k_tri2
-                trind(num_ib,3,3)=k_tri3
-                trind(num_ib,4,3)=k_tri4
-
-
-            end if
-        end do
-
-        close(20)
-        close(21)
-        close(23)
-        close(24)
-
-        close(25)
-        close(26)
-        close(27)
-        close(28)
-
-
-
-300     format(6(i4,1x))
-310     format(3e15.8)
-320     format (5e15.8)
-350     format(9e15.8)
-360     format(4e15.8)     ! tri_ibm
-370     format(4(i8,1x))
-
-        write(*,*)myid,', number of ib points: ',num_ib !200+myid
-        !.......................................................................
-
-
-        !     solid points
-        open (22,file='Celle_Bloccate_Indici.inp',status='old')
-
-        read (22,*) numero_celle_bloccate
-
-        num_solide=0
-        contatore=0
-        do l=1,numero_celle_bloccate
-
-            read(22,*)i,j,k
-
-            if((k.ge.kparasta-deepl).and.(k.le.kparaend+deepr))then
-
-                tipo(i,j,k)=0
-
-                num_solide=num_solide+1
-
-                indici_celle_bloccate(num_solide,1)=i
-                indici_celle_bloccate(num_solide,2)=j
-                indici_celle_bloccate(num_solide,3)=k
-
-                if(k.gt.kparaend .or. k.lt.kparasta)then
-                    contatore=contatore+1
-                end if
-            end if
-        end do
-
-        close (22)
-        !      if(myid.eq.0)then
-        !      write(*,*)'read solid cells ---> OK'
-        !      end if
-        write(*,*)'border solid',contatore
-
-        num_solide_real=num_solide-contatore !without border cells
-
-        write(*,*)myid,'number of solid cells: ',num_solide
-
-        !-----------------------------------------------------------------------
-        !     check number of ibm for each proc
-
-        call MPI_REDUCE(num_ib,ib_totali,1,MPI_INTEGER,MPI_SUM,0,MPI_COMM_WORLD,ierror)
-        call MPI_REDUCE(num_solide_real,solide_totali,1,MPI_INTEGER,MPI_SUM,0,MPI_COMM_WORLD,ierror)
-        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-
-        if(myid.eq.0)then
-            write(*,*)'--------------------------------------------'
-            if(ib_totali.eq.numero_celle_IB)then
-                write(*,*)'check IB for each proc --> OK'
-            else
-                write(*,*)'check IB for each proc --> NO'
-            end if
-
-            if(solide_totali.eq.numero_celle_bloccate)then
-                write(*,*)'check solid cells for each proc --> OK'
-            else
-                write(*,*)'check solid cells for each proc --> NO'
-            end if
-
-            write(*,*)'--------------------------------------------'
-            write(*,*)'read input file for Immersed Boundaries'
-            write(*,*)'total number of IB',numero_celle_IB
-            write(*,*)'total number of solid',numero_celle_bloccate
-            write(*,*)'--------------------------------------------'
-        end if
-
-        write(*,*)'number IB proc --->',num_ib
-        write(*,*)'number solid cells proc --->',num_solide
-        write(*,*)'--------------------------------------------'
-
-        if(myid.eq.0)then
-            write(*,*)'       LOAD IBM finished'
-            write(*,*)'*****************************************'
-            write (*,*)' '
-        end if
-
-        !-----------------------------------------------------------------------
-        !-----------------------------------------------------------------------
-        !     PREPARE COMUNICATION BETWEEN PROCS FOR IB
-        allocate( stencil_left_snd(2*jx*jy,3))
-        allocate(stencil_right_snd(2*jx*jy,3))
-        allocate( stencil_left_rcv(2*jx*jy,3))
-        allocate(stencil_right_rcv(2*jx*jy,3))
-
-        stencil_left_rcv  = 0
-        stencil_right_rcv = 0
-        stencil_left_snd  = 0
-        stencil_right_snd = 0
-
-        ! my stencil requires node of the close proc
-        ! therefore kparasta-1 and kparaend+1
-
-        num_left_snd = 0
-        num_right_snd = 0
-        num_right_rcv = 0
-        num_left_rcv = 0
-
-        tipo_spedito = 0
-
-        do l=1,num_ib
-            do np = 1,4
-                i=trind(l,np,1)
-                j=trind(l,np,2)
-                k=trind(l,np,3)
-
-
-                if(tipo_spedito(i,j,k)==0)then
-
-                    if(k==kparasta-1)then
-                        num_left_rcv = num_left_rcv + 1
-                        stencil_left_rcv(num_left_rcv,1) = i
-                        stencil_left_rcv(num_left_rcv,2) = j
-                        stencil_left_rcv(num_left_rcv,3) = k
-
-                        tipo_spedito(i,j,k) = 1
-                    end if
-
-
-                    if(k==kparaend+1)then
-                        num_right_rcv = num_right_rcv + 1
-                        stencil_right_rcv(num_right_rcv,1) = i
-                        stencil_right_rcv(num_right_rcv,2) = j
-                        stencil_right_rcv(num_right_rcv,3) = k
-
-                        tipo_spedito(i,j,k) = 1
-                    end if
-
-                end if ! tipo_spedito
-
-            end do
-        end do
-
-        !     comunicate left the point left has to send right
-        if(myid.ne.0)then
-            call MPI_SEND(num_left_rcv,1,MPI_INTEGER,leftpe,tagls,MPI_COMM_WORLD,ierror)
-        end if
-        if(myid.ne.nproc-1)then
-            call MPI_RECV(num_right_snd,1,MPI_INTEGER,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
-        end if
-
-        !     comunicate right the point right has to send left
-        if(myid.ne.nproc-1)then
-            call MPI_SEND(num_right_rcv,1,MPI_INTEGER,rightpe,tagrs,MPI_COMM_WORLD,ierror)
-        end if
-        if(myid.ne.0)then
-            call MPI_RECV(num_left_snd,1,MPI_INTEGER,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
-        end if
-
-        !     if periodic
-        if(kp==0)then
-            if(myid.eq.0)then
-                call MPI_SEND(num_left_rcv,1,MPI_INTEGER,nproc-1,tagls,MPI_COMM_WORLD,ierror)
-            end if
-            if(myid.eq.nproc-1)then
-                call MPI_RECV(num_right_snd,1,MPI_INTEGER,0,tagrr,MPI_COMM_WORLD,status,ierror)
-            end if
-
-            if(myid.eq.nproc-1)then
-                call MPI_SEND(num_right_rcv,1,MPI_INTEGER,0,tagrs,MPI_COMM_WORLD,ierror)
-            end if
-            if(myid.eq.0)then
-                call MPI_RECV(num_left_snd,1,MPI_INTEGER,nproc-1,taglr,MPI_COMM_WORLD,status,ierror)
-            end if
-        else
-            if(myid.eq.0)then
-                num_left_snd = 0
-                num_left_rcv = 0
-            end if
-            if(myid.eq.nproc-1)then
-                num_right_rcv = 0
-                num_right_snd = 0
-            end if
-        end if
-
-        !     I know the counter! now I send the values
-
-        !     send left the indeces left has to send right
-        if(myid.ne.0)then
-            call MPI_SEND(stencil_left_rcv(1,1),3*2*jx*jy,MPI_INTEGER,leftpe,tagls,MPI_COMM_WORLD,ierror)
-        end if
-        if(myid.ne.nproc-1)then
-            call MPI_RECV(stencil_right_snd(1,1),3*2*jx*jy,MPI_INTEGER,rightpe,tagrr,MPI_COMM_WORLD,status,ierror)
-        end if
-
-        !     send right the indeces right has to send left
-        if(myid.ne.nproc-1)then
-            call MPI_SEND(stencil_right_rcv(1,1),3*2*jx*jy,MPI_INTEGER,rightpe,tagrs,MPI_COMM_WORLD,ierror)
-        end if
-        if(myid.ne.0)then
-            call MPI_RECV(stencil_left_snd(1,1),3*2*jx*jy,MPI_INTEGER,leftpe,taglr,MPI_COMM_WORLD,status,ierror)
-        end if
-
-        !     if periodic
-        if(kp==0)then
-
-            !       left to 0 is nproc-1
-            if(myid.eq.0)then
-                call MPI_SEND(stencil_left_rcv(1,1),3*2*jx*jy,MPI_INTEGER,nproc-1,tagls,MPI_COMM_WORLD,ierror)
-            end if
-            if(myid.eq.nproc-1)then
-                call MPI_RECV(stencil_right_snd(1,1),3*2*jx*jy,MPI_INTEGER,0,tagrr,MPI_COMM_WORLD,status,ierror)
-            end if
-
-            ! right to nproc-1 is 0
-            if(myid.eq.nproc-1)then
-                call MPI_SEND(stencil_right_rcv(1,1),3*2*jx*jy,MPI_INTEGER,0,tagrs,MPI_COMM_WORLD,ierror)
-            end if
-            if(myid.eq.0)then
-                call MPI_RECV(stencil_left_snd(1,1),3*2*jx*jy,MPI_INTEGER,nproc-1,taglr,MPI_COMM_WORLD,status,ierror)
-            end if
-
-            !       now myid=0 and myid=nproc-1 know the index they will recive,
-            !       but they need to save
-            !       on the border, so I change the k
-
-            if (myid == nproc-1) stencil_right_snd(:,3)=jz
-            if (myid == 0) stencil_left_snd(:,3)=1
-
-        end if
-
-        !-----------------------------------------------------------------------
-        !-----------------------------------------------------------------------
-
-        return
-
-    end subroutine carico_immb
-
     function global2local(var,l)
-
-        implicit none
 
         real,intent(in) :: var(3)
         integer,intent(in) :: l
         real,dimension(3) :: global2local
 
-        global2local(1)=var(1)*rot(l,1,1)+var(3)*rot(l,1,2)+var(2)*rot(l,1,3)
-        global2local(2)=var(1)*rot(l,2,1)+var(3)*rot(l,2,2)+var(2)*rot(l,2,3)
-        global2local(3)=var(1)*rot(l,3,1)+var(3)*rot(l,3,2)+var(2)*rot(l,3,3)
+        global2local(1)=var(1)*rot(1,1,l)+var(3)*rot(1,2,l)+var(2)*rot(1,3,l)
+        global2local(2)=var(1)*rot(2,1,l)+var(3)*rot(2,2,l)+var(2)*rot(2,3,l)
+        global2local(3)=var(1)*rot(3,1,l)+var(3)*rot(3,2,l)+var(2)*rot(3,3,l)
 
         return
 
@@ -1506,37 +1115,82 @@ contains
 
     function local2global(var,l)
 
-        implicit none
-
         real,intent(in) :: var(3)
         integer,intent(in) :: l
         real,dimension(3) :: local2global
 
-        local2global(1)=var(1)*rot_inverse(l,1,1)+var(2)*rot_inverse(l,1,2)+var(3)*rot_inverse(l,1,3)
-        local2global(2)=var(1)*rot_inverse(l,3,1)+var(2)*rot_inverse(l,3,2)+var(3)*rot_inverse(l,3,3)
-        local2global(3)=var(1)*rot_inverse(l,2,1)+var(2)*rot_inverse(l,2,2)+var(3)*rot_inverse(l,2,3)
+        local2global(1)=var(1)*rot_inverse(1,1,l)+var(2)*rot_inverse(1,2,l)+var(3)*rot_inverse(1,3,l)
+        local2global(2)=var(1)*rot_inverse(3,1,l)+var(2)*rot_inverse(3,2,l)+var(3)*rot_inverse(3,3,l)
+        local2global(3)=var(1)*rot_inverse(2,1,l)+var(2)*rot_inverse(2,2,l)+var(3)*rot_inverse(2,3,l)
 
         return
 
     end function local2global
 
-    function trilinear_interpolation(var,l)
-
-        use scala3, only: n1,n2
-        use mysending, only: kparasta,kparaend,deepl,deepr
-
-        implicit none
+    function trilinear_interpolation(var,l,tipo)
 
         real :: trilinear_interpolation
         real,intent(in) :: var(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
+        integer,intent(in) :: tipo(0:n1+1,0:n2+1,kparasta-deepl:kparaend+deepr)
         integer,intent(in) :: l
         !real,intent(out) :: trilinear_interpolation
+        integer :: a
 
         trilinear_interpolation= &
-            tricoef(l,1)*var(trind(l,1,1),trind(l,1,2),trind(l,1,3)) &
-            +tricoef(l,2)*var(trind(l,2,1),trind(l,2,2),trind(l,2,3)) &
-            +tricoef(l,3)*var(trind(l,3,1),trind(l,3,2),trind(l,3,3)) &
-            +tricoef(l,4)*var(trind(l,4,1),trind(l,4,2),trind(l,4,3))
+            tricoef(1,l)*var(trind(1,1,l),trind(1,2,l),trind(1,3,l)) &
+            +tricoef(2,l)*var(trind(2,1,l),trind(2,2,l),trind(2,3,l)) &
+            +tricoef(3,l)*var(trind(3,1,l),trind(3,2,l),trind(3,3,l)) &
+            +tricoef(4,l)*var(trind(4,1,l),trind(4,2,l),trind(4,3,l))
+
+!            if (tipo(trind(1,1,l),trind(1,2,l),trind(1,3,l))==0 .and. &
+!                tipo(trind(2,1,l),trind(2,2,l),trind(2,3,l))==0 .and. &
+!                tipo(trind(3,1,l),trind(3,2,l),trind(3,3,l))==0 .and. &
+!                tipo(trind(4,1,l),trind(4,2,l),trind(4,3,l))==0 .and. &
+!                var(trind(1,1,l),trind(1,2,l),trind(1,3,l))==0.0 .and. &
+!                var(trind(2,1,l),trind(2,2,l),trind(2,3,l))==0.0 .and. &
+!                var(trind(3,1,l),trind(3,2,l),trind(3,3,l))==0.0 .and. &
+!                var(trind(4,1,l),trind(4,2,l),trind(4,3,l))==0.0) then
+!
+!                write(*,*) 'both problems(0) ',l
+!
+!            else if (tipo(trind(1,1,l),trind(1,2,l),trind(1,3,l))==1 .and. &
+!                tipo(trind(2,1,l),trind(2,2,l),trind(2,3,l))==1 .and. &
+!                tipo(trind(3,1,l),trind(3,2,l),trind(3,3,l))==1 .and. &
+!                tipo(trind(4,1,l),trind(4,2,l),trind(4,3,l))==1 .and. &
+!                var(trind(1,1,l),trind(1,2,l),trind(1,3,l))==0.0 .and. &
+!                var(trind(2,1,l),trind(2,2,l),trind(2,3,l))==0.0 .and. &
+!                var(trind(3,1,l),trind(3,2,l),trind(3,3,l))==0.0 .and. &
+!                var(trind(4,1,l),trind(4,2,l),trind(4,3,l))==0.0) then
+!
+!            write(*,*) 'both problems(1) ',l
+!
+!                else
+!
+!            if (tipo(trind(1,1,l),trind(1,2,l),trind(1,3,l))==0 .and. &
+!                tipo(trind(2,1,l),trind(2,2,l),trind(2,3,l))==0 .and. &
+!                tipo(trind(3,1,l),trind(3,2,l),trind(3,3,l))==0 .and. &
+!                tipo(trind(4,1,l),trind(4,2,l),trind(4,3,l))==0) then
+!                write(*,*) 'tipo problem(0) ',l
+!            end if
+!
+!            if (tipo(trind(1,1,l),trind(1,2,l),trind(1,3,l))==1 .and. &
+!                tipo(trind(2,1,l),trind(2,2,l),trind(2,3,l))==1 .and. &
+!                tipo(trind(3,1,l),trind(3,2,l),trind(3,3,l))==1 .and. &
+!                tipo(trind(4,1,l),trind(4,2,l),trind(4,3,l))==1) then
+!                write(*,*) 'tipo problem(0) ',l
+!            end if
+!
+!            if (var(trind(1,1,l),trind(1,2,l),trind(1,3,l))==0.0 .and. &
+!                var(trind(2,1,l),trind(2,2,l),trind(2,3,l))==0.0 .and. &
+!                var(trind(3,1,l),trind(3,2,l),trind(3,3,l))==0.0 .and. &
+!                var(trind(4,1,l),trind(4,2,l),trind(4,3,l))==0.0) then
+!                write(*,*) 'var problem ',l
+!            end if
+!
+!            end if
+
+
+
 
         return
 

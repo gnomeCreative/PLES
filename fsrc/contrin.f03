@@ -1,6 +1,5 @@
-!***********************************************************************
 subroutine contrin
-   !***********************************************************************
+
    ! controvariant fluxes compuatation from interpolation data (dns)
    ! generalized periodicity
    !
@@ -14,33 +13,27 @@ subroutine contrin
    use mpi
 
    implicit none
-   !
 
-
-   !
    !-----------------------------------------------------------------------
-   ! array declaration
-
    integer i,j,k
    integer ierr
    real diver,divmax,divmax_loc
    integer kpsta,kpend
-   !
    !-----------------------------------------------------------------------
    !
    ! flux J-1*U
    !
    do k=kparasta,kparaend !1,jz
-      do j=1,jy
+      do j=1,n2
          !        face 1
          uc(0,j,k)=csx(0,j,k)*u(0,j,k) &
             +csy(0,j,k)*v(0,j,k) &
             +csz(0,j,k)*w(0,j,k)
          !        face 2
-         uc(jx,j,k)=csx(jx,j,k)*u(jx+1,j,k) &
-            +csy(jx,j,k)*v(jx+1,j,k) &
-            +csz(jx,j,k)*w(jx+1,j,k)
-         do i=ip,jx-ip
+         uc(n1,j,k)=csx(n1,j,k)*u(n1+1,j,k) &
+            +csy(n1,j,k)*v(n1+1,j,k) &
+            +csz(n1,j,k)*w(n1+1,j,k)
+         do i=ip,n1-ip
             !           inside the domain and face 1 and 2 if periodic
             uc(i,j,k)= &
                csx(i,j,k)*.5*(u(i,j,k)+u(i+1,j,k)) &
@@ -53,16 +46,16 @@ subroutine contrin
    ! flusso J-1*V
    !
    do k=kparasta,kparaend !1,jz
-      do i=1,jx
+      do i=1,n1
          !        face 3
          vc(i,0,k)=etx(i,0,k)*u(i,0,k) &
             +ety(i,0,k)*v(i,0,k) &
             +etz(i,0,k)*w(i,0,k)
          !        face 4
-         vc(i,jy,k)=etx(i,jy,k)*u(i,jy+1,k) &
-            +ety(i,jy,k)*v(i,jy+1,k) &
-            +etz(i,jy,k)*w(i,jy+1,k)
-         do j=jp,jy-jp
+         vc(i,n2,k)=etx(i,n2,k)*u(i,n2+1,k) &
+            +ety(i,n2,k)*v(i,n2+1,k) &
+            +etz(i,n2,k)*w(i,n2+1,k)
+         do j=1,n2-1
             !           inside the domain and face 3 and 4 if periodic
             vc(i,j,k)= &
                etx(i,j,k)*.5*(u(i,j,k)+u(i,j+1,k)) &
@@ -78,8 +71,8 @@ subroutine contrin
    kpend = kparaend
    if(myid.eq.0)then
       kpsta = kpsta + kp
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             !          face 5
             wc(i,j,0)=ztx(i,j,0)*u(i,j,0) &
                +zty(i,j,0)*v(i,j,0) &
@@ -96,12 +89,12 @@ subroutine contrin
       enddo
    elseif(myid.eq. nproc-1)then
       kpend = kparaend-kp
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             !          face 6
-            wc(i,j,jz)=ztx(i,j,jz)*u(i,j,jz+1) &
-               +zty(i,j,jz)*v(i,j,jz+1) &
-               +ztz(i,j,jz)*w(i,j,jz+1)
+            wc(i,j,n3)=ztx(i,j,n3)*u(i,j,n3+1) &
+               +zty(i,j,n3)*v(i,j,n3+1) &
+               +ztz(i,j,n3)*w(i,j,n3+1)
             do k=kpsta,kpend !kp,jz-kp
                !             inside the domain and at face 6 if periodic
                wc(i,j,k)= &
@@ -112,8 +105,8 @@ subroutine contrin
          enddo
       enddo
    else
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             do k=kpsta,kpend !kp,jz-kp
                !          inside the domain
                wc(i,j,k)= &
@@ -131,8 +124,8 @@ subroutine contrin
    !
    !     AAA needs isend for wc(kparasta-1)
    do k=kparasta,kparaend !1,jz
-      do j=1,jy
-         do i=1,jx
+      do j=1,n2
+         do i=1,n1
             diver=uc(i,j,k)-uc(i-1,j,k) &
                +vc(i,j,k)-vc(i,j-1,k) &
                +wc(i,j,k)-wc(i,j,k-1)

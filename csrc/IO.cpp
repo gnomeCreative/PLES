@@ -18,6 +18,7 @@ void IO::initialize(){
 		a=mkdir(partDirectory.c_str(),0777);
 		cout<<"Work directory created = "<<partDirectory<<". Result: "<<a<<"\n";
 	}
+
 	// build data file names for shell
 	partFileFormat=partDirectory+"/part%010u.vtu";
 	recycleFileFormat=partDirectory+"/recycle%010u.vtu";
@@ -84,6 +85,7 @@ void IO::outputStep(const double& time, const DEM& dem){
 		exportFile.close();
 		cout.flush();
 	}
+
 }
 
 void IO::outputFinal(){
@@ -186,6 +188,10 @@ void IO::exportParaviewParticles(const elmtList& elmts, const particleList& part
 	for (int i=0; i<Pnumber; ++i){
 		elmts[particles[i].clusterIndex].FWall.printLine(paraviewParticleFile);
 	}
+	paraviewParticleFile<<"    <DataArray type=\"Float64\" Name=\"FObject\" NumberOfComponents=\"3\"/>\n";
+	for (int i=0; i<Pnumber; ++i){
+		elmts[particles[i].clusterIndex].FObject.printLine(paraviewParticleFile);
+	}
 	paraviewParticleFile<<"    <DataArray type=\"Float64\" Name=\"FHydroPressure\" NumberOfComponents=\"3\"/>\n";
 	for (int i=0; i<Pnumber; ++i){
 		elmts[particles[i].clusterIndex].FHydroPressure.printLine(paraviewParticleFile);
@@ -201,6 +207,10 @@ void IO::exportParaviewParticles(const elmtList& elmts, const particleList& part
 	paraviewParticleFile<<"    <DataArray type=\"Float64\" Name=\"MWall\" NumberOfComponents=\"3\"/>\n";
 	for (int i=0; i<Pnumber; ++i){
 		elmts[particles[i].clusterIndex].MWall.printLine(paraviewParticleFile);
+	}
+	paraviewParticleFile<<"    <DataArray type=\"Float64\" Name=\"MObject\" NumberOfComponents=\"3\"/>\n";
+	for (int i=0; i<Pnumber; ++i){
+		elmts[particles[i].clusterIndex].MObject.printLine(paraviewParticleFile);
 	}
 	paraviewParticleFile<<"    <DataArray type=\"Float64\" Name=\"n1\" NumberOfComponents=\"3\"/>\n";
 	for (int i=0; i<Pnumber; ++i){
@@ -534,6 +544,7 @@ double IO::collisionForceTot(const elmtList& elmts) const {
 	for (int n=0; n<elmts.size(); ++n){
 		totForce+=elmts[n].FParticle.norm();
 		totForce+=elmts[n].FWall.norm();
+		totForce+=elmts[n].FObject.norm();
 	}
 
 	return totForce;

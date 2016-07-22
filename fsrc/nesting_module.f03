@@ -7,7 +7,7 @@ module nesting_module
     use orlansky_module
     use buffer_bodyforce_module, only: ti_pom_new,ti_pom_old,ti_pom_fin
     !
-    use mysending, only: kparasta,kparaend,myid,nproc,MPI_REAL_SD
+    use mysending, only: myid,nproc,MPI_REAL_SD
     use scala3
     !
     use mpi
@@ -26,7 +26,7 @@ module nesting_module
 contains
 
     subroutine nesting(ti)
-        !***********************************************************************
+
         ! subroutine for nesting procedure
         use inflow_module, only: redistribuzione
         use mysettings, only: freesurface
@@ -141,11 +141,11 @@ contains
         !     array allocation and initialization for nesting
         if(infout1 /=0)then
             !     side   1
-            allocate(uo1(0:jy+1,0:jz+1))
-            allocate(vo1(0:jy+1,0:jz+1))
-            allocate(wo1(0:jy+1,0:jz+1))
-            allocate(rhovo1(nscal,0:jy+1,0:jz+1))
-            allocate(ucp1(jy,kparasta:kparaend))
+            allocate(uo1(0:n2+1,0:n3+1))
+            allocate(vo1(0:n2+1,0:n3+1))
+            allocate(wo1(0:n2+1,0:n3+1))
+            allocate(rhovo1(nscal,0:n2+1,0:n3+1))
+            allocate(ucp1(n2,kparasta:kparaend))
 
             uo1=0.
             vo1=0.
@@ -159,11 +159,11 @@ contains
             n_ti_pom = int(ntireal)
             read(unit1,*)ti_pom_old
 
-            allocate(tkepom1(0:jy+1,kparasta-1:kparaend+1,n_ti_pom)) !face 1
+            allocate(tkepom1(0:n2+1,kparasta-1:kparaend+1,n_ti_pom)) !face 1
             tkepom1 = 0.
 
-            do k=0,jz+1
-                do j=0,jy+1
+            do k=0,n3+1
+                do j=0,n2+1
                     read(unit1,*)var1,var2,var3,var4,(var(n),n=1,nscal)
 
                     if(k.ge.kparasta.and.k.le.kparaend)then
@@ -183,11 +183,11 @@ contains
         !-----------------------------------------------------------------------
         !     side   2
         if(infout2 /=0)then
-            allocate(uo2(0:jy+1,0:jz+1))
-            allocate(vo2(0:jy+1,0:jz+1))
-            allocate(wo2(0:jy+1,0:jz+1))
-            allocate(rhovo2(nscal,0:jy+1,0:jz+1))
-            allocate(ucp2(jy,kparasta:kparaend))
+            allocate(uo2(0:n2+1,0:n3+1))
+            allocate(vo2(0:n2+1,0:n3+1))
+            allocate(wo2(0:n2+1,0:n3+1))
+            allocate(rhovo2(nscal,0:n2+1,0:n3+1))
+            allocate(ucp2(n2,kparasta:kparaend))
 
             uo2=0.
             vo2=0.
@@ -201,11 +201,11 @@ contains
             n_ti_pom = int(ntireal)
             read(unit2,*)ti_pom_old
 
-            allocate(tkepom2(0:jy+1,kparasta-1:kparaend+1,n_ti_pom)) !face 2
+            allocate(tkepom2(0:n2+1,kparasta-1:kparaend+1,n_ti_pom)) !face 2
             tkepom2 = 0.
 
-            do k=0,jz+1
-                do j=0,jy+1
+            do k=0,n3+1
+                do j=0,n2+1
                     read(unit2,*)var1,var2,var3,var4,(var(n),n=1,nscal)
                     if(k.ge.kparasta.and.k.le.kparaend)then
                         uo2(j,k) = var1*index_out2(j,k)
@@ -261,11 +261,11 @@ contains
         !-----------------------------------------------------------------------
         !     side   5
         if(infout5 /=0)then
-            allocate(uo5(0:jx+1,0:jy+1))
-            allocate(vo5(0:jx+1,0:jy+1))
-            allocate(wo5(0:jx+1,0:jy+1))
-            allocate(rhovo5(nscal,0:jx+1,0:jy+1))
-            allocate(wcp5(jx,jy))
+            allocate(uo5(0:n1+1,0:n2+1))
+            allocate(vo5(0:n1+1,0:n2+1))
+            allocate(wo5(0:n1+1,0:n2+1))
+            allocate(rhovo5(nscal,0:n1+1,0:n2+1))
+            allocate(wcp5(n1,n2))
 
             uo5=0.
             vo5=0.
@@ -279,11 +279,11 @@ contains
             n_ti_pom = int(ntireal)
             read(unit5,*)ti_pom_old
 
-            allocate(tkepom5(0:jx+1,0:jy+1,n_ti_pom))
+            allocate(tkepom5(0:n1+1,0:n2+1,n_ti_pom))
             tkepom5 = 0.
 
-            do j=0,jy+1
-                do i=0,jx+1
+            do j=0,n2+1
+                do i=0,n1+1
 
                     read(unit5,*)var1,var2,var3,var4,(var(n),n=1,nscal)
 
@@ -301,11 +301,11 @@ contains
         !-----------------------------------------------------------------------
         !     side   6
         if(infout6 /=0)then
-            allocate(uo6(0:jx+1,0:jy+1))
-            allocate(vo6(0:jx+1,0:jy+1))
-            allocate(wo6(0:jx+1,0:jy+1))
-            allocate(rhovo6(nscal,0:jx+1,0:jy+1))
-            allocate(wcp6(jx,jy))
+            allocate(uo6(0:n1+1,0:n2+1))
+            allocate(vo6(0:n1+1,0:n2+1))
+            allocate(wo6(0:n1+1,0:n2+1))
+            allocate(rhovo6(nscal,0:n1+1,0:n2+1))
+            allocate(wcp6(n1,n2))
 
             uo6=0.
             vo6=0.
@@ -319,11 +319,11 @@ contains
             n_ti_pom = int(ntireal)
             read(unit6,*)ti_pom_old
 
-            allocate(tkepom6(0:jx+1,0:jy+1,n_ti_pom))
+            allocate(tkepom6(0:n1+1,0:n2+1,n_ti_pom))
             tkepom6 = 0.
 
-            do j=0,jy+1
-                do i=0,jx+1
+            do j=0,n2+1
+                do i=0,n1+1
 
                     read(unit6,*)var1,var2,var3,var4,(var(n),n=1,nscal)
 
@@ -357,10 +357,10 @@ contains
             !        allocation for nesting
             !        side 1
             if(infout1 /=0)then
-                allocate(un1(0:jy+1,0:jz+1))
-                allocate(vn1(0:jy+1,0:jz+1))
-                allocate(wn1(0:jy+1,0:jz+1))
-                allocate(rhovn1(nscal,0:jy+1,0:jz+1))
+                allocate(un1(0:n2+1,0:n3+1))
+                allocate(vn1(0:n2+1,0:n3+1))
+                allocate(wn1(0:n2+1,0:n3+1))
+                allocate(rhovn1(nscal,0:n2+1,0:n3+1))
                 un1 = 0.
                 vn1 = 0.
                 wn1 = 0.
@@ -368,10 +368,10 @@ contains
             end if
             !        side 2
             if(infout2 /=0)then
-                allocate(un2(0:jy+1,0:jz+1))
-                allocate(vn2(0:jy+1,0:jz+1))
-                allocate(wn2(0:jy+1,0:jz+1))
-                allocate(rhovn2(nscal,0:jy+1,0:jz+1))
+                allocate(un2(0:n2+1,0:n3+1))
+                allocate(vn2(0:n2+1,0:n3+1))
+                allocate(wn2(0:n2+1,0:n3+1))
+                allocate(rhovn2(nscal,0:n2+1,0:n3+1))
                 un2 = 0.
                 vn2 = 0.
                 wn2 = 0.
@@ -379,10 +379,10 @@ contains
             end if
             !        side 5
             if(infout5 /=0)then
-                allocate(un5(0:jx+1,0:jy+1))
-                allocate(vn5(0:jx+1,0:jy+1))
-                allocate(wn5(0:jx+1,0:jy+1))
-                allocate(rhovn5(nscal,0:jx+1,0:jy+1))
+                allocate(un5(0:n1+1,0:n2+1))
+                allocate(vn5(0:n1+1,0:n2+1))
+                allocate(wn5(0:n1+1,0:n2+1))
+                allocate(rhovn5(nscal,0:n1+1,0:n2+1))
                 un5 = 0.
                 vn5 = 0.
                 wn5 = 0.
@@ -390,10 +390,10 @@ contains
             end if
             !        side 6
             if(infout6 /=0)then
-                allocate(un6(0:jx+1,0:jy+1))
-                allocate(vn6(0:jx+1,0:jy+1))
-                allocate(wn6(0:jx+1,0:jy+1))
-                allocate(rhovn6(nscal,0:jx+1,0:jy+1))
+                allocate(un6(0:n1+1,0:n2+1))
+                allocate(vn6(0:n1+1,0:n2+1))
+                allocate(wn6(0:n1+1,0:n2+1))
+                allocate(rhovn6(nscal,0:n1+1,0:n2+1))
                 un6 = 0.
                 vn6 = 0.
                 wn6 = 0.
@@ -448,7 +448,7 @@ contains
         !     side 1
         if(infout1 /= 0)then
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
 
                     u(0,j,k)=up1(j,k)
                     v(0,j,k)=vp1(j,k)
@@ -464,14 +464,14 @@ contains
         !     side 1
         if(infout2 /= 0)then
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
 
-                    u(jx+1,j,k)=up2(j,k)
-                    v(jx+1,j,k)=vp2(j,k)
-                    w(jx+1,j,k)=wp2(j,k)
+                    u(n1+1,j,k)=up2(j,k)
+                    v(n1+1,j,k)=vp2(j,k)
+                    w(n1+1,j,k)=wp2(j,k)
 
                     do isc=1,nscal
-                        rhov(isc,jx+1,j,k)=rhovp2(isc,j,k)
+                        rhov(isc,n1+1,j,k)=rhovp2(isc,j,k)
                     end do
                 end do
             end do
@@ -480,8 +480,8 @@ contains
         !     sides 5
         if(infout5 /= 0)then
             if(myid==0)then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         u(i,j,0)=up5(i,j)
                         v(i,j,0)=vp5(i,j)
                         w(i,j,0)=wp5(i,j)
@@ -496,13 +496,13 @@ contains
         !     sides 6
         if(infout6 /= 0)then
             if(myid==nproc-1)then
-                do j=1,jy
-                    do i=1,jx
-                        u(i,j,jz+1)=up6(i,j)
-                        v(i,j,jz+1)=vp6(i,j)
-                        w(i,j,jz+1)=wp6(i,j)
+                do j=1,n2
+                    do i=1,n1
+                        u(i,j,n3+1)=up6(i,j)
+                        v(i,j,n3+1)=vp6(i,j)
+                        w(i,j,n3+1)=wp6(i,j)
                         do isc=1,nscal
-                            rhov(isc,i,j,jz+1)=rhovp6(isc,i,j)
+                            rhov(isc,i,j,n3+1)=rhovp6(isc,i,j)
                         end do
                     end do
                 end do
@@ -530,22 +530,22 @@ contains
 
         real dist1,dist2,dist_tot
 
-        real x_p0(0:jx,0:jy)
-        real y_p0(0:jx,0:jy)
-        real z_p0(0:jx,0:jy)
+        real x_p0(0:n1,0:n2)
+        real y_p0(0:n1,0:n2)
+        real z_p0(0:n1,0:n2)
 
-        real x_pjz(0:jx,0:jy)
-        real y_pjz(0:jx,0:jy)
-        real z_pjz(0:jx,0:jy)
+        real x_pjz(0:n1,0:n2)
+        real y_pjz(0:n1,0:n2)
+        real z_pjz(0:n1,0:n2)
 
         real r_ew,r_sn
 
-        real buffer(3*(jx+1)*(jy+1))
+        real buffer(3*(n1+1)*(n2+1))
         integer icount,numcount
         integer ierr
         !-----------------------------------------------------------------------
 
-        numcount = (jx+1)*(jy+1)
+        numcount = (n1+1)*(n2+1)
 
         !     plane comunication
         !     plane 0
@@ -553,8 +553,8 @@ contains
         if(myid==0)then
 
             k=0
-            do j=0,jy
-                do i=0,jx
+            do j=0,n2
+                do i=0,n1
                     x_p0(i,j)=x(i,j,k)
                     y_p0(i,j)=y(i,j,k)
                     z_p0(i,j)=z(i,j,k)
@@ -562,8 +562,8 @@ contains
             end do
 
             icount = 1
-            do j=0,jy
-                do i=0,jx
+            do j=0,n2
+                do i=0,n1
                     buffer(           icount) = x_p0(i,j)
                     buffer(  numcount+icount) = y_p0(i,j)
                     buffer(2*numcount+icount) = z_p0(i,j)
@@ -576,8 +576,8 @@ contains
         call MPI_BCAST(buffer(1),3*numcount,MPI_REAL_SD,0,MPI_COMM_WORLD,ierr)
 
         icount = 1
-        do j=0,jy
-            do i=0,jx
+        do j=0,n2
+            do i=0,n1
                 x_p0(i,j) = buffer(           icount)
                 y_p0(i,j) = buffer(  numcount+icount)
                 z_p0(i,j) = buffer(2*numcount+icount)
@@ -592,9 +592,9 @@ contains
         buffer = 0.
         if(myid==nproc-1)then
 
-            k=jz
-            do j=0,jy
-                do i=0,jx
+            k=n3
+            do j=0,n2
+                do i=0,n1
                     x_pjz(i,j)=x(i,j,k)
                     y_pjz(i,j)=y(i,j,k)
                     z_pjz(i,j)=z(i,j,k)
@@ -602,8 +602,8 @@ contains
             end do
 
             icount = 1
-            do j=0,jy
-                do i=0,jx
+            do j=0,n2
+                do i=0,n1
                     buffer(           icount) = x_pjz(i,j)
                     buffer(  numcount+icount) = y_pjz(i,j)
                     buffer(2*numcount+icount) = z_pjz(i,j)
@@ -616,8 +616,8 @@ contains
         call MPI_BCAST(buffer(1),3*numcount,MPI_REAL_SD,nproc-1,MPI_COMM_WORLD,ierr)
 
         icount = 1
-        do j=0,jy
-            do i=0,jx
+        do j=0,n2
+            do i=0,n1
                 x_pjz(i,j) = buffer(           icount)
                 y_pjz(i,j) = buffer(  numcount+icount)
                 z_pjz(i,j) = buffer(2*numcount+icount)
@@ -630,16 +630,16 @@ contains
         !
         if(myid==0)write(*,*)'ENTRO'
         !     interpolation
-        do j=1,jy
+        do j=1,n2
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
                     do isc= 1,nscal
 
                         xp1 = .5*(x(0 ,j,k)+x(0 ,j,k-1))
                         zp1 = .5*(z(0 ,j,k)+z(0 ,j,k-1))
 
-                        xp2 = .5*(x(jx,j,k)+x(jx,j,k-1))
-                        zp2 = .5*(z(jx,j,k)+z(jx,j,k-1))
+                        xp2 = .5*(x(n1,j,k)+x(n1,j,k-1))
+                        zp2 = .5*(z(n1,j,k)+z(n1,j,k-1))
 
                         xc = .25*(x(i,j,k)+x(i,j,k-1)+x(i-1,j,k-1)+x(i-1,j,k))
                         zc = .25*(z(i,j,k)+z(i,j,k-1)+z(i-1,j,k-1)+z(i-1,j,k))
@@ -699,7 +699,7 @@ contains
         if(infout1 /=0)then
             i=0
             do k=kparasta-1,kparaend+1 !0,jz+1
-                do j=0,jy+1
+                do j=0,n2+1
                     up1(j,k)=(delta_r*uo1(j,k)+delta_l*un1(j,k))*inv_timewindow*index_out1(j,k)
 
                     vp1(j,k)=(delta_r*vo1(j,k)+delta_l*vn1(j,k))*inv_timewindow*index_out1(j,k)
@@ -718,9 +718,9 @@ contains
 
         !     side 2
         if(infout2 /=0)then
-            i=jx+1
+            i=n1+1
             do k=kparasta-1,kparaend+1 !0,jz+1
-                do j=0,jy+1
+                do j=0,n2+1
                     up2(j,k)=(delta_r*uo2(j,k)+delta_l*un2(j,k))*inv_timewindow*index_out2(j,k)
 
                     vp2(j,k)=(delta_r*vo2(j,k)+delta_l*vn2(j,k))*inv_timewindow*index_out2(j,k)
@@ -742,8 +742,8 @@ contains
         if(infout5 /=0)then
             if(myid==0)then
                 k=0
-                do j=0,jy+1
-                    do i=0,jx+1
+                do j=0,n2+1
+                    do i=0,n1+1
                         up5(i,j)=(delta_r*uo5(i,j)+delta_l*un5(i,j))*inv_timewindow*index_out5(i,j)
 
                         vp5(i,j)=(delta_r*vo5(i,j)+delta_l*vn5(i,j))*inv_timewindow*index_out5(i,j)
@@ -764,9 +764,9 @@ contains
         !     side 6
         if(infout6 /=0)then
             if(myid==nproc-1)then
-                k=jz+1
-                do j=0,jy+1
-                    do i=0,jx+1
+                k=n3+1
+                do j=0,n2+1
+                    do i=0,n1+1
                         up6(i,j)=(delta_r*uo6(i,j)+delta_l*un6(i,j))*inv_timewindow*index_out6(i,j)
 
                         vp6(i,j)=(delta_r*vo6(i,j)+delta_l*vn6(i,j))*inv_timewindow*index_out6(i,j)
@@ -812,7 +812,7 @@ contains
         !     side 1
         if(infout1 /= 0)then
             do k=kparasta,kparaend !1,jz
-                do j=1,jy
+                do j=1,n2
 
                     uc(0,j,k)=csx(0,j,k)*uo1(j,k)+csy(0,j,k)*vo1(j,k)+csz(0,j,k)*wo1(j,k)
                     ucp1(j,k)=uc(0,j,k)
@@ -824,10 +824,10 @@ contains
         !     side 2
         if(infout2 /= 0)then
             do k=kparasta,kparaend !1,jz
-                do j=1,jy
+                do j=1,n2
 
-                    uc(jx,j,k)=csx(jx,j,k)*uo2(j,k)+csy(jx,j,k)*vo2(j,k)+csz(jx,j,k)*wo2(j,k)
-                    ucp2(j,k)=uc(jx,j,k)
+                    uc(n1,j,k)=csx(n1,j,k)*uo2(j,k)+csy(n1,j,k)*vo2(j,k)+csz(n1,j,k)*wo2(j,k)
+                    ucp2(j,k)=uc(n1,j,k)
 
                 enddo
             enddo
@@ -836,7 +836,7 @@ contains
         !
         ! flux J-1*V
         vc(:,0,:)=0.
-        vc(:,jy,:)=0.
+        vc(:,n2,:)=0.
         !
         !
         ! flux J-1*W
@@ -845,8 +845,8 @@ contains
         if(infout5 /= 0)then
             if(myid.eq.0)then
 
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         wc(i,j,0)=ztx(i,j,0)*uo5(i,j)+zty(i,j,0)*vo5(i,j)+ztz(i,j,0)*wo5(i,j)
                         wcp5(i,j)=wc(i,j,0)
                     enddo
@@ -859,10 +859,10 @@ contains
         if(infout6 /= 0)then
             if(myid.eq.nproc-1)then
 
-                do j=1,jy
-                    do i=1,jx
-                        wc(i,j,jz)=ztx(i,j,jz)*uo6(i,j)+zty(i,j,jz)*vo6(i,j)+ztz(i,j,jz)*wo6(i,j)
-                        wcp6(i,j)=wc(i,j,jz)
+                do j=1,n2
+                    do i=1,n1
+                        wc(i,j,n3)=ztx(i,j,n3)*uo6(i,j)+zty(i,j,n3)*vo6(i,j)+ztz(i,j,n3)*wo6(i,j)
+                        wcp6(i,j)=wc(i,j,n3)
                     enddo
                 enddo
 
@@ -895,7 +895,7 @@ contains
         !     side 1
         if(infout1 /= 0)then
             do k=kparasta,kparaend !1,jz
-                do j=1,jy
+                do j=1,n2
 
                     uc(0,j,k)=csx(0,j,k)*up1(j,k)+csy(0,j,k)*vp1(j,k)+csz(0,j,k)*wp1(j,k)
                     ucp1(j,k)=uc(0,j,k)
@@ -906,10 +906,10 @@ contains
         !    side 2
         if(infout2 /= 0)then
             do k=kparasta,kparaend !1,jz
-                do j=1,jy
+                do j=1,n2
 
-                    uc(jx,j,k)=csx(jx,j,k)*up2(j,k)+csy(jx,j,k)*vp2(j,k)+csz(jx,j,k)*wp2(j,k)
-                    ucp2(j,k)=uc(jx,j,k)
+                    uc(n1,j,k)=csx(n1,j,k)*up2(j,k)+csy(n1,j,k)*vp2(j,k)+csz(n1,j,k)*wp2(j,k)
+                    ucp2(j,k)=uc(n1,j,k)
 
                 enddo
             enddo
@@ -917,7 +917,7 @@ contains
         !
         ! flux J-1*V
         vc(:,0,:)=0.
-        vc(:,jy,:)=0.
+        vc(:,n2,:)=0.
         !
         !
         ! flux J-1*W
@@ -926,8 +926,8 @@ contains
         if(infout5 /= 0)then
             if(myid.eq.0)then
 
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         wc(i,j,0)=ztx(i,j,0)*up5(i,j)+zty(i,j,0)*vp5(i,j)+ztz(i,j,0)*wp5(i,j)
                         wcp5(i,j)=wc(i,j,0)
                     enddo
@@ -940,10 +940,10 @@ contains
         if(infout6 /= 0)then
             if(myid.eq.nproc-1)then
 
-                do j=1,jy
-                    do i=1,jx
-                        wc(i,j,jz)=ztx(i,j,jz)*up6(i,j)+zty(i,j,jz)*vp6(i,j)+ztz(i,j,jz)*wp6(i,j)
-                        wcp6(i,j)=wc(i,j,jz)
+                do j=1,n2
+                    do i=1,n1
+                        wc(i,j,n3)=ztx(i,j,n3)*up6(i,j)+zty(i,j,n3)*vp6(i,j)+ztz(i,j,n3)*wp6(i,j)
+                        wcp6(i,j)=wc(i,j,n3)
                     enddo
                 enddo
 
@@ -981,8 +981,8 @@ contains
 
                 read(  81,*)ti_pom_new
 
-                do k=0,jz+1
-                    do j=0,jy+1
+                do k=0,n3+1
+                    do j=0,n2+1
                         read(  81,*)var1,var2,var3,var4,(var(n),n=1,nscal)
 
                         if(k.ge.kparasta.and.k.le.kparaend)then
@@ -1004,8 +1004,8 @@ contains
 
                 read(  82,*)ti_pom_new
 
-                do k=0,jz+1
-                    do j=0,jy+1
+                do k=0,n3+1
+                    do j=0,n2+1
                         read(   82,*)var1,var2,var3,var4,(var(n),n=1,nscal)
                         if(k.ge.kparasta.and.k.le.kparaend)then
                             un2(j,k) = var1*index_out2(j,k)
@@ -1025,8 +1025,8 @@ contains
             if(infout5 /= 0)then
                 read(  85,*)ti_pom_new
 
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
                         read( 85,*)var1,var2,var3,var4,(var(n),n=1,nscal)
 
@@ -1046,8 +1046,8 @@ contains
             if(infout6 /= 0)then
                 read(  86,*)ti_pom_new
 
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
                         read( 86,*)var1,var2,var3,var4,(var(n),n=1,nscal)
 

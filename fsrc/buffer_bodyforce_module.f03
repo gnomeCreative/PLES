@@ -2,15 +2,11 @@ module buffer_bodyforce_module
 
     use,intrinsic :: iso_c_binding
 
-    use mysending
     use myarrays_velo3
     use contour_module
-    !use nesting_module
     use orlansky_module
-    !
+
     use scala3
-    !
-    use mpi
 
     implicit none
 
@@ -77,7 +73,6 @@ contains
         ! generates a coloured noise to start turbulence from tke information
         ! tke comes from a RANS model, this sub is used for nesting procedure
 
-        use mysending
         use myarrays_metri3
 
         implicit none
@@ -135,7 +130,7 @@ contains
         nti=100
 
         ! check sponge region dimension in i and k directions
-        if (kspon>jz/nproc .and. myid==0) then
+        if (kspon>n3/nproc .and. myid==0) then
             write(*,*)'NESTING PROBLEM'
             write(*,*)'program not suited to have a sponge region'
             write(*,*)'larger than the processor z allocation'
@@ -146,30 +141,30 @@ contains
         !     allocation and initialization
         if (ktime==1) then
 
-            allocate(bcsi_f1(ispon,jy,kparasta:kparaend))
-            allocate(beta_f1(ispon,jy,kparasta:kparaend))
-            allocate(bzet_f1(ispon,jy,kparasta:kparaend))
+            allocate(bcsi_f1(ispon,n2,kparasta:kparaend))
+            allocate(beta_f1(ispon,n2,kparasta:kparaend))
+            allocate(bzet_f1(ispon,n2,kparasta:kparaend))
             bcsi_f1(:,:,:)=0.0
             beta_f1(:,:,:)=0.0
             bzet_f1(:,:,:)=0.0
 
-            allocate(bcsi_f2(jx-ispon+1:jx,jy,kparasta:kparaend))
-            allocate(beta_f2(jx-ispon+1:jx,jy,kparasta:kparaend))
-            allocate(bzet_f2(jx-ispon+1:jx,jy,kparasta:kparaend))
+            allocate(bcsi_f2(n1-ispon+1:n1,n2,kparasta:kparaend))
+            allocate(beta_f2(n1-ispon+1:n1,n2,kparasta:kparaend))
+            allocate(bzet_f2(n1-ispon+1:n1,n2,kparasta:kparaend))
             bcsi_f2(:,:,:)=0.0
             beta_f2(:,:,:)=0.0
             bzet_f2(:,:,:)=0.0
 
-            allocate(bcsi_f5(jx,jy,kspon))
-            allocate(beta_f5(jx,jy,kspon))
-            allocate(bzet_f5(jx,jy,kspon))
+            allocate(bcsi_f5(n1,n2,kspon))
+            allocate(beta_f5(n1,n2,kspon))
+            allocate(bzet_f5(n1,n2,kspon))
             bcsi_f5(:,:,:)=0.0
             beta_f5(:,:,:)=0.0
             bzet_f5(:,:,:)=0.0
 
-            allocate(bcsi_f6(jx,jy,jz-kspon+1:jz))
-            allocate(beta_f6(jx,jy,jz-kspon+1:jz))
-            allocate(bzet_f6(jx,jy,jz-kspon+1:jz))
+            allocate(bcsi_f6(n1,n2,n3-kspon+1:n3))
+            allocate(beta_f6(n1,n2,n3-kspon+1:n3))
+            allocate(bzet_f6(n1,n2,n3-kspon+1:n3))
             bcsi_f6(:,:,:)=0.0
             beta_f6(:,:,:)=0.0
             bzet_f6(:,:,:)=0.0
@@ -209,7 +204,7 @@ contains
         L_d=(x(ispon,1,kparasta)-x(0,1,kparasta))
         !      if (myid==0)write(*,*)'L_d face 1 ',L_d
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 do i=1,ispon
                     local_dump(i,j,k)=x(i,j,k)-x(0,j,k)
                     local_dump(i,j,k)=1.0-local_dump(i,j,k)/L_d
@@ -222,12 +217,12 @@ contains
 
         ! face 2
         allocate(local_dump(n1+1-ispon:n1,n2,kparasta:kparaend))
-        L_d=(x(jx,1,kparasta)-x(jx-ispon,1,kparasta))
+        L_d=(x(n1,1,kparasta)-x(n1-ispon,1,kparasta))
         !      if (myid==0)write(*,*)'L_d face 2 ',L_d
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx+1-ispon,jx  !1,ispon
-                    local_dump(i,j,k)=x(jx,j,k) - x(i-1,j,k)
+            do j=1,n2
+                do i=n1+1-ispon,n1  !1,ispon
+                    local_dump(i,j,k)=x(n1,j,k) - x(i-1,j,k)
                     local_dump(i,j,k)=1. - local_dump(i,j,k) / L_d
                 end do
             end do
@@ -242,8 +237,8 @@ contains
             L_d=(z(1,1,kspon)-z(1,1,0))
             !      if (myid==0)write(*,*)'L_d face 5 ',L_d
             do k=1,kspon !kparasta,kparaend
-                do j=1,jy
-                    do i=1,jx  !ispon
+                do j=1,n2
+                    do i=1,n1  !ispon
                         local_dump(i,j,k)=z(i,j,k) - z(i,j,0)
                         local_dump(i,j,k)=1. - local_dump(i,j,k) / L_d
                     !    if (i==1 .and. j==10) then
@@ -262,12 +257,12 @@ contains
         ! face 6
         if (myid==nproc-1) then
             allocate(local_dump(n1,n2,n3+1-kspon:n3))
-            L_d=(z(1,1,jz)-z(1,1,jz-kspon))
+            L_d=(z(1,1,n3)-z(1,1,n3-kspon))
             !      if (myid==nproc-1)write(*,*)'L_d face 6 ',L_d
-            do k=jz+1-kspon,jz !1,kspon !kparasta,kparaend
-                do j=1,jy
-                    do i=1,jx  !ispon
-                        local_dump(i,j,k)=z(i,j,jz) - z(i,j,k-1)
+            do k=n3+1-kspon,n3 !1,kspon !kparasta,kparaend
+                do j=1,n2
+                    do i=1,n1  !ispon
+                        local_dump(i,j,k)=z(i,j,n3) - z(i,j,k-1)
                         local_dump(i,j,k)=1. - local_dump(i,j,k) / L_d
                     !    if (i==1 .and. j==10) then
                     !       write(453,*)k,local_dump(i,j,k)
@@ -283,13 +278,13 @@ contains
 
 
         !----------------------------------------------------------------
-        allocate( var_prov(jx+1-ispon:jx,jy,kparasta:kparaend))
-        allocate(var_prov2(jx+1-ispon:jx,jy,kparasta:kparaend))
+        allocate( var_prov(n1+1-ispon:n1,n2,kparasta:kparaend))
+        allocate(var_prov2(n1+1-ispon:n1,n2,kparasta:kparaend))
         allocate(local_dump(n1+1-ispon:n1,n2,kparasta:kparaend))
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx+1-ispon,jx  !1,ispon
+            do j=1,n2
+                do i=n1+1-ispon,n1  !1,ispon
                     var_prov(i,j,k)=annit(i,j,k)
                     var_prov2(i,j,k)=annitV(i,j,k)
                 end do
@@ -297,10 +292,10 @@ contains
         end do
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx+1-ispon,jx  !1,ispon
+            do j=1,n2
+                do i=n1+1-ispon,n1  !1,ispon
                     !         local_dump(i,j,k)=x(jx,j,k) - x(i-1,j,k)
-                    local_dump(i,j,k)=(x(jx,j,k) - x(i-1,j,k) ) -  L_d
+                    local_dump(i,j,k)=(x(n1,j,k) - x(i-1,j,k) ) -  L_d
                     local_dump(i,j,k)=1. - local_dump(i,j,k) * L_d
                 end do
             end do
@@ -309,8 +304,8 @@ contains
         call sponge_dumping_visco(ispon,n2,n3/nproc,local_dump,var_prov,var_prov,var_prov2)
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx+1-ispon,jx  !1,ispon
+            do j=1,n2
+                do i=n1+1-ispon,n1  !1,ispon
                 !          annit(i,j,k)= var_prov(i,j,k)
                 !         annitV(i,j,k)=var_prov2(i,j,k)
                 end do
@@ -329,7 +324,7 @@ contains
         apply_dist1=0.0
         apply_dist2=0.0
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                          !side 1
                 ! uc>0 inflow; uc<0 outflow
                 !inflow  mass_sign=1
@@ -345,7 +340,7 @@ contains
                 ! uc<0 inflow; uc>0 outflow
                 !inflow  mass_sign=1
                 !outflow mass_sign =-1
-                mass_sign=-int(sign(1.,uc(jx,j,k)))
+                mass_sign=-int(sign(1.,uc(n1,j,k)))
 
                 !inflow  apply_dist=1.
                 !outflow apply_dist=0.
@@ -355,8 +350,8 @@ contains
 
         if (myid==0) then
             apply_dist5=0.
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                              !side 5
                     ! wc>0 inflow; wc<0 outflow
                     !inflow  mass_sign=1
@@ -372,13 +367,13 @@ contains
 
         if (myid==nproc-1) then
             apply_dist6=0.
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                              !side 6
                     ! wc<0 inflow; wc>0 outflow
                     !inflow  mass_sign=1
                     !outflow mass_sign =-1
-                    mass_sign=- INT(sign(1.,wc(i,j,jz)))
+                    mass_sign=- INT(sign(1.,wc(i,j,n3)))
 
                     !inflow  apply_dist=1.
                     !outflow apply_dist=0.
@@ -392,7 +387,7 @@ contains
 
         ! sponge in front of face 1
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 do i=1,ispon
 
                     bcsi(i,j,k)=bcsi(i,j,k) + bcsi_f1(i,j,k)*apply_dist1(j,k)
@@ -405,8 +400,8 @@ contains
 
         ! sponge in front of face 2
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx-ispon+1,jx
+            do j=1,n2
+                do i=n1-ispon+1,n1
 
                     bcsi(i,j,k)=bcsi(i,j,k) + bcsi_f2(i,j,k)*apply_dist2(j,k)
                     beta(i,j,k)=beta(i,j,k) + beta_f2(i,j,k)*apply_dist2(j,k)
@@ -419,8 +414,8 @@ contains
         ! sponge in front of face 5
         if (myid==0) then
             do k=1,kspon
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
                         bcsi(i,j,k)=bcsi(i,j,k) + bcsi_f5(i,j,k)*apply_dist5(i,j)
                         beta(i,j,k)=beta(i,j,k) + beta_f5(i,j,k)*apply_dist5(i,j)
@@ -433,9 +428,9 @@ contains
 
         ! sponge in front of face 6
         if (myid==nproc-1) then
-            do k=jz-kspon+1,jz
-                do j=1,jy
-                    do i=1,jx
+            do k=n3-kspon+1,n3
+                do j=1,n2
+                    do i=1,n1
 
                         bcsi(i,j,k)=bcsi(i,j,k) + bcsi_f6(i,j,k)*apply_dist6(i,j)
                         beta(i,j,k)=beta(i,j,k) + beta_f6(i,j,k)*apply_dist6(i,j)
@@ -613,43 +608,43 @@ contains
 
             !       face 1
             !       in x in space and time
-            nreal=jy*jz/nproc
+            nreal=n2*n3/nproc
             nstep=nti
             allocate(noise_f1_xtime(nreal,-1:nstep*2))
             allocate(old_noise_f1_xtime(nreal))
             noise_f1_xtime     =0.
             old_noise_f1_xtime =0.
 
-            nreal=jy*jz/nproc
+            nreal=n2*n3/nproc
             nstep=ispon
             allocate(noise_f1_xspace(nreal,-1:nstep*2))
             noise_f1_xspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f1_xspace,myid)
 
             !       in y in space and time
-            nreal=ispon*jz/nproc
+            nreal=ispon*n3/nproc
             nstep=nti
             allocate(noise_f1_ytime(nreal,-1:nstep*2))
             allocate(old_noise_f1_ytime(nreal))
             noise_f1_ytime    =0.
             old_noise_f1_ytime=0.
 
-            nreal=ispon*jz/nproc
-            nstep=jy
+            nreal=ispon*n3/nproc
+            nstep=n2
             allocate(noise_f1_yspace(nreal,-1:nstep*2))
             noise_f1_yspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f1_yspace,myid)
 
             !       in z in space and time
-            nreal=jy*ispon
+            nreal=n2*ispon
             nstep=nti
             allocate(noise_f1_ztime(nreal,-1:nstep*2))
             allocate(old_noise_f1_ztime(nreal))
             noise_f1_ztime    =0.
             old_noise_f1_ztime=0.
 
-            nreal=jy*ispon
-            nstep=jz/nproc
+            nreal=n2*ispon
+            nstep=n3/nproc
             allocate(noise_f1_zspace(nreal,-1:nstep*2))
             noise_f1_zspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f1_zspace,myid)
@@ -662,7 +657,7 @@ contains
             if (myid==0)write(*,*)'TIME',ktime,ntime
             cont=0
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     cont=cont + 1
                     old_noise_f1_xtime(cont)=noise_f1_xtime(cont,ntime)
                 end do
@@ -677,7 +672,7 @@ contains
             end do
 
             cont=0
-            do j=1,jy
+            do j=1,n2
                 do i=1,ispon
                     cont=cont + 1
                     old_noise_f1_ztime(cont)=noise_f1_ztime(cont,ntime)
@@ -693,19 +688,19 @@ contains
             !      corr_factor=100.
 
             !     in x in time
-            nreal=jy*jz/nproc
+            nreal=n2*n3/nproc
             nstep=nti
             noise_f1_xtime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f1_xtime,myid)
 
             !     in y in time
-            nreal=ispon*jz/nproc
+            nreal=ispon*n3/nproc
             nstep=nti
             noise_f1_ytime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f1_ytime,myid)
 
             !     in z in time
-            nreal=jy*ispon
+            nreal=n2*ispon
             nstep=nti
             noise_f1_ztime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f1_ztime,myid)
@@ -718,7 +713,7 @@ contains
             do ntime=1,nti*2
                 cont=0
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         cont=cont + 1
                         noise_f1_xtime(cont,ntime)=noise_f1_xtime(cont,ntime)+(old_noise_f1_xtime(cont)-noise_f1_xtime(cont,1))
                     end do
@@ -733,7 +728,7 @@ contains
                 end do
 
                 cont=0
-                do j=1,jy
+                do j=1,n2
                     do i=1,ispon
                         cont=cont + 1
                         noise_f1_ztime(cont,ntime)=noise_f1_ztime(cont,ntime)+(old_noise_f1_ztime(cont)-noise_f1_ztime(cont,1))
@@ -753,7 +748,7 @@ contains
         meanz=0.
         cont_mean=0
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 do i=1,ispon
                     cont_mean=cont_mean + 1
                     meanx=meanx + coef_x(i,j,k)
@@ -770,7 +765,7 @@ contains
         dev_y=0.
         dev_z=0.
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 do i=1,ispon
                     coef_x(i,j,k)=coef_x(i,j,k)-meanx
                     coef_y(i,j,k)=coef_y(i,j,k)-meany
@@ -790,7 +785,7 @@ contains
         var_y=0.05
         var_z=0.05
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 do i=1,ispon
                     coef_x(i,j,k)=coef_x(i,j,k)*var_x/dev_x
                     coef_y(i,j,k)=coef_y(i,j,k)*var_y/dev_y
@@ -810,7 +805,7 @@ contains
 
 
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 do i=1,ispon
 
                     if (index_out1(j,k)>0.01) then
@@ -997,43 +992,43 @@ contains
 
             !       face 1
             !       in x in space and time
-            nreal=jy*jz/nproc
+            nreal=n2*n3/nproc
             nstep=nti
             allocate(noise_f2_xtime(nreal,-1:nstep*2))
             allocate(old_noise_f2_xtime(nreal))
             noise_f2_xtime     =0.
             old_noise_f2_xtime =0.
 
-            nreal=jy*jz/nproc
+            nreal=n2*n3/nproc
             nstep=ispon
             allocate(noise_f2_xspace(nreal,-1:nstep*2))
             noise_f2_xspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f2_xspace,myid)
 
             !       in y in space and time
-            nreal=ispon*jz/nproc
+            nreal=ispon*n3/nproc
             nstep=nti
             allocate(noise_f2_ytime(nreal,-1:nstep*2))
             allocate(old_noise_f2_ytime(nreal))
             noise_f2_ytime    =0.
             old_noise_f2_ytime=0.
 
-            nreal=ispon*jz/nproc
-            nstep=jy
+            nreal=ispon*n3/nproc
+            nstep=n2
             allocate(noise_f2_yspace(nreal,-1:nstep*2))
             noise_f2_yspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f2_yspace,myid)
 
             !       in z in space and time
-            nreal=jy*ispon
+            nreal=n2*ispon
             nstep=nti
             allocate(noise_f2_ztime(nreal,-1:nstep*2))
             allocate(old_noise_f2_ztime(nreal))
             noise_f2_ztime    =0.
             old_noise_f2_ztime=0.
 
-            nreal=jy*ispon
-            nstep=jz/nproc
+            nreal=n2*ispon
+            nstep=n3/nproc
             allocate(noise_f2_zspace(nreal,-1:nstep*2))
             noise_f2_zspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f2_zspace,myid)
@@ -1046,7 +1041,7 @@ contains
             if (myid==0)write(*,*)'TIME',ktime,ntime
             cont=0
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     cont=cont + 1
                     old_noise_f2_xtime(cont)=noise_f2_xtime(cont,ntime)
                 end do
@@ -1061,7 +1056,7 @@ contains
             end do
 
             cont=0
-            do j=1,jy
+            do j=1,n2
                 do i=1,ispon
                     cont=cont + 1
                     old_noise_f2_ztime(cont)=noise_f2_ztime(cont,ntime)
@@ -1077,19 +1072,19 @@ contains
             !      corr_factor=100.
 
             !     in x in time
-            nreal=jy*jz/nproc
+            nreal=n2*n3/nproc
             nstep=nti
             noise_f2_xtime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f2_xtime,myid)
 
             !     in y in time
-            nreal=ispon*jz/nproc
+            nreal=ispon*n3/nproc
             nstep=nti
             noise_f2_ytime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f2_ytime,myid)
 
             !     in z in time
-            nreal=jy*ispon
+            nreal=n2*ispon
             nstep=nti
             noise_f2_ztime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f2_ztime,myid)
@@ -1102,7 +1097,7 @@ contains
             do ntime=1,nti*2
                 cont=0
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         cont=cont + 1
                         noise_f2_xtime(cont,ntime)=noise_f2_xtime(cont,ntime)+(old_noise_f2_xtime(cont)-noise_f2_xtime(cont,1))
                     end do
@@ -1117,7 +1112,7 @@ contains
                 end do
 
                 cont=0
-                do j=1,jy
+                do j=1,n2
                     do i=1,ispon
                         cont=cont + 1
                         noise_f2_ztime(cont,ntime)=noise_f2_ztime(cont,ntime)+(old_noise_f2_ztime(cont)-noise_f2_ztime(cont,1))
@@ -1137,8 +1132,8 @@ contains
         meanz=0.
         cont_mean=0
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx+1-ispon,jx
+            do j=1,n2
+                do i=n1+1-ispon,n1
                     cont_mean=cont_mean + 1
                     meanx=meanx + coef_x(i,j,k)
                     meany=meany + coef_y(i,j,k)
@@ -1154,8 +1149,8 @@ contains
         dev_y=0.
         dev_z=0.
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx+1-ispon,jx
+            do j=1,n2
+                do i=n1+1-ispon,n1
                     coef_x(i,j,k)=coef_x(i,j,k)-meanx
                     coef_y(i,j,k)=coef_y(i,j,k)-meany
                     coef_z(i,j,k)=coef_z(i,j,k)-meanz
@@ -1175,8 +1170,8 @@ contains
         var_z=0.05
         !      if (myid ==0)write(*,*)'DEV:',dev_x,dev_y,dev_z
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx+1-ispon,jx
+            do j=1,n2
+                do i=n1+1-ispon,n1
                     coef_x(i,j,k)=coef_x(i,j,k)*var_x/dev_x
                     coef_y(i,j,k)=coef_y(i,j,k)*var_y/dev_y
                     coef_z(i,j,k)=coef_z(i,j,k)*var_z/dev_z
@@ -1190,8 +1185,8 @@ contains
         !      dt_tot=1./(dt1+dt2)
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=jx+1-ispon,jx  !1,ispon
+            do j=1,n2
+                do i=n1+1-ispon,n1  !1,ispon
                     if (index_out2(j,k)>0.01) then
 
                         !fluctuation
@@ -1362,42 +1357,42 @@ contains
 
             !       face 5
             !       in x in space and time
-            nreal=jy*kspon   !jy*jz/nproc
+            nreal=n2*kspon   !jy*jz/nproc
             nstep=nti
             allocate(noise_f5_xtime(nreal,-1:nstep*2))
             allocate(old_noise_f5_xtime(nreal))
             noise_f5_xtime     =0.
             old_noise_f5_xtime =0.
 
-            nreal=jy*kspon   !jy*jz/nproc
-            nstep=jx         !ispon
+            nreal=n2*kspon   !jy*jz/nproc
+            nstep=n1         !ispon
             allocate(noise_f5_xspace(nreal,-1:nstep*2))
             noise_f5_xspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f5_xspace,myid)
 
             !       in y in space and time
-            nreal=jx*kspon   !ispon*jz/nproc
+            nreal=n1*kspon   !ispon*jz/nproc
             nstep=nti
             allocate(noise_f5_ytime(nreal,-1:nstep*2))
             allocate(old_noise_f5_ytime(nreal))
             noise_f5_ytime    =0.
             old_noise_f5_ytime=0.
 
-            nreal=jx*kspon !ispon*jz/nproc
-            nstep=jy
+            nreal=n1*kspon !ispon*jz/nproc
+            nstep=n2
             allocate(noise_f5_yspace(nreal,-1:nstep*2))
             noise_f5_yspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f5_yspace,myid)
 
             !       in z in space and time
-            nreal=jy*jx  !jy*ispon
+            nreal=n2*n1  !jy*ispon
             nstep=nti
             allocate(noise_f5_ztime(nreal,-1:nstep*2))
             allocate(old_noise_f5_ztime(nreal))
             noise_f5_ztime    =0.
             old_noise_f5_ztime=0.
 
-            nreal=jy*jx !jy*ispon
+            nreal=n2*n1 !jy*ispon
             nstep=kspon !jz/nproc
             allocate(noise_f5_zspace(nreal,-1:nstep*2))
             noise_f5_zspace=0.
@@ -1411,7 +1406,7 @@ contains
             if (myid==0)write(*,*)'TIME',ktime,ntime
             cont=0
             do k=1,kspon !kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     cont=cont + 1
                     old_noise_f5_xtime(cont)=noise_f5_xtime(cont,ntime)
                 end do
@@ -1419,15 +1414,15 @@ contains
 
             cont=0
             do k=1,kspon !kparasta,kparaend
-                do i=1,jx  !ispon
+                do i=1,n1  !ispon
                     cont=cont + 1
                     old_noise_f5_ytime(cont)=noise_f5_ytime(cont,ntime)
                 end do
             end do
 
             cont=0
-            do j=1,jy
-                do i=1,jx  !ispon
+            do j=1,n2
+                do i=1,n1  !ispon
                     cont=cont + 1
                     old_noise_f5_ztime(cont)=noise_f5_ztime(cont,ntime)
                 end do
@@ -1442,19 +1437,19 @@ contains
             !      corr_factor=100.
 
             !     in x in time
-            nreal=jy*kspon !jy*jz/nproc
+            nreal=n2*kspon !jy*jz/nproc
             nstep=nti
             noise_f5_xtime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f5_xtime,myid)
 
             !     in y in time
-            nreal=jx*kspon !ispon*jz/nproc
+            nreal=n1*kspon !ispon*jz/nproc
             nstep=nti
             noise_f5_ytime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f5_ytime,myid)
 
             !     in z in time
-            nreal=jy*jx  !jy*ispon
+            nreal=n2*n1  !jy*ispon
             nstep=nti
             noise_f5_ztime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f5_ztime,myid)
@@ -1467,7 +1462,7 @@ contains
             do ntime=1,nti*2
                 cont=0
                 do k=1,kspon !kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         cont=cont + 1
                         noise_f5_xtime(cont,ntime)=noise_f5_xtime(cont,ntime)+(old_noise_f5_xtime(cont)-noise_f5_xtime(cont,1))
                     end do
@@ -1475,15 +1470,15 @@ contains
 
                 cont=0
                 do k=1,kspon !kparasta,kparaend
-                    do i=1,jx    !ispon
+                    do i=1,n1    !ispon
                         cont=cont + 1
                         noise_f5_ytime(cont,ntime)=noise_f5_ytime(cont,ntime)+(old_noise_f5_ytime(cont)-noise_f5_ytime(cont,1))
                     end do
                 end do
 
                 cont=0
-                do j=1,jy
-                    do i=1,jx  !ispon
+                do j=1,n2
+                    do i=1,n1  !ispon
                         cont=cont + 1
                         noise_f5_ztime(cont,ntime)=noise_f5_ztime(cont,ntime)+(old_noise_f5_ztime(cont)-noise_f5_ztime(cont,1))
                     end do
@@ -1501,8 +1496,8 @@ contains
         meanz=0.
         cont_mean=0
         do k=1,kspon !kparasta,kparaend
-            do j=1,jy
-                do i=1,jx    !ispon
+            do j=1,n2
+                do i=1,n1    !ispon
                     cont_mean=cont_mean + 1
                     meanx=meanx + coef_x(i,j,k)
                     meany=meany + coef_y(i,j,k)
@@ -1518,8 +1513,8 @@ contains
         dev_y=0.
         dev_z=0.
         do k=1,kspon !kparasta,kparaend
-            do j=1,jy
-                do i=1,jx    !ispon
+            do j=1,n2
+                do i=1,n1    !ispon
                     coef_x(i,j,k)=coef_x(i,j,k)-meanx
                     coef_y(i,j,k)=coef_y(i,j,k)-meany
                     coef_z(i,j,k)=coef_z(i,j,k)-meanz
@@ -1538,8 +1533,8 @@ contains
         var_y=0.05
         var_z=0.05
         do k=1,kspon !kparasta,kparaend
-            do j=1,jy
-                do i=1,jx    !ispon
+            do j=1,n2
+                do i=1,n1    !ispon
                     coef_x(i,j,k)=coef_x(i,j,k)*var_x/dev_x
                     coef_y(i,j,k)=coef_y(i,j,k)*var_y/dev_y
                     coef_z(i,j,k)=coef_z(i,j,k)*var_z/dev_z
@@ -1553,8 +1548,8 @@ contains
         !      dt_tot=1./(dt1+dt2)
         icount=0
         do k=1,kspon !kparasta,kparaend
-            do j=1,jy
-                do i=1,jx    !ispon
+            do j=1,n2
+                do i=1,n1    !ispon
                     if (index_out5(i,j)>0.01) then
 
                         !fluctuation
@@ -1724,42 +1719,42 @@ contains
 
             !       face 5
             !       in x in space and time
-            nreal=jy*kspon   !jy*jz/nproc
+            nreal=n2*kspon   !jy*jz/nproc
             nstep=nti
             allocate(noise_f6_xtime(nreal,-1:nstep*2))
             allocate(old_noise_f6_xtime(nreal))
             noise_f6_xtime     =0.
             old_noise_f6_xtime =0.
 
-            nreal=jy*kspon   !jy*jz/nproc
-            nstep=jx         !ispon
+            nreal=n2*kspon   !jy*jz/nproc
+            nstep=n1         !ispon
             allocate(noise_f6_xspace(nreal,-1:nstep*2))
             noise_f6_xspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f6_xspace,myid)
 
             !       in y in space and time
-            nreal=jx*kspon   !ispon*jz/nproc
+            nreal=n1*kspon   !ispon*jz/nproc
             nstep=nti
             allocate(noise_f6_ytime(nreal,-1:nstep*2))
             allocate(old_noise_f6_ytime(nreal))
             noise_f6_ytime    =0.
             old_noise_f6_ytime=0.
 
-            nreal=jx*kspon !ispon*jz/nproc
-            nstep=jy
+            nreal=n1*kspon !ispon*jz/nproc
+            nstep=n2
             allocate(noise_f6_yspace(nreal,-1:nstep*2))
             noise_f6_yspace=0.
             call genero_random(corr_factor_sp,nreal,nstep,noise_f6_yspace,myid)
 
             !       in z in space and time
-            nreal=jy*jx  !jy*ispon
+            nreal=n2*n1  !jy*ispon
             nstep=nti
             allocate(noise_f6_ztime(nreal,-1:nstep*2))
             allocate(old_noise_f6_ztime(nreal))
             noise_f6_ztime    =0.
             old_noise_f6_ztime=0.
 
-            nreal=jy*jx !jy*ispon
+            nreal=n2*n1 !jy*ispon
             nstep=kspon !jz/nproc
             allocate(noise_f6_zspace(nreal,-1:nstep*2))
             noise_f6_zspace=0.
@@ -1773,7 +1768,7 @@ contains
             if (myid==0)write(*,*)'TIME',ktime,ntime
             cont=0
             do k=1,kspon !kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     cont=cont + 1
                     old_noise_f6_xtime(cont)=noise_f6_xtime(cont,ntime)
                 end do
@@ -1781,15 +1776,15 @@ contains
 
             cont=0
             do k=1,kspon !kparasta,kparaend
-                do i=1,jx  !ispon
+                do i=1,n1  !ispon
                     cont=cont + 1
                     old_noise_f6_ytime(cont)=noise_f6_ytime(cont,ntime)
                 end do
             end do
 
             cont=0
-            do j=1,jy
-                do i=1,jx  !ispon
+            do j=1,n2
+                do i=1,n1  !ispon
                     cont=cont + 1
                     old_noise_f6_ztime(cont)=noise_f6_ztime(cont,ntime)
                 end do
@@ -1804,19 +1799,19 @@ contains
             !      corr_factor=100.
 
             !     in x in time
-            nreal=jy*kspon !jy*jz/nproc
+            nreal=n2*kspon !jy*jz/nproc
             nstep=nti
             noise_f6_xtime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f6_xtime,myid)
 
             !     in y in time
-            nreal=jx*kspon !ispon*jz/nproc
+            nreal=n1*kspon !ispon*jz/nproc
             nstep=nti
             noise_f6_ytime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f6_ytime,myid)
 
             !     in z in time
-            nreal=jy*jx  !jy*ispon
+            nreal=n2*n1  !jy*ispon
             nstep=nti
             noise_f6_ztime=0.
             call genero_random(corr_factor,nreal,nstep,noise_f6_ztime,myid)
@@ -1829,7 +1824,7 @@ contains
             do ntime=1,nti*2
                 cont=0
                 do k=1,kspon !kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         cont=cont + 1
                         noise_f6_xtime(cont,ntime)=noise_f6_xtime(cont,ntime)+(old_noise_f6_xtime(cont)-noise_f6_xtime(cont,1))
                     end do
@@ -1837,15 +1832,15 @@ contains
 
                 cont=0
                 do k=1,kspon !kparasta,kparaend
-                    do i=1,jx    !ispon
+                    do i=1,n1    !ispon
                         cont=cont + 1
                         noise_f6_ytime(cont,ntime)=noise_f6_ytime(cont,ntime)+(old_noise_f6_ytime(cont)-noise_f6_ytime(cont,1))
                     end do
                 end do
 
                 cont=0
-                do j=1,jy
-                    do i=1,jx  !ispon
+                do j=1,n2
+                    do i=1,n1  !ispon
                         cont=cont + 1
                         noise_f6_ztime(cont,ntime)=noise_f6_ztime(cont,ntime)+(old_noise_f6_ztime(cont)-noise_f6_ztime(cont,1))
                     end do
@@ -1862,9 +1857,9 @@ contains
         meany=0.
         meanz=0.
         cont_mean=0
-        do k=jz+1-kspon,jz !1,kspon !kparasta,kparaend
-            do j=1,jy
-                do i=1,jx    !ispon
+        do k=n3+1-kspon,n3 !1,kspon !kparasta,kparaend
+            do j=1,n2
+                do i=1,n1    !ispon
                     cont_mean=cont_mean + 1
                     meanx=meanx + coef_x(i,j,k)
                     meany=meany + coef_y(i,j,k)
@@ -1879,9 +1874,9 @@ contains
         dev_x=0.
         dev_y=0.
         dev_z=0.
-        do k=jz+1-kspon,jz !1,kspon !kparasta,kparaend
-            do j=1,jy
-                do i=1,jx    !ispon
+        do k=n3+1-kspon,n3 !1,kspon !kparasta,kparaend
+            do j=1,n2
+                do i=1,n1    !ispon
                     coef_x(i,j,k)=coef_x(i,j,k)-meanx
                     coef_y(i,j,k)=coef_y(i,j,k)-meany
                     coef_z(i,j,k)=coef_z(i,j,k)-meanz
@@ -1899,9 +1894,9 @@ contains
         var_x=0.05
         var_y=0.05
         var_z=0.05
-        do k=jz+1-kspon,jz !1,kspon !kparasta,kparaend
-            do j=1,jy
-                do i=1,jx    !ispon
+        do k=n3+1-kspon,n3 !1,kspon !kparasta,kparaend
+            do j=1,n2
+                do i=1,n1    !ispon
                     coef_x(i,j,k)=coef_x(i,j,k)*var_x/dev_x
                     coef_y(i,j,k)=coef_y(i,j,k)*var_y/dev_y
                     coef_z(i,j,k)=coef_z(i,j,k)*var_z/dev_z
@@ -1914,9 +1909,9 @@ contains
         !      dt2=ti_pom_new - ti
         !      dt_tot=1./(dt1+dt2)
 
-        do k=jz+1-kspon,jz !1,kspon !kparasta,kparaend
-            do j=1,jy
-                do i=1,jx    !ispon
+        do k=n3+1-kspon,n3 !1,kspon !kparasta,kparaend
+            do j=1,n2
+                do i=1,n1    !ispon
                     if (index_out6(i,j)>0.01) then
 
                         !fluctuation
@@ -2189,7 +2184,7 @@ contains
         ! Here we use the flat distribution RAN1 also taken from Numerical Recipe
         ! but any other good flat distribution random number generator will do.
 
-        !        double precision ran1,cape,dt,l1me2,cgaussA
+        !        real ran1,cape,dt,l1me2,cgaussA
         real cape,dt,l1me2 !,cgaussA -> Alessandro
         real cortim,x
         logical white
@@ -2233,7 +2228,7 @@ contains
         !      INTEGER idum,iset
         INTEGER iset
         logical white
-        !      double precision  fac,gset,rsq,v1,v2,ran1,l1me2,h,cape
+        !      real  fac,gset,rsq,v1,v2,ran1,l1me2,h,cape
         real  fac,gset,rsq,v1,v2,l1me2,h,cape,prev
         common /color/l1me2,cape,white
 

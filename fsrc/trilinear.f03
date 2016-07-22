@@ -1,6 +1,6 @@
 module trilinear
 
-    use myarrays_metri3, only: xcd,ycd,zcd
+    use myarrays_metri3, only: centroid
     use mysending, only: myid, nproc
     use geometricRoutines
 
@@ -28,7 +28,7 @@ contains
         integer nx,ny,nz
         integer l
         integer sum_degenere,idegenere
-        integer trind(num_ib,4,3)
+        integer trind(4,3,num_ib)
 
         real trilinear_coef(4)
         real pp_position(3)
@@ -46,14 +46,13 @@ contains
         PP(:) = pp_position(:)
 
         do np = 1,4
-            il(np) = trind(l,np,1)
-            jl(np) = trind(l,np,2)
-            kl(np) = trind(l,np,3)
-            !write(*,*)'np',il(np),jl(np),kl(np)
+            il(np) = trind(np,1,l)
+            jl(np) = trind(np,2,l)
+            kl(np) = trind(np,3,l)
+
             ! point of quadrilater
-            v(np,1) = xcd(il(np),jl(np),kl(np))
-            v(np,2) = ycd(il(np),jl(np),kl(np))
-            v(np,3) = zcd(il(np),jl(np),kl(np))
+            v(np,:) = centroid(:,il(np),jl(np),kl(np))
+
         end do
         !-----------------------------------------------------------------------
         ! decide the direction for the projection 3D-2D
@@ -306,7 +305,7 @@ contains
         real,intent(out) :: F,G,H,x0,y0,z0
         logical,intent(out) :: trovato
         real,intent(out) :: pp_position(3)
-        integer,intent(out) :: trind(num_ib,4,3)
+        integer,intent(out) :: trind(4,3,num_ib)
 
         real,parameter :: tolC=1.d-12
 
@@ -351,13 +350,9 @@ contains
                     kl(np)=kbase
                 end if
 
-                v(np,1)=xcd(il(np),jl(np),kl(np))
-                v(np,2)=ycd(il(np),jl(np),kl(np))
-                v(np,3)=zcd(il(np),jl(np),kl(np))
+                v(np,:)=centroid(:,il(np),jl(np),kl(np))
 
-                vert(1,np)=xcd(il(np),jl(np),kl(np))
-                vert(2,np)=ycd(il(np),jl(np),kl(np))
-                vert(3,np)=zcd(il(np),jl(np),kl(np))
+                vert(:,np)=centroid(:,il(np),jl(np),kl(np))
 
             end do
 
@@ -437,9 +432,9 @@ contains
                             kl(np)=kbase
                         end if
 
-                        trind(l,np,1)=il(np)
-                        trind(l,np,2)=jl(np)
-                        trind(l,np,3)=kl(np)
+                        trind(np,1,l)=il(np)
+                        trind(np,2,l)=jl(np)
+                        trind(np,3,l)=kl(np)
 
                     end do
                 end if

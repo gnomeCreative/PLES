@@ -4,7 +4,7 @@ module flu_module
     use myarrays_metri3
     use myarrays_velo3
     !use wallmodel_module, only: att_mod_par, eseguo34, u_t, utangente
-    use mysettings, only: bodyforce
+    use mysettings, only: bodyforce,insc
     !
     use scala3
     use period
@@ -18,7 +18,6 @@ module flu_module
 contains
 
     subroutine flucn(r,espl,coef_wall,tipo,tau_wind)
-        !***********************************************************************
         ! compute explicit diffusive term
         !
         ! NNI*G11*D(u,v,w)/D(csi)+
@@ -58,15 +57,15 @@ contains
             !
             !     side left
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     f1(0,j,k)=es*f1(0,j,k)+annit(0,j,k)*g11(0,j,k)*(-8.*r(0,j,k)+9.*r(1,j,k)-r(2,j,k))/3.
                 end do
             end do
             !
             !     side right
             do k=kparasta,kparaend
-                do j=1,jy
-                    f1(jx,j,k)=es*f1(jx,j,k)+annit(jx+1,j,k)*g11(jx,j,k)*(8.*r(jx+1,j,k)-9.*r(jx,j,k)+r(jx-1,j,k))/3.
+                do j=1,n2
+                    f1(n1,j,k)=es*f1(n1,j,k)+annit(n1+1,j,k)*g11(n1,j,k)*(8.*r(n1+1,j,k)-9.*r(n1,j,k)+r(n1-1,j,k))/3.
                 end do
             end do
         !
@@ -74,8 +73,8 @@ contains
         !
         !     into the field
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
                     f1(i,j,k)=es*f1(i,j,k)+.5*(annit(i,j,k)+annit(i+1,j,k))*g11(i,j,k)*(r(i+1,j,k)-r(i,j,k))
                 !
@@ -84,12 +83,12 @@ contains
         end do
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
                     if (bodyforce) then
                         if (tipo(i,j,k)==0) f1(i,j,k)=0.
-                        if (i<jx) then
+                        if (i<n1) then
                             if (tipo(i+1,j,k)==0) f1(i,j,k)=0.
                         end if
                     end if
@@ -101,13 +100,13 @@ contains
         !-----------------------------------------------------------------------
         ! term nni*g22*d/d(eta)
         !
-        if (jp==1) then
+        ! direction 2 is always not periodic
             !
             !     side bottom
             !
             !     for direction 2, allthough coef_wall=1, the wall model is switched off
             if (eseguo34==0.and.coef_wall==1) then
-                allocate(prov(jx,2,kparasta:kparaend))
+                allocate(prov(n1,2,kparasta:kparaend))
                 prov(:,:,:)=att_mod_par(:,:,:)
                 att_mod_par(:,:,:)=.false.
             end if
@@ -115,14 +114,14 @@ contains
             !     wall model off
             if (coef_wall==0) then
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
                         f2(i,0,k)=es*f2(i,0,k)+annitV(i,0,k)*g22(i,0,k)*(-8.*r(i,0,k)+9.*r(i,1,k)-r(i,2,k))/3.
                     end do
                 end do
             !     wall model on
             else if (coef_wall==1) then
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
                         if (att_mod_par(i,1,k)) then
                             f2(i,0,k)=es*f2(i,0,k)+u_t(i,1,k)*u_t(i,1,k)*areola3(i,k)* &
                                 ((2-eseguo34)*u(i,1,k)-(1-eseguo34)*w(i,1,k))/utangente(i,1,k)
@@ -146,9 +145,9 @@ contains
                 ! Giulia modificavento:
                 rhow=1000.  ! SMELLS LIKE MAGIC
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
                         !          f2(i,jy,k)=abs(vel_tau(i,k))*vel_tau(i,k)*areola4(i,k)
-                        f2(i,jy,k)=tau_wind(i,k)*areola4(i,k)/rhow
+                        f2(i,n2,k)=tau_wind(i,k)*areola4(i,k)/rhow
                     end do
                 end do
             ! Giulia modificavento:
@@ -158,23 +157,23 @@ contains
                 !     wall model off
                 if (coef_wall==0) then
                     do k=kparasta,kparaend
-                        do i=1,jx
-                            f2(i,jy,k)=es*f2(i,jy,k)+annitV(i,jy+1,k)*g22(i,jy,k)*&
-                                (8.*r(i,jy+1,k)-9.*r(i,jy,k)+r(i,jy-1,k))/3.
+                        do i=1,n1
+                            f2(i,n2,k)=es*f2(i,n2,k)+annitV(i,n2+1,k)*g22(i,n2,k)*&
+                                (8.*r(i,n2+1,k)-9.*r(i,n2,k)+r(i,n2-1,k))/3.
                         end do
                     end do
 
                 !      wall model on
                 elseif (coef_wall==1) then
                     do k=kparasta,kparaend
-                        do i=1,jx
+                        do i=1,n1
                             if (att_mod_par(i,2,k)) then
-                                f2(i,jy,k)=es*f2(i,jy,k)-u_t(i,2,k)*u_t(i,2,k)*areola4(i,k)*&
-                                    ((2-eseguo34)*u(i,jy,k) &
-                                    -(1-eseguo34)*w(i,jy,k))/utangente(i,2,k)
+                                f2(i,n2,k)=es*f2(i,n2,k)-u_t(i,2,k)*u_t(i,2,k)*areola4(i,k)*&
+                                    ((2-eseguo34)*u(i,n2,k) &
+                                    -(1-eseguo34)*w(i,n2,k))/utangente(i,2,k)
                             else
-                                f2(i,jy,k)=es*f2(i,jy,k)+annitV(i,jy+1,k)*g22(i,jy,k)*&
-                                    (8.*r(i,jy+1,k)-9.*r(i,jy,k)+r(i,jy-1,k))/3.
+                                f2(i,n2,k)=es*f2(i,n2,k)+annitV(i,n2+1,k)*g22(i,n2,k)*&
+                                    (8.*r(i,n2+1,k)-9.*r(i,n2,k)+r(i,n2-1,k))/3.
 
                             end if
                         end do
@@ -190,12 +189,11 @@ contains
                 att_mod_par(:,:,:)=prov(:,:,:)
                 deallocate(prov)
             end if
-        end if
         !
         !     into the field
         do k=kparasta,kparaend
-            do i=1,jx
-                do j=jp,jy-jp
+            do i=1,n1
+                do j=1,n2-1
                     !
                     f2(i,j,k)=es*f2(i,j,k)+.5*(annitV(i,j,k)+annitV(i,j+1,k))&
                         &              *g22(i,j,k)*(r(i,j+1,k)-r(i,j,k))
@@ -205,13 +203,13 @@ contains
         end do
         !
         do k=kparasta,kparaend
-            do j=jp,jy-jp
-                do i=1,jx
+            do j=1,n2-1
+                do i=1,n1
                     !
 
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f2(i,j,k)=0.
-                        if (j<jy) then
+                        if (j<n2) then
                             if (tipo(i,j+1,k)==0)f2(i,j,k)=0.
                         end if
                     end if
@@ -227,8 +225,8 @@ contains
             !     side back
             if (myid==0) then
 
-                do i=1,jx
-                    do j=1,jy
+                do i=1,n1
+                    do j=1,n2
                         f3(i,j,0)=es*f3(i,j,0)+annit(i,j,0)*g33(i,j,0)*&
                             &     (-8.*r(i,j,0)+9.*r(i,j,1)-r(i,j,2))/3.
                     end do
@@ -239,10 +237,10 @@ contains
             !     side front
             if (myid==nproc-1) then
 
-                do i=1,jx
-                    do j=1,jy
-                        f3(i,j,jz)=es*f3(i,j,jz)+annit(i,j,jz+1)*g33(i,j,jz)*&
-                            &   (8.*r(i,j,jz+1)-9.*r(i,j,jz)+r(i,j,jz-1))/3.
+                do i=1,n1
+                    do j=1,n2
+                        f3(i,j,n3)=es*f3(i,j,n3)+annit(i,j,n3+1)*g33(i,j,n3)*&
+                            &   (8.*r(i,j,n3+1)-9.*r(i,j,n3)+r(i,j,n3-1))/3.
                     end do
                 end do
 
@@ -262,8 +260,8 @@ contains
             kparaendl=kparaend
         end if
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 do k=kparastal,kparaendl
                     !
                     f3(i,j,k)=es*f3(i,j,k)+.5*(annit(i,j,k)+annit(i,j,k+1))*g33(i,j,k)*(r(i,j,k+1)-r(i,j,k))
@@ -272,12 +270,12 @@ contains
             end do
         end do
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 do k=kparastal,kparaendl
                     if (bodyforce) then
                         if (tipo(i,j,k)==0) f3(i,j,k)=0.
-                        if (k<jz) then
+                        if (k<n3) then
                             if (tipo(i,j,k+1)==0) f3(i,j,k)=0.
                         end if
                     end if
@@ -299,10 +297,10 @@ contains
         end if
 
         if (rightpem/=MPI_PROC_NULL) then
-            call MPI_SEND(f3(1,1,kparaend),jx*jy,MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(f3(1,1,kparaend),n1*n2,MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
         end if
         if (leftpem/=MPI_PROC_NULL) then
-            call MPI_RECV(f3(1,1,kparasta-1),jx*jy,MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(f3(1,1,kparasta-1),n1*n2,MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
         end if
 
     !        !     integral
@@ -320,7 +318,7 @@ contains
     !
     !        ! make the value known to all procs
     !
-    !        call MPI_ALLREDUCE(bulk_loc,bulkn,1,MPI_DOUBLE_PRECISION,&
+    !        call MPI_ALLREDUCE(bulk_loc,bulkn,1,MPI_REAL_SD,&
     !            &                   MPI_SUM,&
     !            &                   MPI_COMM_WORLD,ierr)
     !
@@ -345,27 +343,27 @@ contains
         !
         !     side left and right, periodic
         do k=kparasta,kparaend
-            do j=1,jy
+            do j=1,n2
                 !
-                cgra1(0,j,k)=csx(0,j,k)*.5*(gra1(jx,j,k)+gra1(1,j,k))+ &
-                    csy(0,j,k)*.5*(gra2(jx,j,k)+gra2(1,j,k))+ &
-                    csz(0,j,k)*.5*(gra3(jx,j,k)+gra3(1,j,k))- &
+                cgra1(0,j,k)=csx(0,j,k)*.5*(gra1(n1,j,k)+gra1(1,j,k))+ &
+                    csy(0,j,k)*.5*(gra2(n1,j,k)+gra2(1,j,k))+ &
+                    csz(0,j,k)*.5*(gra3(n1,j,k)+gra3(1,j,k))- &
                     cgra1(0,j,k)
                 cgra1(0,j,k)=(1-ip)*cgra1(0,j,k)
 
-                cgra1(jx,j,k)=csx(jx,j,k)*.5*(gra1(jx,j,k)+gra1(1,j,k))+ &
-                    csy(jx,j,k)*.5*(gra2(jx,j,k)+gra2(1,j,k))+ &
-                    csz(jx,j,k)*.5*(gra3(jx,j,k)+gra3(1,j,k))- &
-                    cgra1(jx,j,k)
-                cgra1(jx,j,k)=(1-ip)*cgra1(jx,j,k)
+                cgra1(n1,j,k)=csx(n1,j,k)*.5*(gra1(n1,j,k)+gra1(1,j,k))+ &
+                    csy(n1,j,k)*.5*(gra2(n1,j,k)+gra2(1,j,k))+ &
+                    csz(n1,j,k)*.5*(gra3(n1,j,k)+gra3(1,j,k))- &
+                    cgra1(n1,j,k)
+                cgra1(n1,j,k)=(1-ip)*cgra1(n1,j,k)
             !
             end do
         end do
         !
         !     into the field
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=1,jx-1
+            do j=1,n2
+                do i=1,n1-1
                     !
                     cgra1(i,j,k)=csx(i,j,k)*.5*(gra1(i+1,j,k)+gra1(i,j,k))+ &
                         csy(i,j,k)*.5*(gra2(i+1,j,k)+gra2(i,j,k))+ &
@@ -380,27 +378,16 @@ contains
         !
         !     sides bottom and upper, not periodic
         do k=kparasta,kparaend
-            do i=1,jx
-
-                cgra2(i,0,k)=etx(i,0,k)*.5*(gra1(i,jy,k)+gra1(i,1,k))+ &
-                    ety(i,0,k)*.5*(gra2(i,jy,k)+gra2(i,1,k))+ &
-                    etz(i,0,k)*.5*(gra3(i,jy,k)+gra3(i,1,k))- &
-                    cgra2(i,0,k)
-                cgra2(i,0,k)=(1-jp)*cgra2(i,0,k)
-
-                cgra2(i,jy,k)=etx(i,jy,k)*.5*(gra1(i,jy,k)+gra1(i,1,k))+ &
-                    ety(i,jy,k)*.5*(gra2(i,jy,k)+gra2(i,1,k))+ &
-                    etz(i,jy,k)*.5*(gra3(i,jy,k)+gra3(i,1,k))- &
-                    cgra2(i,jy,k)
-                cgra2(i,jy,k)=(1-jp)*cgra2(i,jy,k)
-
+            do i=1,n1
+                cgra2(i,0,k)=0.0
+                cgra2(i,n2,k)=0.0
             end do
         end do
 
         !     into the field
         do k=kparasta,kparaend
-            do j=1,jy-1
-                do i=1,jx
+            do j=1,n2-1
+                do i=1,n1
                     !
                     cgra2(i,j,k)=etx(i,j,k)*.5*(gra1(i,j+1,k)+gra1(i,j,k))+ &
                         ety(i,j,k)*.5*(gra2(i,j+1,k)+gra2(i,j,k))+ &
@@ -413,30 +400,24 @@ contains
         !
         ! compute controvariant flux Wf (jordan notation)
         !
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 !
                 if (myid==0) then
 
-                    cgra3(i,j,0 )=ztx(i,j,0 ) &
-                        *.5*(gra1(i,j,1)+gra1_appoggio(i,j,jz))+ &
-                        zty(i,j,0 ) &
-                        *.5*(gra2(i,j,1)+gra2_appoggio(i,j,jz))+ &
-                        ztz(i,j,0 ) &
-                        *.5*(gra3(i,j,1)+gra3_appoggio(i,j,jz))- &
+                    cgra3(i,j,0 )=ztx(i,j,0 ) *.5*(gra1(i,j,1)+gra1_appoggio(i,j,n3))+ &
+                        zty(i,j,0 ) *.5*(gra2(i,j,1)+gra2_appoggio(i,j,n3))+ &
+                        ztz(i,j,0 ) *.5*(gra3(i,j,1)+gra3_appoggio(i,j,n3))- &
                         cgra3(i,j,0)
                     cgra3(i,j,0 )=(1-kp)*cgra3(i,j,0 )
 
                 else if (myid==nproc-1) then
 
-                    cgra3(i,j,jz)=ztx(i,j,jz) &
-                        *.5*(gra1_appoggio(i,j,1)+gra1(i,j,jz))+ &
-                        zty(i,j,jz) &
-                        *.5*(gra2_appoggio(i,j,1)+gra2(i,j,jz))+ &
-                        ztz(i,j,jz) &
-                        *.5*(gra3_appoggio(i,j,1)+gra3(i,j,jz))- &
-                        cgra3(i,j,jz)
-                    cgra3(i,j,jz)=(1-kp)*cgra3(i,j,jz)
+                    cgra3(i,j,n3)=ztx(i,j,n3) *.5*(gra1_appoggio(i,j,1)+gra1(i,j,n3))+ &
+                        zty(i,j,n3) *.5*(gra2_appoggio(i,j,1)+gra2(i,j,n3))+ &
+                        ztz(i,j,n3) *.5*(gra3_appoggio(i,j,1)+gra3(i,j,n3))- &
+                        cgra3(i,j,n3)
+                    cgra3(i,j,n3)=(1-kp)*cgra3(i,j,n3)
 
                 end if
             !
@@ -450,8 +431,8 @@ contains
             kparaendp=kparaend
         end if
         do k=kparasta,kparaendp
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     !
                     cgra3(i,j,k)=ztx(i,j,k)*.5*(gra1(i,j,k+1)+gra1(i,j,k))+ &
                         zty(i,j,k)*.5*(gra2(i,j,k+1)+gra2(i,j,k))+ &
@@ -505,17 +486,15 @@ contains
 
             !     side left
             do k=kparasta,kparaend
-                do j=1,jy
-                    f1(0,j,k)=akapt(isc,0,j,k)*g11(0,j,k)* &
-                        (-8.*r(0,j,k)+9.*r(1,j,k)-r(2,j,k))/3.
+                do j=1,n2
+                    f1(0,j,k)=akapt(isc,0,j,k)*g11(0,j,k)* (-8.*r(0,j,k)+9.*r(1,j,k)-r(2,j,k))/3.
                 end do
             end do
             !
             !     side right
             do k=kparasta,kparaend
-                do j=1,jy
-                    f1(jx,j,k)=akapt(isc,jx+1,j,k)*g11(jx,j,k)* &
-                        (8.*r(jx+1,j,k)-9.*r(jx,j,k)+r(jx-1,j,k))/3.
+                do j=1,n2
+                    f1(n1,j,k)=akapt(isc,n1+1,j,k)*g11(n1,j,k)* (8.*r(n1+1,j,k)-9.*r(n1,j,k)+r(n1-1,j,k))/3.
                 end do
             end do
         !
@@ -523,24 +502,23 @@ contains
         !
         !     into the field
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
-                    f1(i,j,k)=.5*(akapt(isc,i,j,k)+akapt(isc,i+1,j,k))*g11(i,j,k)* &
-                        (r(i+1,j,k)-r(i,j,k))
+                    f1(i,j,k)=.5*(akapt(isc,i,j,k)+akapt(isc,i+1,j,k))*g11(i,j,k)* (r(i+1,j,k)-r(i,j,k))
                 !
                 end do
             end do
         end do
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
 
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f1(i,j,k)=0.
-                        if (i<jx) then
+                        if (i<n1) then
                             if (tipo(i+1,j,k)==0)f1(i,j,k)=0.
                         end if
                     end if
@@ -553,7 +531,7 @@ contains
         !-----------------------------------------------------------------------
         ! term nni*g22*d/d(eta)
         !
-        do jj=1,jp
+        ! direction 2 is always not periodic
             !
             !      if (coef_wall==1 .and. imoist==1) then
             !         call readflux(ti,isc)
@@ -561,9 +539,8 @@ contains
 
             !     side bottom
             do k=kparasta,kparaend
-                do i=1,jx
-                    f2(i,0,k)=akaptV(isc,i,0,k)*g22(i,0,k)* &
-                        (-8.*r(i,0,k)+9.*r(i,1,k)-r(i,2,k))/3.
+                do i=1,n1
+                    f2(i,0,k)=akaptV(isc,i,0,k)*g22(i,0,k)* (-8.*r(i,0,k)+9.*r(i,1,k)-r(i,2,k))/3.
                 end do
             end do
 
@@ -571,34 +548,31 @@ contains
             !
             !     side upper
             do k=kparasta,kparaend
-                do i=1,jx
-                    f2(i,jy,k)=akaptV(isc,i,jy+1,k)*g22(i,jy,k)* &
-                        (8.*r(i,jy+1,k)-9.*r(i,jy,k)+r(i,jy-1,k))/3.
+                do i=1,n1
+                    f2(i,n2,k)=akaptV(isc,i,n2+1,k)*g22(i,n2,k)* (8.*r(i,n2+1,k)-9.*r(i,n2,k)+r(i,n2-1,k))/3.
                 end do
             end do
 
         !hicco      end if
         !
-        end do
         !
         !     into the field
         do k=kparasta,kparaend
-            do i=1,jx
-                do j=jp,jy-jp
+            do i=1,n1
+                do j=1,n2-1
                     !
-                    f2(i,j,k)=.5*(akaptV(isc,i,j,k)+akaptV(isc,i,j+1,k))*g22(i,j,k)* &
-                        (r(i,j+1,k)-r(i,j,k))
+                    f2(i,j,k)=.5*(akaptV(isc,i,j,k)+akaptV(isc,i,j+1,k))*g22(i,j,k)* (r(i,j+1,k)-r(i,j,k))
                 !
                 end do
             end do
         end do
 
         do k=kparasta,kparaend
-            do j=jp,jy-jp
-                do i=1,jx
+            do j=1,n2-1
+                do i=1,n1
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f2(i,j,k)=0.
-                        if (j<jy) then
+                        if (j<n2) then
                             if (tipo(i,j+1,k)==0)f2(i,j,k)=0.
                         end if
                     end if
@@ -617,20 +591,18 @@ contains
             !     side back
             if (myid==0) then
 
-                do i=1,jx
-                    do j=1,jy
-                        f3(i,j,0)=akapt(isc,i,j,0)*g33(i,j,0)* &
-                            (-8.*r(i,j,0)+9.*r(i,j,1)-r(i,j,2))/3.
+                do i=1,n1
+                    do j=1,n2
+                        f3(i,j,0)=akapt(isc,i,j,0)*g33(i,j,0)*(-8.*r(i,j,0)+9.*r(i,j,1)-r(i,j,2))/3.
                     end do
                 end do
             !
             !     side front
             else if (myid==nproc-1) then
 
-                do i=1,jx
-                    do j=1,jy
-                        f3(i,j,jz)=akapt(isc,i,j,jz+1)*g33(i,j,jz)* &
-                            (8.*r(i,j,jz+1)-9.*r(i,j,jz)+r(i,j,jz-1))/3.
+                do i=1,n1
+                    do j=1,n2
+                        f3(i,j,n3)=akapt(isc,i,j,n3+1)*g33(i,j,n3)*(8.*r(i,j,n3+1)-9.*r(i,j,n3)+r(i,j,n3-1))/3.
                     end do
                 end do
 
@@ -651,23 +623,22 @@ contains
         end if
 
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 do k=kparastal,kparaendl
                     !
-                    f3(i,j,k)=.5*(akapt(isc,i,j,k)+akapt(isc,i,j,k+1))*g33(i,j,k)* &
-                        (r(i,j,k+1)-r(i,j,k))
+                    f3(i,j,k)=.5*(akapt(isc,i,j,k)+akapt(isc,i,j,k+1))*g33(i,j,k)* (r(i,j,k+1)-r(i,j,k))
                 !
                 end do
             end do
         end do
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 do k=kparastal,kparaendl
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f3(i,j,k)=0.
-                        if (k<jz) then
+                        if (k<n3) then
                             if (tipo(i,j,k+1)==0)f3(i,j,k)=0.
                         end if
                     end if
@@ -677,9 +648,9 @@ contains
         !
         ! make border values f1, f2, f3 known to all procs
 
-        call MPI_SENDRECV(f3(1,1,kparaend),jx*jy, &
+        call MPI_SENDRECV(f3(1,1,kparaend),n1*n2, &
             MPI_REAL_SD,rightpe,tagrs, &
-            f3(1,1,kparasta-1),jx*jy, &
+            f3(1,1,kparasta-1),n1*n2, &
             MPI_REAL_SD,leftpe,taglr, &
             MPI_COMM_WORLD,status,ierr)
 
@@ -758,19 +729,16 @@ contains
             ! side left
 
             do k=kparasta,kparaend
-                do j=1,jy
-                    f1(0,j,k)=f1(0,j,k)+akapt(isc,0,j,k)*g11(0,j,k)* &
-                        (-8.*r(0,j,k)+9.*r(1,j,k)-r(2,j,k))/3.
+                do j=1,n2
+                    f1(0,j,k)=f1(0,j,k)+akapt(isc,0,j,k)*g11(0,j,k)*(-8.*r(0,j,k)+9.*r(1,j,k)-r(2,j,k))/3.
                 end do
             end do
             !
             ! side right
             !
             do k=kparasta,kparaend
-                do j=1,jy
-                    f1(jx,j,k)=f1(jx,j,k) &
-                        +akapt(isc,jx+1,j,k)*g11(jx,j,k)* &
-                        (8.*r(jx+1,j,k)-9.*r(jx,j,k)+r(jx-1,j,k))/3.
+                do j=1,n2
+                    f1(n1,j,k)=f1(n1,j,k)+akapt(isc,n1+1,j,k)*g11(n1,j,k)*(8.*r(n1+1,j,k)-9.*r(n1,j,k)+r(n1-1,j,k))/3.
                 end do
             end do
         !
@@ -779,23 +747,21 @@ contains
         ! into the field
         !
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
-                    f1(i,j,k)=f1(i,j,k) &
-                        +.5*(akapt(isc,i,j,k)+akapt(isc,i+1,j,k))*g11(i,j,k)* &
-                        (r(i+1,j,k)-r(i,j,k))
+                    f1(i,j,k)=f1(i,j,k)+.5*(akapt(isc,i,j,k)+akapt(isc,i+1,j,k))*g11(i,j,k)*(r(i+1,j,k)-r(i,j,k))
                 !
                 end do
             end do
         end do
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f1(i,j,k)=0.
-                        if (i<jx) then
+                        if (i<n1) then
                             if (tipo(i+1,j,k)==0)f1(i,j,k)=0.
                         end if
                     end if
@@ -807,49 +773,43 @@ contains
         !-----------------------------------------------------------------------
         ! term nni*g22*d/d(eta)
         !
-        do jj=1,jp
+        ! direction 2 is always not periodic
             !
             ! side bottom
             !
             do k=kparasta,kparaend
-                do i=1,jx
-                    f2(i,0,k)=f2(i,0,k)+akaptV(isc,i,0,k)*g22(i,0,k)* &
-                        (-8.*r(i,0,k)+9.*r(i,1,k)-r(i,2,k))/3.
+                do i=1,n1
+                    f2(i,0,k)=f2(i,0,k)+akaptV(isc,i,0,k)*g22(i,0,k)*(-8.*r(i,0,k)+9.*r(i,1,k)-r(i,2,k))/3.
                 end do
             end do
             !
             ! side upper
             !
             do k=kparasta,kparaend
-                do i=1,jx
-                    f2(i,jy,k)=f2(i,jy,k) &
-                        +akaptV(isc,i,jy+1,k)*g22(i,jy,k)* &
-                        (8.*r(i,jy+1,k)-9.*r(i,jy,k)+r(i,jy-1,k))/3.
+                do i=1,n1
+                    f2(i,n2,k)=f2(i,n2,k)+akaptV(isc,i,n2+1,k)*g22(i,n2,k)*(8.*r(i,n2+1,k)-9.*r(i,n2,k)+r(i,n2-1,k))/3.
                 end do
             end do
         !
-        end do
         !
         ! into the field
         !
         do k=kparasta,kparaend
-            do i=1,jx
-                do j=jp,jy-jp
+            do i=1,n1
+                do j=1,n2-1
                     !
-                    f2(i,j,k)=f2(i,j,k) &
-                        +.5*(akaptV(isc,i,j,k)+akaptV(isc,i,j+1,k))*g22(i,j,k)* &
-                        (r(i,j+1,k)-r(i,j,k))
+                    f2(i,j,k)=f2(i,j,k)+.5*(akaptV(isc,i,j,k)+akaptV(isc,i,j+1,k))*g22(i,j,k)*(r(i,j+1,k)-r(i,j,k))
                 !
                 end do
             end do
         end do
 
         do k=kparasta,kparaend
-            do j=jp,jy-jp
-                do i=1,jx
+            do j=1,n2-1
+                do i=1,n1
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f2(i,j,k)=0.
-                        if (j<jy) then
+                        if (j<n2) then
                             if (tipo(i,j+1,k)==0)f2(i,j,k)=0.
                         end if
                     end if
@@ -866,10 +826,9 @@ contains
             !
             if (myid==0) then
 
-                do i=1,jx
-                    do j=1,jy
-                        f3(i,j,0)=f3(i,j,0)+akapt(isc,i,j,0)*g33(i,j,0)* &
-                            (-8.*r(i,j,0)+9.*r(i,j,1)-r(i,j,2))/3.
+                do i=1,n1
+                    do j=1,n2
+                        f3(i,j,0)=f3(i,j,0)+akapt(isc,i,j,0)*g33(i,j,0)*(-8.*r(i,j,0)+9.*r(i,j,1)-r(i,j,2))/3.
                     end do
                 end do
 
@@ -877,11 +836,9 @@ contains
             !
             else if (myid==nproc-1) then
 
-                do i=1,jx
-                    do j=1,jy
-                        f3(i,j,jz)=f3(i,j,jz) &
-                            +akapt(isc,i,j,jz+1)*g33(i,j,jz)* &
-                            (8.*r(i,j,jz+1)-9.*r(i,j,jz)+r(i,j,jz-1))/3.
+                do i=1,n1
+                    do j=1,n2
+                        f3(i,j,n3)=f3(i,j,n3)+akapt(isc,i,j,n3+1)*g33(i,j,n3)*(8.*r(i,j,n3+1)-9.*r(i,j,n3)+r(i,j,n3-1))/3.
                     end do
                 end do
 
@@ -903,24 +860,22 @@ contains
         end if
 
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 do k=kparastal,kparaendl
                     !
-                    f3(i,j,k)=f3(i,j,k) &
-                        +.5*(akapt(isc,i,j,k)+akapt(isc,i,j,k+1))*g33(i,j,k)* &
-                        (r(i,j,k+1)-r(i,j,k))
+                    f3(i,j,k)=f3(i,j,k)+.5*(akapt(isc,i,j,k)+akapt(isc,i,j,k+1))*g33(i,j,k)*(r(i,j,k+1)-r(i,j,k))
                 !
                 end do
             end do
         end do
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 do k=kparastal,kparaendl
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f3(i,j,k)=0.
-                        if (k<jz) then
+                        if (k<n3) then
                             if (tipo(i,j,k+1)==0)f3(i,j,k)=0.
                         end if
                     end if
@@ -932,16 +887,16 @@ contains
         !
         ! make border values f1, f2, f3 known to closer procs
         !
-        call MPI_SENDRECV(f3(1,1,kparaend),jx*jy, &
+        call MPI_SENDRECV(f3(1,1,kparaend),n1*n2, &
             MPI_REAL_SD,rightpe,tagrs, &
-            f3(1,1,kparasta-1),jx*jy, &
+            f3(1,1,kparasta-1),n1*n2, &
             MPI_REAL_SD,leftpe,taglr, &
             MPI_COMM_WORLD,status,ierr)
         !
         return
     end subroutine flucrhoesp
 
-    subroutine flud1(rc,cgra1,r,insc,isc,tipo)
+    subroutine flud1(rc,cgra1,r,isc,tipo)
         !***********************************************************************
         ! compute explicit flux on csi component for scalar equation
         !
@@ -952,7 +907,7 @@ contains
         implicit none
         !-----------------------------------------------------------------------
         !     array declaration
-        integer :: insc,isc
+        integer :: isc
         integer :: kparastak,kparaendk
         integer :: i,j,k,is,iss,jj,kk,ii
         !
@@ -976,10 +931,10 @@ contains
         do i=1,ip
 
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     !
                     f1(0,j,k)=rc(0,j,k)*r(0,j,k)-cgra1(0,j,k)
-                    f1(jx,j,k)=rc(jx,j,k)*r(jx+1,j,k)-cgra1(jx,j,k)
+                    f1(n1,j,k)=rc(n1,j,k)*r(n1+1,j,k)-cgra1(n1,j,k)
                 !
                 end do
             end do
@@ -989,8 +944,8 @@ contains
         ! into the field
         !
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
                     f1(i,j,k)=rc(i,j,k)*.5*(r(i,j,k)+r(i+1,j,k))-cgra1(i,j,k)
                 !
@@ -1003,14 +958,13 @@ contains
         if (insc==1) then
             !     sides 1 and 2
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
 
                     i=1
                     if (rc(i,j,k)>0.) then
                         ravanti=r(2,j,k)
                         rindietro1=r(1,j,k)
-                        rindietro2=ip*(2.*r(0,j,k)-r(1,j,k)) &
-                            +(1.-ip)*r(0,j,k)
+                        rindietro2=ip*(2.*r(0,j,k)-r(1,j,k))+(1.-ip)*r(0,j,k)
 
                         if (tipo(i,j,k)==1) then !ib cell
                             if (tipo(i+1,j,k)==0) then !solido davanti
@@ -1051,11 +1005,11 @@ contains
                     !     >           *.125*( -ravanti +2.*rindietro1-rindietro2 )
                     !         end if
 
-                    i=jx-1
+                    i=n1-1
                     if (rc(i,j,k)>0.) then
-                        ravanti=r(jx  ,j,k)
-                        rindietro1=r(jx-1,j,k)
-                        rindietro2=r(jx-2,j,k)
+                        ravanti=r(n1  ,j,k)
+                        rindietro1=r(n1-1,j,k)
+                        rindietro2=r(n1-2,j,k)
 
                         if (tipo(i,j,k)==1) then !ib cell
                             if (tipo(i+1,j,k)==0) then !solido davanti
@@ -1071,10 +1025,9 @@ contains
                                 *.125*(-ravanti +2.*rindietro1-rindietro2)
                         end if !tipo
                     else
-                        ravanti=r(jx-1,j,k)
-                        rindietro1=r(jx  ,j,k)
-                        rindietro2=ip*(2.*r(jx+1,j,k)-r(jx,j,k)) &
-                            +(1.-ip)*r(jx+1,j,k)
+                        ravanti=r(n1-1,j,k)
+                        rindietro1=r(n1  ,j,k)
+                        rindietro2=ip*(2.*r(n1+1,j,k)-r(n1,j,k))+(1.-ip)*r(n1+1,j,k)
 
                         if (tipo(i+1,j,k)==1) then
                             if (tipo(i,j,k)==0) then !solido indietro
@@ -1100,8 +1053,8 @@ contains
 
             !     into the field
             do k=kparasta,kparaend
-                do j=1,jy
-                    do i=2,jx-2
+                do j=1,n2
+                    do i=2,n1-2
                         !Giulia non comprende tutti i casi, da un lato è quick dall'altro dc
                         !      if (tipo(i,j,k)==2) then
                         !     if (rc(i,j,k)>0.) then
@@ -1161,10 +1114,10 @@ contains
             do i=1,ip
                 !
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         !
                         f1(0,j,k)=rc(0,j,k)*r(0,j,k)-cgra1(0,j,k)
-                        f1(jx,j,k)=rc(jx,j,k)*r(jx+1,j,k)-cgra1(jx,j,k)
+                        f1(n1,j,k)=rc(n1,j,k)*r(n1+1,j,k)-cgra1(n1,j,k)
                     !
                     end do
                 end do
@@ -1173,8 +1126,8 @@ contains
             !
             !     into the field
             do k=kparasta,kparaend
-                do j=1,jy
-                    do i=ip,jx-ip
+                do j=1,n2
+                    do i=ip,n1-ip
                         !
                         f1(i,j,k)=-cgra1(i,j,k)
                     !
@@ -1185,7 +1138,7 @@ contains
 
             !     sides 1 and 2  sia per bodyforce 0 o 1
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     i=1
                     if (rc(i,j,k)>0.) then
                         ravanti=r(2,j,k)
@@ -1222,16 +1175,16 @@ contains
                         *.125*(3*ravanti+6*rindietro1-rindietro2)
 
 
-                    i=jx-1
+                    i=n1-1
                     if (rc(i,j,k)>0.) then
-                        ravanti=r(jx   ,j,k)
-                        rindietro1=r(jx-1,j, k)
-                        rindietro2=r(jx-2,j, k)
+                        ravanti=r(n1   ,j,k)
+                        rindietro1=r(n1-1,j, k)
+                        rindietro2=r(n1-2,j, k)
                     else
-                        ravanti=r(jx-1,j,k)
-                        rindietro1=r(jx  ,j,k)
-                        rindietro2=ip*(2.*r(jx+1,j,k)-r(jx,j,k)) &
-                            +(1.-ip)*r(jx+1,j,k)
+                        ravanti=r(n1-1,j,k)
+                        rindietro1=r(n1  ,j,k)
+                        rindietro2=ip*(2.*r(n1+1,j,k)-r(n1,j,k)) &
+                            +(1.-ip)*r(n1+1,j,k)
                     end if
 
                     !   den=(ravanti-rindietro2)
@@ -1265,8 +1218,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=2,jx-2
+                    do j=1,n2
+                        do i=2,n1-2
                             if (rc(i,j,k)>0.) then
 
                                 f1(i,j,k)=f1(i,j,k)+rc(i,j,k) &
@@ -1284,8 +1237,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=2,jx-2
+                    do j=1,n2
+                        do i=2,n1-2
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i+1,j,k)==0) then !solido davanti
@@ -1363,10 +1316,10 @@ contains
             do i=1,ip
                 !
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         !
                         f1(0,j,k)=rc(0,j,k)*r(0,j,k)-cgra1(0,j,k)
-                        f1(jx,j,k)=rc(jx,j,k)*r(jx+1,j,k)-cgra1(jx,j,k)
+                        f1(n1,j,k)=rc(n1,j,k)*r(n1+1,j,k)-cgra1(n1,j,k)
                     !
                     end do
                 end do
@@ -1375,8 +1328,8 @@ contains
             !
             !     into the field
             do k=kparasta,kparaend
-                do j=1,jy
-                    do i=ip,jx-ip
+                do j=1,n2
+                    do i=ip,n1-ip
                         !
                         f1(i,j,k)=-cgra1(i,j,k)
                     !
@@ -1387,7 +1340,7 @@ contains
 
             !     sides 1 and 2  sia per bodyforce 0 o 1
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     i=1
                     if (rc(i,j,k)>0.) then
                         rindietro1=r(1,j,k)
@@ -1399,11 +1352,11 @@ contains
 
 
 
-                    i=jx-1
+                    i=n1-1
                     if (rc(i,j,k)>0.) then
-                        rindietro1=r(jx-1,j, k)
+                        rindietro1=r(n1-1,j, k)
                     else
-                        rindietro1=r(jx  ,j,k)
+                        rindietro1=r(n1  ,j,k)
                     end if
 
                     f1(i,j,k)=f1(i,j,k)+rc(i,j,k)*rindietro1
@@ -1415,8 +1368,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=2,jx-2
+                    do j=1,n2
+                        do i=2,n1-2
                             if (rc(i,j,k)>0.) then
 
                                 f1(i,j,k)=f1(i,j,k)+rc(i,j,k)*r(i,j,k)
@@ -1432,8 +1385,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=2,jx-2
+                    do j=1,n2
+                        do i=2,n1-2
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i+1,j,k)==0) then !solido davanti
@@ -1513,7 +1466,7 @@ contains
         do i=1,2*ip
             do k=kparasta,kparaend
                 !
-                do j=1+jp,jy-jp
+                do j=2,n2-1
                     !
                     fg=.5*(r(iss,j+1,k)-r(iss,j-1,k))
                     !             f1(is,j,k)=-f1(is,j,k)
@@ -1532,7 +1485,7 @@ contains
                 end do
 
                 !
-                do jj=1,jp
+                ! direction 2 is always not periodic
                     !
                     !        check derivative at wall bottom and upper
                     !
@@ -1551,8 +1504,8 @@ contains
                     end if
 
 
-                    j=jy
-                    fg=.5*(3.*r(iss,jy,k)-4.*r(iss,jy-1,k)+r(iss,jy-2,k))
+                    j=n2
+                    fg=.5*(3.*r(iss,n2,k)-4.*r(iss,n2-1,k)+r(iss,n2-2,k))
                     !         f1(is,j,k)=-f1(is,j,k)
                     !     >                +akapt(isc,iss,j,k)*g12(is,j,k)*fg
 
@@ -1565,21 +1518,20 @@ contains
                             +akapt(isc,iss,j,k)*g12(is,j,k)*fg
                     end if
                 !
-                end do
             !
             end do
             !
-            is=jx
-            iss=jx+1
+            is=n1
+            iss=n1+1
         !
         end do
         !
         ! inside the field
         !
         do k=kparasta,kparaend
-            do i=ip,jx-ip
+            do i=ip,n1-ip
                 !
-                do j=1+jp,jy-jp
+                do j=2,n2-1
                     !
                     r1=.5*(r(i,j-1,k)+r(i+1,j-1,k))
                     r2=.5*(r(i,j+1,k)+r(i+1,j+1,k))
@@ -1607,7 +1559,7 @@ contains
                 !
                 !     check derivative on sides bottom and upper
                 !
-                if (jp==1) then
+                ! direction 2 is always not periodic
                     !
                     j=1
                     r0=.5*(r(i,j  ,k)+r(i+1,j  ,k))
@@ -1633,10 +1585,10 @@ contains
                     end if
 
                     !
-                    j=jy
-                    r0=.5*(r(i,jy  ,k)+r(i+1,jy  ,k))
-                    r1=.5*(r(i,jy-1,k)+r(i+1,jy-1,k))
-                    r2=.5*(r(i,jy-2,k)+r(i+1,jy-2,k))
+                    j=n2
+                    r0=.5*(r(i,n2  ,k)+r(i+1,n2  ,k))
+                    r1=.5*(r(i,n2-1,k)+r(i+1,n2-1,k))
+                    r2=.5*(r(i,n2-2,k)+r(i+1,n2-2,k))
                     fg=.5*(3.*r0-4.*r1+r2)
                     ak=.5*(akapt(isc,i,j,k)+akapt(isc,i+1,j,k))
                     !      f1(i,j,k)=-f1(i,j,k)+g12(i,j,k)*ak*fg
@@ -1655,7 +1607,6 @@ contains
                     else
                         f1(i,j,k)=-f1(i,j,k)+g12(i,j,k)*ak*fg
                     end if
-                end if
             !
             end do
         end do
@@ -1682,7 +1633,7 @@ contains
         iss=0
         do i=1,2*ip
             !
-            do j=1,jy
+            do j=1,n2
                 !
                 do k=kparastak,kparaendk
                     !
@@ -1720,8 +1671,8 @@ contains
                     end if
                     !
                     if (myid==nproc-1) then
-                        k=jz
-                        fg=.5*(3.*r(iss,j,jz)-4.*r(iss,j,jz-1)+r(iss,j,jz-2))
+                        k=n3
+                        fg=.5*(3.*r(iss,j,n3)-4.*r(iss,j,n3-1)+r(iss,j,n3-2))
                         !      f1(is,j,k)=f1(is,j,k)+akapt(isc,iss,j,k)*g13(is,j,k)*fg
 
                         if (tipo(iss,j,k-1)==0.or.tipo(iss,j,k-2)==0) then
@@ -1737,16 +1688,16 @@ contains
             !
             end do
             !
-            is=jx
-            iss=jx+1
+            is=n1
+            iss=n1+1
         !
         end do
         !
         ! into the field
         !
 
-        do j=1,jy
-            do i=ip,jx-ip
+        do j=1,n2
+            do i=ip,n1-ip
                 !
                 do k=kparastak,kparaendk
                     !
@@ -1812,10 +1763,10 @@ contains
                     !
                     if (myid==nproc-1) then
 
-                        k=jz
-                        r0=.5*(r(i,j,jz  )+r(i+1,j,jz  ))
-                        r1=.5*(r(i,j,jz-1)+r(i+1,j,jz-1))
-                        r2=.5*(r(i,j,jz-2)+r(i+1,j,jz-2))
+                        k=n3
+                        r0=.5*(r(i,j,n3  )+r(i+1,j,n3  ))
+                        r1=.5*(r(i,j,n3-1)+r(i+1,j,n3-1))
+                        r2=.5*(r(i,j,n3-2)+r(i+1,j,n3-2))
                         fg=.5*(3.*r0-4.*r1+r2)
                         ak=.5*(akapt(isc,i,j,k)+akapt(isc,i+1,j,k))
                         !      f1(i,j,k)=f1(i,j,k)+g13(i,j,k)*ak*fg
@@ -1844,13 +1795,13 @@ contains
 
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
 
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f1(i,j,k)=0.
-                        if (i<jx) then
+                        if (i<n1) then
                             if (tipo(i+1,j,k)==0)f1(i,j,k)=0.
                         end if
                     end if
@@ -1861,7 +1812,7 @@ contains
         return
     end subroutine flud1
 
-    subroutine flud2(rc,cgra2,r,insc,isc,tipo)
+    subroutine flud2(rc,cgra2,r,isc,tipo)
         !***********************************************************************
         ! compute explicit flux on eta component for scalar equation
         !
@@ -1872,7 +1823,7 @@ contains
         implicit none
         !-----------------------------------------------------------------------
         !     array declaration
-        integer :: insc,isc
+        integer :: isc
         integer :: kparastak,kparaendk
         integer :: i,j,k,js,jss,ii,kk,jj
 
@@ -1889,24 +1840,23 @@ contains
         ! in points closer to wall it uses uf as ghost cell
 
         !     sides bottom and upper
-        do j=1,jp
+        ! direction 2 is always not periodic
             !
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
                     !
                     f2(i,0,k)=rc(i,0,k)*r(i,0,k)-cgra2(i,0,k)
-                    f2(i,jy,k)=rc(i,jy,k)*r(i,jy+1,k)-cgra2(i,jy,k)
+                    f2(i,n2,k)=rc(i,n2,k)*r(i,n2+1,k)-cgra2(i,n2,k)
                 !
                 end do
             end do
 
-        end do
         !
         ! into the field
         !
         do k=kparasta,kparaend
-            do i=1,jx
-                do j=jp,jy-jp
+            do i=1,n1
+                do j=1,n2-1
                     !
                     f2(i,j,k)=rc(i,j,k)*.5*(r(i,j,k)+r(i,j+1,k))-cgra2(i,j,k)
                 !
@@ -1920,14 +1870,13 @@ contains
 
             !     sides 3 and 4
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
 
                     j=1
                     if (rc(i,j,k)>0.) then
                         ravanti=r(i,2,k)
                         rindietro1=r(i,1,k)
-                        rindietro2=jp*(2.*r(i,0,k)-r(i,1,k)) &
-                            +(1.-jp)*r(i,0,k)
+                        rindietro2=2.*r(i,0,k)-r(i,1,k)
 
                         if (tipo(i,j,k)==1) then !ib cell
                             if (tipo(i,j+1,k)==0) then !solido davanti
@@ -1971,11 +1920,11 @@ contains
                     !     >           *.125*( -ravanti +2.*rindietro1-rindietro2 )
                     !         end if
 
-                    j=jy-1
+                    j=n2-1
                     if (rc(i,j,k)>0.) then
-                        ravanti=r(i,jy  ,k)
-                        rindietro1=r(i,jy-1,k)
-                        rindietro2=r(i,jy-2,k)
+                        ravanti=r(i,n2  ,k)
+                        rindietro1=r(i,n2-1,k)
+                        rindietro2=r(i,n2-2,k)
 
                         if (tipo(i,j,k)==1) then !ib cell
                             if (tipo(i,j+1,k)==0) then !solido davanti
@@ -1992,10 +1941,9 @@ contains
                                 .125*(-ravanti +2.*rindietro1-rindietro2)
                         end if !tipo
                     else
-                        ravanti=r(i,jy-1,k)
-                        rindietro1=r(i,jy  ,k)
-                        rindietro2=jp*(2.*r(i,jy+1,k)-r(i,jy,k)) &
-                            +(1.-jp)*r(i,jy+1,k)
+                        ravanti=r(i,n2-1,k)
+                        rindietro1=r(i,n2  ,k)
+                        rindietro2=2.*r(i,n2+1,k)-r(i,n2,k)
 
                         if (tipo(i,j+1,k)==1) then
                             if (tipo(i,j,k)==0) then !solido indietro
@@ -2023,8 +1971,8 @@ contains
 
             !     into the field
             do k=kparasta,kparaend
-                do j=2,jy-2
-                    do i=1,jx
+                do j=2,n2-2
+                    do i=1,n1
                         !
                         !         if (tipo(i,j,k)==2) then
                         !      if (rc(i,j,k)>0.) then
@@ -2083,23 +2031,21 @@ contains
 
             ! GIULIA UCS-CGRA
             !     side left and right
-            do j=1,jp
+            ! direction 2 is always not periodic
                 !
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
                         !
                         f2(i,0,k)=rc(i,0,k)*r(i,0,k)-cgra2(i,0,k)
-                        f2(i,jy,k)=rc(i,jy,k)*r(i,jy+1,k)-cgra2(i,jy,k)
+                        f2(i,n2,k)=rc(i,n2,k)*r(i,n2+1,k)-cgra2(i,n2,k)
                     !
                     end do
                 end do
-
-            end do
             !
             !     into the field
             do k=kparasta,kparaend
-                do j=jp,jy-jp
-                    do i=1,jx
+                do j=1,n2-1
+                    do i=1,n1
                         !
                         f2(i,j,k)=-cgra2(i,j,k)
                     !
@@ -2110,13 +2056,12 @@ contains
 
             !     sides 1 and 2  sia per bodyforce 0 o 1
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
                     j=1
                     if (rc(i,j,k)>0.) then
                         ravanti=r(i,2,k)
                         rindietro1=r(i,1,k)
-                        rindietro2=jp*(2.*r(i,0,k)-r(i,1,k)) &
-                            +(1.-jp)*r(i,0,k)
+                        rindietro2=2.*r(i,0,k)-r(i,1,k)
                     else
                         ravanti=r(i,1,k)
                         rindietro1=r(i,2,k)
@@ -2144,16 +2089,15 @@ contains
                     !        f2(i,j,k)=f2(i,j,k)+rc(i,j,k)*rindietro1
                     !   end if!phic
 
-                    j=jy-1
+                    j=n2-1
                     if (rc(i,j,k)>0.) then
-                        ravanti=r(i,jy  , k)
-                        rindietro1=r(i,jy-1, k)
-                        rindietro2=r(i,jy-2, k)
+                        ravanti=r(i,n2  , k)
+                        rindietro1=r(i,n2-1, k)
+                        rindietro2=r(i,n2-2, k)
                     else
-                        ravanti=r(i,jy-1,k)
-                        rindietro1=r(i,jy  ,k)
-                        rindietro2=jp*(2.*r(i,jy+1,k)-r(i,jy,k)) &
-                            +(1.-jp)*r(i,jy+1,k)
+                        ravanti=r(i,n2-1,k)
+                        rindietro1=r(i,n2  ,k)
+                        rindietro2=2.*r(i,n2+1,k)-r(i,n2,k)
                     end if
 
                     !   den=(ravanti-rindietro2)
@@ -2185,8 +2129,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparasta,kparaend
-                    do j=2,jy-2
-                        do i=1,jx
+                    do j=2,n2-2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
 
                                 f2(i,j,k)=f2(i,j,k)+rc(i,j,k) &
@@ -2206,8 +2150,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparasta,kparaend
-                    do j=2,jy-2
-                        do i=1,jx
+                    do j=2,n2-2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i,j+1,k)==0) then !solido davanti
@@ -2267,23 +2211,21 @@ contains
 
             ! GIULIA UCS-CGRA
             !     side left and right
-            do j=1,jp
+            ! direction 2 is always not periodic
                 !
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
                         !
                         f2(i,0,k)=rc(i,0,k)*r(i,0,k)-cgra2(i,0,k)
-                        f2(i,jy,k)=rc(i,jy,k)*r(i,jy+1,k)-cgra2(i,jy,k)
+                        f2(i,n2,k)=rc(i,n2,k)*r(i,n2+1,k)-cgra2(i,n2,k)
                     !
                     end do
                 end do
-
-            end do
             !
             !     into the field
             do k=kparasta,kparaend
-                do j=jp,jy-jp
-                    do i=1,jx
+                do j=1,n2-1
+                    do i=1,n1
                         !
                         f2(i,j,k)=-cgra2(i,j,k)
                     !
@@ -2294,7 +2236,7 @@ contains
 
             !     sides 1 and 2  sia per bodyforce 0 o 1
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
                     j=1
                     if (rc(i,j,k)>0.) then
 
@@ -2309,14 +2251,14 @@ contains
                     f2(i,j,k)=f2(i,j,k)+rc(i,j,k)*rindietro1
 
 
-                    j=jy-1
+                    j=n2-1
                     if (rc(i,j,k)>0.) then
 
-                        rindietro1=r(i,jy-1, k)
+                        rindietro1=r(i,n2-1, k)
 
                     else
 
-                        rindietro1=r(i,jy  ,k)
+                        rindietro1=r(i,n2  ,k)
 
                     end if
 
@@ -2329,8 +2271,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparasta,kparaend
-                    do j=2,jy-2
-                        do i=1,jx
+                    do j=2,n2-2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
 
                                 f2(i,j,k)=f2(i,j,k)+rc(i,j,k)*r(i,j,k)
@@ -2348,8 +2290,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparasta,kparaend
-                    do j=2,jy-2
-                        do i=1,jx
+                    do j=2,n2-2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i,j+1,k)==0) then !solido davanti
@@ -2401,11 +2343,11 @@ contains
         !     sides bottom and upper
         js=0
         jss=0
-        do j=1,2*jp
+        do j=1,2
             !
             do k=kparasta,kparaend
                 !
-                do  i=1+ip,jx-ip
+                do  i=1+ip,n1-ip
                     !
                     fg=.5*(r(i+1,jss,k)-r(i-1,jss,k))
                     !      f2(i,js,k)=-f2(i,js,k)+akapt(isc,i,jss,k)*g21(i,js,k)*fg
@@ -2437,8 +2379,8 @@ contains
                         f2(i,js,k)=-f2(i,js,k)+akapt(isc,i,jss,k)*g21(i,js,k)*fg
                     end if
                     !
-                    i=jx
-                    fg=.5*(3.*r(jx,jss,k)-4.*r(jx-1,jss,k)+r(jx-2,jss,k))
+                    i=n1
+                    fg=.5*(3.*r(n1,jss,k)-4.*r(n1-1,jss,k)+r(n1-2,jss,k))
                     !      f2(i,js,k)=-f2(i,js,k)+akapt(isc,i,jss,k)*g21(i,js,k)*fg
 
                     if (tipo(i-1,jss,k)==0.or.tipo(i-2,jss,k)==0) then
@@ -2453,17 +2395,17 @@ contains
             !
             end do
             !
-            js=jy
-            jss=jy+1
+            js=n2
+            jss=n2+1
         !
         end do
         !
         ! into the field
         !
         do k=kparasta,kparaend
-            do j=jp,jy-jp
+            do j=1,n2-1
                 !
-                do i=1+ip,jx-ip
+                do i=1+ip,n1-ip
                     !
                     r1=.5*(r(i-1,j,k)+r(i-1,j+1,k))
                     r2=.5*(r(i+1,j,k)+r(i+1,j+1,k))
@@ -2516,10 +2458,10 @@ contains
                         f2(i,j,k)=-f2(i,j,k)+g21(i,j,k)*ak*fg
                     end if
                     !
-                    i=jx
-                    r0=.5*(r(jx  ,j,k)+r(jx  ,j+1,k))
-                    r1=.5*(r(jx-1,j,k)+r(jx-1,j+1,k))
-                    r2=.5*(r(jx-2,j,k)+r(jx-2,j+1,k))
+                    i=n1
+                    r0=.5*(r(n1  ,j,k)+r(n1  ,j+1,k))
+                    r1=.5*(r(n1-1,j,k)+r(n1-1,j+1,k))
+                    r2=.5*(r(n1-2,j,k)+r(n1-2,j+1,k))
                     fg=.5*(3.*r0-4.*r1+r2)
                     ak=.5*(akapt(isc,i,j,k)+akapt(isc,i,j+1,k))
                     !      f2(i,j,k)=-f2(i,j,k)+g21(i,j,k)*ak*fg
@@ -2562,9 +2504,9 @@ contains
 
         js=0
         jss=0
-        do j=1,2*jp
+        do j=1,2
             !
-            do i=1,jx
+            do i=1,n1
                 !
                 do k=kparastak,kparaendk
                     !
@@ -2603,8 +2545,8 @@ contains
                     !
                     if (myid==nproc-1) then
 
-                        k=jz
-                        fg=.5*(3.*r(i,jss,jz)-4.*r(i,jss,jz-1)+r(i,jss,jz-2))
+                        k=n3
+                        fg=.5*(3.*r(i,jss,n3)-4.*r(i,jss,n3-1)+r(i,jss,n3-2))
                         !      f2(i,js,k)=f2(i,js,k)+akapt(isc,i,jss,k)*g23(i,js,k)*fg
 
                         if (tipo(i,jss,k-1)==0.or.tipo(i+1,jss,k-2)==0) then
@@ -2621,15 +2563,15 @@ contains
             !
             end do
             !
-            js=jy
-            jss=jy+1
+            js=n2
+            jss=n2+1
         !
         end do
         !
         ! into the field
         !
-        do j=jp,jy-jp
-            do i=1,jx
+        do j=1,n2-1
+            do i=1,n1
                 !
                 do k=kparastak,kparaendk
                     !
@@ -2691,10 +2633,10 @@ contains
                     !
                     if (myid==nproc-1) then
 
-                        k=jz
-                        r0=.5*(r(i,j,jz  )+r(i,j+1,jz  ))
-                        r1=.5*(r(i,j,jz-1)+r(i,j+1,jz-1))
-                        r2=.5*(r(i,j,jz-2)+r(i,j+1,jz-2))
+                        k=n3
+                        r0=.5*(r(i,j,n3  )+r(i,j+1,n3  ))
+                        r1=.5*(r(i,j,n3-1)+r(i,j+1,n3-1))
+                        r2=.5*(r(i,j,n3-2)+r(i,j+1,n3-2))
                         fg=.5*(3.*r0-4.*r1+r2)
                         ak=.5*(akapt(isc,i,j,k)+akapt(isc,i,j+1,k))
                         !      f2(i,j,k)=f2(i,j,k)+g23(i,j,k)*ak*fg
@@ -2723,13 +2665,13 @@ contains
 
 
         do k=kparasta,kparaend
-            do j=jp,jy-jp
-                do i=1,jx
+            do j=1,n2-1
+                do i=1,n1
                     !
 
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f2(i,j,k)=0.
-                        if (j<jy) then
+                        if (j<n2) then
                             if (tipo(i,j+1,k)==0)f2(i,j,k)=0.
                         end if
                     end if
@@ -2740,7 +2682,7 @@ contains
         return
     end subroutine flud2
 
-    subroutine flud3(rc,cgra3,r,insc,isc,tipo)
+    subroutine flud3(rc,cgra3,r,isc,tipo)
         !***********************************************************************
         ! compute explicit flux on zita component for scalar equation
         !
@@ -2755,7 +2697,7 @@ contains
         !-----------------------------------------------------------------------
         !     array declaration
         integer :: ierr
-        integer :: insc,isc
+        integer :: isc
         integer :: kparastal,kparaendl
         integer :: kparastall,kparaendll
         integer :: i,j,k,ks,kss,ii,jj,kk
@@ -2777,15 +2719,15 @@ contains
         ! sides back and front
         do k=1,kp
 
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     !
                     if (myid==0) then
                         f3(i,j,0)=rc(i,j,0 )*r(i,j,0   )-cgra3(i,j,0 )
                     end if
 
                     if (myid==nproc-1) then
-                        f3(i,j,jz)=rc(i,j,jz)*r(i,j,jz+1)-cgra3(i,j,jz)
+                        f3(i,j,n3)=rc(i,j,n3)*r(i,j,n3+1)-cgra3(i,j,n3)
                     end if
                 !
                 end do
@@ -2807,8 +2749,8 @@ contains
         end if
 
         do k=kparastal,kparaendl
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     !
                     f3(i,j,k)=rc(i,j,k)*.5*(r(i,j,k)+r(i,j,k+1))-cgra3(i,j,k)
                 !
@@ -2833,8 +2775,8 @@ contains
 
             !     sides 5 and 6
             if (myid==0) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
                         k=1
                         if (rc(i,j,k)>0.) then
@@ -2886,14 +2828,14 @@ contains
             end if
 
             if (myid==nproc-1) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
-                        k=jz-1
+                        k=n3-1
                         if (rc(i,j,k)>0.) then
-                            ravanti=r(i,j,jz  )
-                            rindietro1=r(i,j,jz-1)
-                            rindietro2=r(i,j,jz-2)
+                            ravanti=r(i,j,n3  )
+                            rindietro1=r(i,j,n3-1)
+                            rindietro2=r(i,j,n3-2)
 
                             if (tipo(i,j,k)==1) then !ib cell
                                 if (tipo(i,j,k+1)==0) then !solido davanti
@@ -2910,10 +2852,10 @@ contains
                                     .125*(-ravanti +2.*rindietro1-rindietro2 )
                             end if !tipo
                         else
-                            ravanti=r(i,j,jz-1)
-                            rindietro1=r(i,j,jz  )
-                            rindietro2=kp*(2.*r(i,j,jz+1)-r(i,j,jz)) &
-                                +(1.-kp)*r(i,j,jz+1)
+                            ravanti=r(i,j,n3-1)
+                            rindietro1=r(i,j,n3  )
+                            rindietro2=kp*(2.*r(i,j,n3+1)-r(i,j,n3)) &
+                                +(1.-kp)*r(i,j,n3+1)
 
 
                             if (tipo(i,j,k+1)==1) then
@@ -2943,8 +2885,8 @@ contains
             !     into the field
 
             do k=kparastall,kparaendll
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         !      if (tipo(i,j,k)==2) then
                         !      if (rc(i,j,k)>0.) then
@@ -3004,15 +2946,15 @@ contains
             !     sides back and front
             do k=1,kp
 
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         if (myid==0) then
                             f3(i,j,0)=rc(i,j,0 )*r(i,j,0   )-cgra3(i,j,0 )
                         end if
 
                         if (myid==nproc-1) then
-                            f3(i,j,jz)=rc(i,j,jz)*r(i,j,jz+1)-cgra3(i,j,jz)
+                            f3(i,j,n3)=rc(i,j,n3)*r(i,j,n3+1)-cgra3(i,j,n3)
                         end if
                     !
                     end do
@@ -3033,8 +2975,8 @@ contains
 
 
             do k=kparastal,kparaendl
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         f3(i,j,k)=-cgra3(i,j,k)
                     !
@@ -3055,8 +2997,8 @@ contains
 
             !     sides 5 and 6 sia per bodyforce 0 o 1
             if (myid==0) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         k=1
                         if (rc(i,j,k)>0.) then
                             ravanti=r(i,j,2)
@@ -3078,19 +3020,19 @@ contains
             end if !myid==0
 
             if (myid==nproc-1) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
-                        k=jz-1
+                        k=n3-1
                         if (rc(i,j,k)>0.) then
-                            ravanti=r(i,j,jz  )
-                            rindietro1=r(i,j,jz-1)
-                            rindietro2=r(i,j,jz-2)
+                            ravanti=r(i,j,n3  )
+                            rindietro1=r(i,j,n3-1)
+                            rindietro2=r(i,j,n3-2)
                         else
-                            ravanti=r(i,j,jz-1)
-                            rindietro1=r(i,j,jz  )
-                            rindietro2=kp*(2.*r(i,j,jz+1)-r(i,j,jz)) &
-                                +(1.-kp)*r(i,j,jz+1)
+                            ravanti=r(i,j,n3-1)
+                            rindietro1=r(i,j,n3  )
+                            rindietro2=kp*(2.*r(i,j,n3+1)-r(i,j,n3)) &
+                                +(1.-kp)*r(i,j,n3+1)
                         end if
 
                         f3(i,j,k)=f3(i,j,k)+rc(i,j,k) &
@@ -3104,8 +3046,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparastall,kparaendll
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
 
                                 f3(i,j,k)=f3(i,j,k)+rc(i,j,k) &
@@ -3123,8 +3065,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparastall,kparaendll
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i,j,k+1)==0) then !solido davanti
@@ -3203,15 +3145,15 @@ contains
             !     sides back and front
             do k=1,kp
 
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         if (myid==0) then
                             f3(i,j,0)=rc(i,j,0 )*r(i,j,0   )-cgra3(i,j,0 )
                         end if
 
                         if (myid==nproc-1) then
-                            f3(i,j,jz)=rc(i,j,jz)*r(i,j,jz+1)-cgra3(i,j,jz)
+                            f3(i,j,n3)=rc(i,j,n3)*r(i,j,n3+1)-cgra3(i,j,n3)
                         end if
                     !
                     end do
@@ -3232,8 +3174,8 @@ contains
 
 
             do k=kparastal,kparaendl
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         f3(i,j,k)=-cgra3(i,j,k)
                     !
@@ -3254,8 +3196,8 @@ contains
 
             !     sides 5 and 6 sia per bodyforce 0 o 1
             if (myid==0) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         k=1
                         if (rc(i,j,k)>0.) then
 
@@ -3275,17 +3217,17 @@ contains
             end if !myid==0
 
             if (myid==nproc-1) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
-                        k=jz-1
+                        k=n3-1
                         if (rc(i,j,k)>0.) then
 
-                            rindietro1=r(i,j,jz-1)
+                            rindietro1=r(i,j,n3-1)
 
                         else
 
-                            rindietro1=r(i,j,jz  )
+                            rindietro1=r(i,j,n3  )
 
                         end if
 
@@ -3299,8 +3241,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparastall,kparaendll
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
 
                                 f3(i,j,k)=f3(i,j,k)+rc(i,j,k)*r(i,j,k)
@@ -3316,8 +3258,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparastall,kparaendll
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i,j,k+1)==0) then !solido davanti
@@ -3392,9 +3334,9 @@ contains
 
             if (myid==(k-1)*(nproc-1)) then
 
-                do j=1,jy
+                do j=1,n2
                     !
-                    do i=1+ip,jx-ip
+                    do i=1+ip,n1-ip
                         !
                         fg=.5*(r(i+1,j,kss)-r(i-1,j,kss))
                         !         f3(i,j,ks)=-f3(i,j,ks)
@@ -3428,8 +3370,8 @@ contains
                                 +akapt(isc,i,j,kss)*g31(i,j,ks)*fg
                         end if
                         !
-                        i=jx
-                        fg=.5*(3.*r(jx,j,kss)-4.*r(jx-1,j,kss)+r(jx-2,j,kss))
+                        i=n1
+                        fg=.5*(3.*r(n1,j,kss)-4.*r(n1-1,j,kss)+r(n1-2,j,kss))
                         !      f3(i,j,ks)=-f3(i,j,ks)
                         !     >               +akapt(isc,i,j,kss)*g31(i,j,ks)*fg
                         !
@@ -3447,17 +3389,17 @@ contains
             !
             end if
 
-            ks=jz
-            kss=jz+1
+            ks=n3
+            kss=n3+1
         !
         end do
         !
         ! into the field
         !
         do k=kparastal,kparaendl
-            do j=1,jy
+            do j=1,n2
                 !
-                do i=1+ip,jx-ip
+                do i=1+ip,n1-ip
                     !
                     r1=.5*(r(i-1,j,k)+r(i-1,j,k+1))
                     r2=.5*(r(i+1,j,k)+r(i+1,j,k+1))
@@ -3512,10 +3454,10 @@ contains
                         f3(i,j,k)=-f3(i,j,k)+g31(i,j,k)*ak*fg
                     end if
                     !
-                    i=jx
-                    r0=.5*(r(jx  ,j,k)+r(jx  ,j,k+1))
-                    r1=.5*(r(jx-1,j,k)+r(jx-1,j,k+1))
-                    r2=.5*(r(jx-2,j,k)+r(jx-2,j,k+1))
+                    i=n1
+                    r0=.5*(r(n1  ,j,k)+r(n1  ,j,k+1))
+                    r1=.5*(r(n1-1,j,k)+r(n1-1,j,k+1))
+                    r2=.5*(r(n1-2,j,k)+r(n1-2,j,k+1))
                     fg=.5*(3.*r0-4.*r1+r2)
                     ak=.5*(akapt(isc,i,j,k)+akapt(isc,i,j,k+1))
                     !      f3(i,j,k)=-f3(i,j,k)+g31(i,j,k)*ak*fg
@@ -3550,9 +3492,9 @@ contains
 
             if (myid==(k-1)*(nproc-1)) then
 
-                do i=1,jx
+                do i=1,n1
                     !
-                    do j=1+jp,jy-jp
+                    do j=2,n2-1
                         !
                         fg=.5*(r(i,j+1,kss)-r(i,j-1,kss))
                         !         f3(i,j,ks)=f3(i,j,ks)
@@ -3568,7 +3510,7 @@ contains
                         end if
                     end do
                     !
-                    do jj=1,jp
+                    ! direction 2 is always not periodic
                         !
                         ! check derivative on sides back and front
                         !
@@ -3586,8 +3528,8 @@ contains
                                 +akapt(isc,i,j,kss)*g32(i,j,ks)*fg
                         end if
                         !
-                        j=jy
-                        fg=.5*(3.*r(i,jy,kss)-4.*r(i,jy-1,kss)+r(i,jy-2,kss))
+                        j=n2
+                        fg=.5*(3.*r(i,n2,kss)-4.*r(i,n2-1,kss)+r(i,n2-2,kss))
                         !      f3(i,j,ks)=f3(i,j,ks)
                         !     >              +akapt(isc,i,j,kss)*g32(i,j,ks)*fg
 
@@ -3600,14 +3542,12 @@ contains
                                 +akapt(isc,i,j,kss)*g32(i,j,ks)*fg
                         end if
                     !
-                    end do
-                !
                 end do
             !
             end if
 
-            ks=jz
-            kss=jz+1
+            ks=n3
+            kss=n3+1
         !
         end do
         !
@@ -3615,9 +3555,9 @@ contains
         !
 
         do k=kparastal,kparaendl
-            do i=1,jx
+            do i=1,n1
                 !
-                do j=1+jp,jy-jp
+                do j=2,n2-1
                     !
                     r1=.5*(r(i,j-1,k)+r(i,j-1,k+1))
                     r2=.5*(r(i,j+1,k)+r(i,j+1,k+1))
@@ -3645,7 +3585,7 @@ contains
                 !
                 end do
                 !
-                if (jp==1) then
+                ! direction 2 is always not periodic
                     !
                     ! check derivative on sides back and front
                     !
@@ -3673,10 +3613,10 @@ contains
                     end if
 
                     !
-                    j=jy
-                    r0=.5*(r(i,jy  ,k)+r(i,jy  ,k+1))
-                    r1=.5*(r(i,jy-1,k)+r(i,jy-1,k+1))
-                    r2=.5*(r(i,jy-2,k)+r(i,jy-2,k+1))
+                    j=n2
+                    r0=.5*(r(i,n2  ,k)+r(i,n2  ,k+1))
+                    r1=.5*(r(i,n2-1,k)+r(i,n2-1,k+1))
+                    r2=.5*(r(i,n2-2,k)+r(i,n2-2,k+1))
                     fg=.5*(3.*r0-4.*r1+r2)
                     ak=.5*(akapt(isc,i,j,k)+akapt(isc,i,j,k+1))
                     !      f3(i,j,k)=f3(i,j,k)+g32(i,j,k)*ak*fg
@@ -3696,20 +3636,18 @@ contains
                     else
                         f3(i,j,k)=f3(i,j,k)+g32(i,j,k)*ak*fg
                     end if
-
-                end if
             !
             end do
         end do
 
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 do k=kparastal,kparaendl
                     !
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f3(i,j,k)=0.
-                        if (k<jz) then
+                        if (k<n3) then
                             if (tipo(i,j,k+1)==0)f3(i,j,k)=0.
                         end if
                     end if
@@ -3731,16 +3669,16 @@ contains
         end if
 
         if (rightpem/=MPI_PROC_NULL) then
-            call MPI_SEND(f3(1,1,kparaend),jx*jy,MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(f3(1,1,kparaend),n1*n2,MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
         end if
         if (leftpem/=MPI_PROC_NULL) then
-            call MPI_RECV(f3(1,1,kparasta-1),jx*jy,MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(f3(1,1,kparasta-1),n1*n2,MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
         end if
 
         return
     end subroutine flud3
 
-    subroutine flux1(rc,cgra1,r,insc,tipo)
+    subroutine flux1(rc,cgra1,r,tipo)
         !***********************************************************************
         ! compute explict flux on csi component:
         !
@@ -3752,9 +3690,8 @@ contains
 
         !-----------------------------------------------------------------------
         !     array declaration
-        integer :: insc
         integer :: kparastak,kparaendk
-        !double precision bulk_loc
+        !real bulk_loc
         !
         integer :: i,j,k,jj,kk,is,iss
         real :: fg,r0,r1,r2,an
@@ -3774,10 +3711,10 @@ contains
         do i=1,ip
             !
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     !
                     f1(0,j,k)=rc(0,j,k)*r(0,j,k)-cgra1(0,j,k)
-                    f1(jx,j,k)=rc(jx,j,k)*r(jx+1,j,k)-cgra1(jx,j,k)
+                    f1(n1,j,k)=rc(n1,j,k)*r(n1+1,j,k)-cgra1(n1,j,k)
                 !
                 end do
             end do
@@ -3786,8 +3723,8 @@ contains
         !
         !     into the field
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
                     f1(i,j,k)=rc(i,j,k)*.5*(r(i,j,k)+r(i+1,j,k))-cgra1(i,j,k)
                 !
@@ -3802,7 +3739,7 @@ contains
         if (insc==1) then
             !     sides 1 and 2
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
 
                     i=1
                     if (rc(i,j,k)>0.) then
@@ -3821,16 +3758,16 @@ contains
                             *.125*( -ravanti +2.*rindietro1-rindietro2 )
                     end if
 
-                    i=jx-1
+                    i=n1-1
                     if (rc(i,j,k)>0.) then
-                        ravanti=r(jx  ,j,k)
-                        rindietro1=r(jx-1,j,k)
-                        rindietro2=r(jx-2,j,k)
+                        ravanti=r(n1  ,j,k)
+                        rindietro1=r(n1-1,j,k)
+                        rindietro2=r(n1-2,j,k)
                     else
-                        ravanti=r(jx-1,j,k)
-                        rindietro1=r(jx  ,j,k)
-                        rindietro2=ip*(2.*r(jx+1,j,k)-r(jx,j,k)) &
-                            +(1.-ip)*r(jx+1,j,k)
+                        ravanti=r(n1-1,j,k)
+                        rindietro1=r(n1  ,j,k)
+                        rindietro2=ip*(2.*r(n1+1,j,k)-r(n1,j,k)) &
+                            +(1.-ip)*r(n1+1,j,k)
                     end if
 
                     if (tipo(i,j,k)==2) then
@@ -3842,8 +3779,8 @@ contains
 
             !     into the field
             do k=kparasta,kparaend
-                do j=1,jy
-                    do i=2,jx-2
+                do j=1,n2
+                    do i=2,n1-2
                         !Giulia non comprende tutti i casi, da un lato è quick dall'altro dc
                         !      if (tipo(i,j,k)==2) then
                         !     if (rc(i,j,k)>0.) then
@@ -3902,10 +3839,10 @@ contains
             do i=1,ip
                 !
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         !
                         f1(0,j,k)=rc(0,j,k)*r(0,j,k)-cgra1(0,j,k)
-                        f1(jx,j,k)=rc(jx,j,k)*r(jx+1,j,k)-cgra1(jx,j,k)
+                        f1(n1,j,k)=rc(n1,j,k)*r(n1+1,j,k)-cgra1(n1,j,k)
                     !
                     end do
                 end do
@@ -3914,8 +3851,8 @@ contains
             !
             !     into the field
             do k=kparasta,kparaend
-                do j=1,jy
-                    do i=ip,jx-ip
+                do j=1,n2
+                    do i=ip,n1-ip
                         !
                         f1(i,j,k)=-cgra1(i,j,k)
                     !
@@ -3926,7 +3863,7 @@ contains
 
             !     sides 1 and 2  sia per bodyforce 0 o 1
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     i=1
                     if (rc(i,j,k)>0.) then
                         ravanti=r(2,j,k)
@@ -3943,16 +3880,16 @@ contains
                         *.125*( 3.*ravanti +6.*rindietro1-rindietro2 )
 
 
-                    i=jx-1
+                    i=n1-1
                     if (rc(i,j,k)>0.) then
-                        ravanti=r(jx   ,j,k)
-                        rindietro1=r(jx-1,j, k)
-                        rindietro2=r(jx-2,j, k)
+                        ravanti=r(n1   ,j,k)
+                        rindietro1=r(n1-1,j, k)
+                        rindietro2=r(n1-2,j, k)
                     else
-                        ravanti=r(jx-1,j,k)
-                        rindietro1=r(jx  ,j,k)
-                        rindietro2=ip*(2.*r(jx+1,j,k)-r(jx,j,k)) &
-                            +(1.-ip)*r(jx+1,j,k)
+                        ravanti=r(n1-1,j,k)
+                        rindietro1=r(n1  ,j,k)
+                        rindietro2=ip*(2.*r(n1+1,j,k)-r(n1,j,k)) &
+                            +(1.-ip)*r(n1+1,j,k)
                     end if
 
 
@@ -3966,8 +3903,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=2,jx-2
+                    do j=1,n2
+                        do i=2,n1-2
                             if (rc(i,j,k)>0.) then
 
                                 f1(i,j,k)=f1(i,j,k)+rc(i,j,k) &
@@ -3991,8 +3928,8 @@ contains
 
 
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=2,jx-2
+                    do j=1,n2
+                        do i=2,n1-2
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i+1,j,k)==0) then !solido davanti
@@ -4071,10 +4008,10 @@ contains
             do i=1,ip
                 !
                 do k=kparasta,kparaend
-                    do j=1,jy
+                    do j=1,n2
                         !
                         f1(0,j,k)=rc(0,j,k)*r(0,j,k)-cgra1(0,j,k)
-                        f1(jx,j,k)=rc(jx,j,k)*r(jx+1,j,k)-cgra1(jx,j,k)
+                        f1(n1,j,k)=rc(n1,j,k)*r(n1+1,j,k)-cgra1(n1,j,k)
                     !
                     end do
                 end do
@@ -4083,8 +4020,8 @@ contains
             !
             !     into the field
             do k=kparasta,kparaend
-                do j=1,jy
-                    do i=ip,jx-ip
+                do j=1,n2
+                    do i=ip,n1-ip
                         !
                         f1(i,j,k)=-cgra1(i,j,k)
                     !
@@ -4095,7 +4032,7 @@ contains
 
             !     sides 1 and 2  sia per bodyforce 0 o 1
             do k=kparasta,kparaend
-                do j=1,jy
+                do j=1,n2
                     i=1
                     if (rc(i,j,k)>0.) then
                         rindietro1=r(1,j,k)
@@ -4107,13 +4044,13 @@ contains
                     f1(i,j,k)=f1(i,j,k)+rc(i,j,k)*rindietro1
 
 
-                    i=jx-1
+                    i=n1-1
                     if (rc(i,j,k)>0.) then
-                        rindietro1=r(jx-1,j, k)
+                        rindietro1=r(n1-1,j, k)
 
                     else
 
-                        rindietro1=r(jx  ,j,k)
+                        rindietro1=r(n1  ,j,k)
 
                     end if
 
@@ -4126,8 +4063,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=2,jx-2
+                    do j=1,n2
+                        do i=2,n1-2
                             if (rc(i,j,k)>0.) then
 
                                 f1(i,j,k)=f1(i,j,k)+rc(i,j,k)*r(i,j,k)
@@ -4144,8 +4081,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=2,jx-2
+                    do j=1,n2
+                        do i=2,n1-2
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i+1,j,k)==0) then !solido davanti
@@ -4222,7 +4159,7 @@ contains
             !
             do k=kparasta,kparaend
                 !
-                do j=1+jp,jy-jp
+                do j=2,n2-1
                     !
                     fg=.5*(r(iss,j+1,k)-r(iss,j-1,k))
                     f1(is,j,k)=-f1(is,j,k) &
@@ -4230,7 +4167,7 @@ contains
                 !
                 end do
                 !
-                do jj=1,jp
+                ! direction 2 is always not periodic
                     !
                     !        check derivative at wall bottom and upper
                     !
@@ -4239,26 +4176,25 @@ contains
                     f1(is,j,k)=-f1(is,j,k) &
                         +annit(iss,j,k)*g12(is,j,k)*fg
                     !
-                    j=jy
-                    fg=.5*(3.*r(iss,jy,k)-4.*r(iss,jy-1,k)+r(iss,jy-2,k))
+                    j=n2
+                    fg=.5*(3.*r(iss,n2,k)-4.*r(iss,n2-1,k)+r(iss,n2-2,k))
                     f1(is,j,k)=-f1(is,j,k) &
                         +annit(iss,j,k)*g12(is,j,k)*fg
                 !
-                end do
             !
             end do
             !
-            is=jx
-            iss=jx+1
+            is=n1
+            iss=n1+1
         !
         end do
         !
         !
         !     into the field
         do k=kparasta,kparaend
-            do i=ip,jx-ip
+            do i=ip,n1-ip
                 !
-                do j=1+jp,jy-jp
+                do j=2,n2-1
                     !
                     r1=.5*(r(i,j-1,k)+r(i+1,j-1,k))
                     r2=.5*(r(i,j+1,k)+r(i+1,j+1,k))
@@ -4270,7 +4206,7 @@ contains
                 !
                 !     check derivative on sides bottom and upper
                 !
-                do jj=1,jp
+                ! direction 2 is always not periodic
                     !
                     j=1
                     r0=.5*(r(i,j  ,k)+r(i+1,j  ,k))
@@ -4280,15 +4216,14 @@ contains
                     an=.5*(annit(i,j,k)+annit(i+1,j,k))
                     f1(i,j,k)=-f1(i,j,k)+g12(i,j,k)*an*fg
                     !
-                    j=jy
-                    r0=.5*(r(i,jy  ,k)+r(i+1,jy  ,k))
-                    r1=.5*(r(i,jy-1,k)+r(i+1,jy-1,k))
-                    r2=.5*(r(i,jy-2,k)+r(i+1,jy-2,k))
+                    j=n2
+                    r0=.5*(r(i,n2  ,k)+r(i+1,n2  ,k))
+                    r1=.5*(r(i,n2-1,k)+r(i+1,n2-1,k))
+                    r2=.5*(r(i,n2-2,k)+r(i+1,n2-2,k))
                     fg=.5*(3.*r0-4.*r1+r2)
                     an=.5*(annit(i,j,k)+annit(i+1,j,k))
                     f1(i,j,k)=-f1(i,j,k)+g12(i,j,k)*an*fg
                 !
-                end do
             !
             end do
         end do
@@ -4316,7 +4251,7 @@ contains
 
         do i=1,2*ip
             !
-            do j=1,jy
+            do j=1,n2
                 !
                 do k=kparastak,kparaendk
                     !
@@ -4341,8 +4276,8 @@ contains
                     !
                     if (myid==nproc-1) then
 
-                        k=jz
-                        fg=.5*(3.*r(iss,j,jz)-4.*r(iss,j,jz-1)+r(iss,j,jz-2))
+                        k=n3
+                        fg=.5*(3.*r(iss,j,n3)-4.*r(iss,j,n3-1)+r(iss,j,n3-2))
                         f1(is,j,k)=f1(is,j,k) &
                             +annit(iss,j,k)*g13(is,j,k)*fg
 
@@ -4352,8 +4287,8 @@ contains
             !
             end do
             !
-            is=jx
-            iss=jx+1
+            is=n1
+            iss=n1+1
         !
         end do
 
@@ -4361,8 +4296,8 @@ contains
         !
         ! into the field
         !
-        do j=1,jy
-            do i=ip,jx-ip
+        do j=1,n2
+            do i=ip,n1-ip
                 do k=kparastak,kparaendk
                     !
                     !
@@ -4394,10 +4329,10 @@ contains
                     !
                     if (myid==nproc-1) then
 
-                        k=jz
-                        r0=.5*(r(i,j,jz  )+r(i+1,j,jz  ))
-                        r1=.5*(r(i,j,jz-1)+r(i+1,j,jz-1))
-                        r2=.5*(r(i,j,jz-2)+r(i+1,j,jz-2))
+                        k=n3
+                        r0=.5*(r(i,j,n3  )+r(i+1,j,n3  ))
+                        r1=.5*(r(i,j,n3-1)+r(i+1,j,n3-1))
+                        r2=.5*(r(i,j,n3-2)+r(i+1,j,n3-2))
                         fg=.5*(3.*r0-4.*r1+r2)
                         an=.5*(annit(i,j,k)+annit(i+1,j,k))
                         f1(i,j,k)=f1(i,j,k)+g13(i,j,k)*an*fg
@@ -4412,13 +4347,13 @@ contains
 
 
         do k=kparasta,kparaend
-            do j=1,jy
-                do i=ip,jx-ip
+            do j=1,n2
+                do i=ip,n1-ip
                     !
 
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f1(i,j,k)=0.
-                        if (i<jx) then
+                        if (i<n1) then
                             if (tipo(i+1,j,k)==0)f1(i,j,k)=0.
                         end if
                     end if
@@ -4441,7 +4376,7 @@ contains
         !        !
         !        ! make the value known to all procs to compute the total
         !        !
-        !        call MPI_ALLREDUCE(bulk_loc,bulk,1,MPI_DOUBLE_PRECISION, &
+        !        call MPI_ALLREDUCE(bulk_loc,bulk,1,MPI_REAL_SD, &
         !            MPI_SUM, &
         !            MPI_COMM_WORLD,ierr)
         !
@@ -4450,7 +4385,7 @@ contains
         return
     end subroutine flux1
 
-    subroutine flux2(rc,cgra2,r,insc,tipo)
+    subroutine flux2(rc,cgra2,r,tipo)
         !***********************************************************************
         ! compute explicit flux on eta component
         !
@@ -4464,9 +4399,8 @@ contains
 
         !-----------------------------------------------------------------------
         !     array declaration
-        integer :: insc
         integer :: kparastak,kparaendk
-        !double precision bulk_loc,bulk2
+        !real bulk_loc,bulk2
 
         integer :: i,j,k,ii,kk,js,jss
         real :: fg,r0,r1,r2,an
@@ -4482,23 +4416,21 @@ contains
         ! in points closer to wall it uses uf as ghost cell
 
         !     sides bottom and upper
-        do j=1,jp
+        ! direction 2 is always not periodic
             !
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
                     !
                     f2(i,0,k)=rc(i,0,k)*r(i,0,k)-cgra2(i,0,k)
-                    f2(i,jy,k)=rc(i,jy,k)*r(i,jy+1,k)-cgra2(i,jy,k)
+                    f2(i,n2,k)=rc(i,n2,k)*r(i,n2+1,k)-cgra2(i,n2,k)
                 !
                 end do
             end do
 
-        end do
-
         !     into the field
         do k=kparasta,kparaend
-            do j=jp,jy-jp
-                do i=1,jx
+            do j=1,n2-1
+                do i=1,n1
                     !
                     f2(i,j,k)=rc(i,j,k)*.5*(r(i,j,k)+r(i,j+1,k))-cgra2(i,j,k)
                 !
@@ -4512,14 +4444,13 @@ contains
 
             !     sides 3 and 4
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
 
                     j=1
                     if (rc(i,j,k)>0.) then
                         ravanti=r(i,2,k)
                         rindietro1=r(i,1,k)
-                        rindietro2=jp*(2.*r(i,0,k)-r(i,1,k)) &
-                            +(1.-jp)*r(i,0,k)
+                        rindietro2=2.*r(i,0,k)-r(i,1,k)
                     else
                         ravanti=r(i,1,k)
                         rindietro1=r(i,2,k)
@@ -4531,16 +4462,15 @@ contains
                             *.125*( -ravanti +2.*rindietro1-rindietro2 )
                     end if
 
-                    j=jy-1
+                    j=n2-1
                     if (rc(i,j,k)>0.) then
-                        ravanti=r(i,jy  ,k)
-                        rindietro1=r(i,jy-1,k)
-                        rindietro2=r(i,jy-2,k)
+                        ravanti=r(i,n2  ,k)
+                        rindietro1=r(i,n2-1,k)
+                        rindietro2=r(i,n2-2,k)
                     else
-                        ravanti=r(i,jy-1,k)
-                        rindietro1=r(i,jy  ,k)
-                        rindietro2=jp*(2.*r(i,jy+1,k)-r(i,jy,k)) &
-                            +(1.-jp)*r(i,jy+1,k)
+                        ravanti=r(i,n2-1,k)
+                        rindietro1=r(i,n2  ,k)
+                        rindietro2=2.*r(i,n2+1,k)-r(i,n2,k)
                     end if
 
                     if (tipo(i,j,k)==2) then
@@ -4552,8 +4482,8 @@ contains
 
             !     into the field
             do k=kparasta,kparaend
-                do j=2,jy-2
-                    do i=1,jx
+                do j=2,n2-2
+                    do i=1,n1
                         !
                         !         if (tipo(i,j,k)==2) then
                         !      if (rc(i,j,k)>0.) then
@@ -4611,23 +4541,21 @@ contains
 
             ! GIULIA UCS-CGRA
             !     side left and right
-            do j=1,jp
+            ! direction 2 is always not periodic
                 !
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
                         !
                         f2(i,0,k)=rc(i,0,k)*r(i,0,k)-cgra2(i,0,k)
-                        f2(i,jy,k)=rc(i,jy,k)*r(i,jy+1,k)-cgra2(i,jy,k)
+                        f2(i,n2,k)=rc(i,n2,k)*r(i,n2+1,k)-cgra2(i,n2,k)
                     !
                     end do
                 end do
-
-            end do
             !
             !     into the field
             do k=kparasta,kparaend
-                do j=jp,jy-jp
-                    do i=1,jx
+                do j=1,n2-1
+                    do i=1,n1
                         !
                         f2(i,j,k)=-cgra2(i,j,k)
                     !
@@ -4638,13 +4566,12 @@ contains
 
             !     sides 1 and 2  sia per bodyforce 0 o 1
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
                     j=1
                     if (rc(i,j,k)>0.) then
                         ravanti=r(i,2,k)
                         rindietro1=r(i,1,k)
-                        rindietro2=jp*(2.*r(i,0,k)-r(i,1,k)) &
-                            +(1.-jp)*r(i,0,k)
+                        rindietro2=2.*r(i,0,k)-r(i,1,k)
                     else
                         ravanti=r(i,1,k)
                         rindietro1=r(i,2,k)
@@ -4654,16 +4581,15 @@ contains
                     f2(i,j,k)=f2(i,j,k)+rc(i,j,k) &
                         *.125*( 3.*ravanti +6.*rindietro1-rindietro2 )
 
-                    j=jy-1
+                    j=n2-1
                     if (rc(i,j,k)>0.) then
-                        ravanti=r(i,jy  , k)
-                        rindietro1=r(i,jy-1, k)
-                        rindietro2=r(i,jy-2, k)
+                        ravanti=r(i,n2  , k)
+                        rindietro1=r(i,n2-1, k)
+                        rindietro2=r(i,n2-2, k)
                     else
-                        ravanti=r(i,jy-1,k)
-                        rindietro1=r(i,jy  ,k)
-                        rindietro2=jp*(2.*r(i,jy+1,k)-r(i,jy,k)) &
-                            +(1.-jp)*r(i,jy+1,k)
+                        ravanti=r(i,n2-1,k)
+                        rindietro1=r(i,n2  ,k)
+                        rindietro2=2.*r(i,n2+1,k)-r(i,n2,k)
                     end if
 
 
@@ -4677,8 +4603,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparasta,kparaend
-                    do j=2,jy-2
-                        do i=1,jx
+                    do j=2,n2-2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
 
                                 f2(i,j,k)=f2(i,j,k)+rc(i,j,k) &
@@ -4701,8 +4627,8 @@ contains
 
 
                 do k=kparasta,kparaend
-                    do j=2,jy-2
-                        do i=1,jx
+                    do j=2,n2-2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i,j+1,k)==0) then !solido davanti
@@ -4780,23 +4706,21 @@ contains
 
             ! GIULIA UCS-CGRA
             !     side left and right
-            do j=1,jp
+            ! direction 2 is always not periodic
                 !
                 do k=kparasta,kparaend
-                    do i=1,jx
+                    do i=1,n1
                         !
                         f2(i,0,k)=rc(i,0,k)*r(i,0,k)-cgra2(i,0,k)
-                        f2(i,jy,k)=rc(i,jy,k)*r(i,jy+1,k)-cgra2(i,jy,k)
+                        f2(i,n2,k)=rc(i,n2,k)*r(i,n2+1,k)-cgra2(i,n2,k)
                     !
                     end do
                 end do
-
-            end do
             !
             !     into the field
             do k=kparasta,kparaend
-                do j=jp,jy-jp
-                    do i=1,jx
+                do j=1,n2-1
+                    do i=1,n1
                         !
                         f2(i,j,k)=-cgra2(i,j,k)
                     !
@@ -4807,7 +4731,7 @@ contains
 
             !     sides 1 and 2  sia per bodyforce 0 o 1
             do k=kparasta,kparaend
-                do i=1,jx
+                do i=1,n1
                     j=1
                     if (rc(i,j,k)>0.) then
 
@@ -4821,14 +4745,14 @@ contains
 
                     f2(i,j,k)=f2(i,j,k)+rc(i,j,k)*rindietro1
 
-                    j=jy-1
+                    j=n2-1
                     if (rc(i,j,k)>0.) then
 
-                        rindietro1=r(i,jy-1, k)
+                        rindietro1=r(i,n2-1, k)
 
                     else
 
-                        rindietro1=r(i,jy  ,k)
+                        rindietro1=r(i,n2  ,k)
 
                     end if
 
@@ -4842,8 +4766,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparasta,kparaend
-                    do j=2,jy-2
-                        do i=1,jx
+                    do j=2,n2-2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
 
                                 f2(i,j,k)=f2(i,j,k)+rc(i,j,k)*r(i,j,k)
@@ -4862,8 +4786,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparasta,kparaend
-                    do j=2,jy-2
-                        do i=1,jx
+                    do j=2,n2-2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i,j+1,k)==0) then !solido davanti
@@ -4936,12 +4860,12 @@ contains
         jss=0
         iwfp=wfp3
 
-        do j=1,2*jp
+        do j=1,2
             !
             do k=kparasta,kparaend
                 !
 
-                do  i=1+ip,jx-ip
+                do  i=1+ip,n1-ip
                     fg=.5*(r(i+1,jss,k)-r(i-1,jss,k))
                     !         WALL MODEL : all in flucn
                     if (iwfp) then
@@ -4959,8 +4883,8 @@ contains
                     fg=.5*(-3.*r(i,jss,k)+4.*r(i+1,jss,k)-r(i+2,jss,k))
                     f2(i,js,k)=-f2(i,js,k) &
                         +annit(i,jss,k)*g21(i,js,k)*fg
-                    i=jx
-                    fg=.5*(3.*r(jx,jss,k)-4.*r(jx-1,jss,k)+r(jx-2,jss,k))
+                    i=n1
+                    fg=.5*(3.*r(n1,jss,k)-4.*r(n1-1,jss,k)+r(n1-2,jss,k))
                     f2(i,js,k)=-f2(i,js,k) &
                         +annit(i,jss,k)*g21(i,js,k)*fg
                 end do
@@ -4969,8 +4893,8 @@ contains
             !
             end do
             !
-            js=jy
-            jss=jy+1
+            js=n2
+            jss=n2+1
             iwfp=wfp4
         !
         end do
@@ -4978,9 +4902,9 @@ contains
         ! into the field
         !
         do k=kparasta,kparaend
-            do j=jp,jy-jp
+            do j=1,n2-1
                 !
-                do i=1+ip,jx-ip
+                do i=1+ip,n1-ip
                     !
                     r1=.5*(r(i-1,j,k)+r(i-1,j+1,k))
                     r2=.5*(r(i+1,j,k)+r(i+1,j+1,k))
@@ -5002,10 +4926,10 @@ contains
                     an=.5*(annit(i,j,k)+annit(i,j+1,k))
                     f2(i,j,k)=-f2(i,j,k)+g21(i,j,k)*an*fg
                     !
-                    i=jx
-                    r0=.5*(r(jx  ,j,k)+r(jx  ,j+1,k))
-                    r1=.5*(r(jx-1,j,k)+r(jx-1,j+1,k))
-                    r2=.5*(r(jx-2,j,k)+r(jx-2,j+1,k))
+                    i=n1
+                    r0=.5*(r(n1  ,j,k)+r(n1  ,j+1,k))
+                    r1=.5*(r(n1-1,j,k)+r(n1-1,j+1,k))
+                    r2=.5*(r(n1-2,j,k)+r(n1-2,j+1,k))
                     fg=.5*(3.*r0-4.*r1+r2)
                     an=.5*(annit(i,j,k)+annit(i,j+1,k))
                     f2(i,j,k)=-f2(i,j,k)+g21(i,j,k)*an*fg
@@ -5036,9 +4960,9 @@ contains
         js=0
         jss=0
         iwfp=wfp3
-        do j=1,2*jp
+        do j=1,2
             !
-            do i=1,jx
+            do i=1,n1
                 !
                 do k=kparastak,kparaendk
                     !
@@ -5070,8 +4994,8 @@ contains
                     !
                     if (myid==nproc-1) then
 
-                        k=jz
-                        fg=.5*(3.*r(i,jss,jz)-4.*r(i,jss,jz-1)+r(i,jss,jz-2))
+                        k=n3
+                        fg=.5*(3.*r(i,jss,n3)-4.*r(i,jss,n3-1)+r(i,jss,n3-2))
                         f2(i,js,k)=f2(i,js,k) &
                             +annit(i,jss,k)*g23(i,js,k)*fg
 
@@ -5081,16 +5005,16 @@ contains
             !
             end do
             !
-            js=jy
-            jss=jy+1
+            js=n2
+            jss=n2+1
             iwfp=wfp4
         !
         end do
         !
         ! into the field
         !
-        do j=jp,jy-jp
-            do i=1,jx
+        do j=1,n2-1
+            do i=1,n1
                 !
                 do k=kparastak,kparaendk
                     !
@@ -5120,10 +5044,10 @@ contains
                     !
                     if (myid==nproc-1) then
 
-                        k=jz
-                        r0=.5*(r(i,j,jz  )+r(i,j+1,jz  ))
-                        r1=.5*(r(i,j,jz-1)+r(i,j+1,jz-1))
-                        r2=.5*(r(i,j,jz-2)+r(i,j+1,jz-2))
+                        k=n3
+                        r0=.5*(r(i,j,n3  )+r(i,j+1,n3  ))
+                        r1=.5*(r(i,j,n3-1)+r(i,j+1,n3-1))
+                        r2=.5*(r(i,j,n3-2)+r(i,j+1,n3-2))
                         fg=.5*(3.*r0-4.*r1+r2)
                         an=.5*(annit(i,j,k)+annit(i,j+1,k))
                         f2(i,j,k)=f2(i,j,k)+g23(i,j,k)*an*fg
@@ -5137,13 +5061,13 @@ contains
 
 
         do k=kparasta,kparaend
-            do j=jp,jy-jp
-                do i=1,jx
+            do j=1,n2-1
+                do i=1,n1
                     !
 
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f2(i,j,k)=0.
-                        if (j<jy) then
+                        if (j<n2) then
                             if (tipo(i,j+1,k)==0)f2(i,j,k)=0.
                         end if
                     end if
@@ -5165,7 +5089,7 @@ contains
         !        end do
         !
         !        ! make the value known to all procs
-        !        call MPI_ALLREDUCE(bulk_loc,bulk2,1,MPI_DOUBLE_PRECISION, &
+        !        call MPI_ALLREDUCE(bulk_loc,bulk2,1,MPI_REAL_SD, &
         !            MPI_SUM, &
         !            MPI_COMM_WORLD,ierr)
         !
@@ -5176,7 +5100,7 @@ contains
         return
     end subroutine flux2
 
-    subroutine flux3(rc,cgra3,r,insc,tipo)
+    subroutine flux3(rc,cgra3,r,tipo)
         !***********************************************************************
         ! compute explicit flux on component zita
         !
@@ -5190,10 +5114,9 @@ contains
         !-----------------------------------------------------------------------
         !     array declaration
         integer :: ierr
-        integer :: insc
         integer :: kparastal,kparaendl
         integer :: kparastall,kparaendll
-        !double precision bulk_loc,bulk3
+        !real bulk_loc,bulk3
         integer :: i,j,k,ii,jj,ks,kss
         real :: fg,r0,r1,r2,an
         real :: rc(n1,n2,kparasta-1:kparaend) !0:n3)
@@ -5211,15 +5134,15 @@ contains
         !     sides back and front
         do k=1,kp
 
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     !
                     if (myid==0) then
                         f3(i,j,0)=rc(i,j,0)*r(i,j,0   )-cgra3(i,j,0 )
                     end if
 
                     if (myid==nproc-1) then
-                        f3(i,j,jz)=rc(i,j,jz)*r(i,j,jz+1)-cgra3(i,j,jz)
+                        f3(i,j,n3)=rc(i,j,n3)*r(i,j,n3+1)-cgra3(i,j,n3)
                     end if
                 !
                 end do
@@ -5242,8 +5165,8 @@ contains
 
 
         do k=kparastal,kparaendl
-            do j=1,jy
-                do i=1,jx
+            do j=1,n2
+                do i=1,n1
                     !
                     f3(i,j,k)=rc(i,j,k)*.5*(r(i,j,k)+r(i,j,k+1))-cgra3(i,j,k)
                 !
@@ -5268,8 +5191,8 @@ contains
             !     sides 5 and 6
 
             if (myid==0) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
                         k=1
                         if (rc(i,j,k)>0.) then
@@ -5293,19 +5216,19 @@ contains
             end if
 
             if (myid==nproc-1) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
-                        k=jz-1
+                        k=n3-1
                         if (rc(i,j,k)>0.) then
-                            ravanti=r(i,j,jz  )
-                            rindietro1=r(i,j,jz-1)
-                            rindietro2=r(i,j,jz-2)
+                            ravanti=r(i,j,n3  )
+                            rindietro1=r(i,j,n3-1)
+                            rindietro2=r(i,j,n3-2)
                         else
-                            ravanti=r(i,j,jz-1)
-                            rindietro1=r(i,j,jz  )
-                            rindietro2=kp*(2.*r(i,j,jz+1)-r(i,j,jz)) &
-                                +(1.-kp)*r(i,j,jz+1)
+                            ravanti=r(i,j,n3-1)
+                            rindietro1=r(i,j,n3  )
+                            rindietro2=kp*(2.*r(i,j,n3+1)-r(i,j,n3)) &
+                                +(1.-kp)*r(i,j,n3+1)
                         end if
 
                         if (tipo(i,j,k)==2) then
@@ -5318,8 +5241,8 @@ contains
 
             !     into the field
             do k=kparastall,kparaendll
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         !      if (tipo(i,j,k)==2) then
                         !      if (rc(i,j,k)>0.) then
@@ -5377,15 +5300,15 @@ contains
             !     sides back and front
             do k=1,kp
 
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         if (myid==0) then
                             f3(i,j,0)=rc(i,j,0 )*r(i,j,0   )-cgra3(i,j,0 )
                         end if
 
                         if (myid==nproc-1) then
-                            f3(i,j,jz)=rc(i,j,jz)*r(i,j,jz+1)-cgra3(i,j,jz)
+                            f3(i,j,n3)=rc(i,j,n3)*r(i,j,n3+1)-cgra3(i,j,n3)
                         end if
                     !
                     end do
@@ -5406,8 +5329,8 @@ contains
 
 
             do k=kparastal,kparaendl
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         f3(i,j,k)=-cgra3(i,j,k)
                     !
@@ -5428,8 +5351,8 @@ contains
 
             !     sides 5 and 6 sia per bodyforce 0 o 1
             if (myid==0) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         k=1
                         if (rc(i,j,k)>0.) then
                             ravanti=r(i,j,2)
@@ -5452,19 +5375,19 @@ contains
             end if !myid==0
 
             if (myid==nproc-1) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
-                        k=jz-1
+                        k=n3-1
                         if (rc(i,j,k)>0.) then
-                            ravanti=r(i,j,jz  )
-                            rindietro1=r(i,j,jz-1)
-                            rindietro2=r(i,j,jz-2)
+                            ravanti=r(i,j,n3  )
+                            rindietro1=r(i,j,n3-1)
+                            rindietro2=r(i,j,n3-2)
                         else
-                            ravanti=r(i,j,jz-1)
-                            rindietro1=r(i,j,jz  )
-                            rindietro2=kp*(2.*r(i,j,jz+1)-r(i,j,jz)) &
-                                +(1.-kp)*r(i,j,jz+1)
+                            ravanti=r(i,j,n3-1)
+                            rindietro1=r(i,j,n3  )
+                            rindietro2=kp*(2.*r(i,j,n3+1)-r(i,j,n3)) &
+                                +(1.-kp)*r(i,j,n3+1)
                         end if
 
 
@@ -5480,8 +5403,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparastall,kparaendll
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
 
                                 f3(i,j,k)=f3(i,j,k)+rc(i,j,k) &
@@ -5501,8 +5424,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparastall,kparaendll
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i,j,k+1)==0) then !solido davanti
@@ -5582,15 +5505,15 @@ contains
             !     sides back and front
             do k=1,kp
 
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         if (myid==0) then
                             f3(i,j,0)=rc(i,j,0)*r(i,j,0)-cgra3(i,j,0 )
                         end if
 
                         if (myid==nproc-1) then
-                            f3(i,j,jz)=rc(i,j,jz)*r(i,j,jz+1)-cgra3(i,j,jz)
+                            f3(i,j,n3)=rc(i,j,n3)*r(i,j,n3+1)-cgra3(i,j,n3)
                         end if
                     !
                     end do
@@ -5611,8 +5534,8 @@ contains
 
 
             do k=kparastal,kparaendl
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         f3(i,j,k)=-cgra3(i,j,k)
                     !
@@ -5633,8 +5556,8 @@ contains
 
             !     sides 5 and 6 sia per bodyforce 0 o 1
             if (myid==0) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         k=1
                         if (rc(i,j,k)>0.) then
                             ravanti=r(i,j,2)
@@ -5656,19 +5579,19 @@ contains
             end if !myid==0
 
             if (myid==nproc-1) then
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
 
-                        k=jz-1
+                        k=n3-1
                         if (rc(i,j,k)>0.) then
-                            ravanti=r(i,j,jz  )
-                            rindietro1=r(i,j,jz-1)
-                            rindietro2=r(i,j,jz-2)
+                            ravanti=r(i,j,n3  )
+                            rindietro1=r(i,j,n3-1)
+                            rindietro2=r(i,j,n3-2)
                         else
-                            ravanti=r(i,j,jz-1)
-                            rindietro1=r(i,j,jz  )
-                            rindietro2=kp*(2.*r(i,j,jz+1)-r(i,j,jz)) &
-                                +(1.-kp)*r(i,j,jz+1)
+                            ravanti=r(i,j,n3-1)
+                            rindietro1=r(i,j,n3  )
+                            rindietro2=kp*(2.*r(i,j,n3+1)-r(i,j,n3)) &
+                                +(1.-kp)*r(i,j,n3+1)
                         end if
 
 
@@ -5683,8 +5606,8 @@ contains
             !     into the field without bodyforce
             if (.not.bodyforce) then
                 do k=kparastall,kparaendll
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
 
                                 f3(i,j,k)=f3(i,j,k)+rc(i,j,k)*r(i,j,k)
@@ -5702,8 +5625,8 @@ contains
             !
             else !bodyforce attivo
                 do k=kparastall,kparaendll
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             if (rc(i,j,k)>0.) then
                                 if (tipo(i,j,k)==1) then !ib cell
                                     if (tipo(i,j,k+1)==0) then !solido davanti
@@ -5779,9 +5702,9 @@ contains
 
             if (myid==(k-1)*(nproc-1)) then
 
-                do j=1,jy
+                do j=1,n2
                     !
-                    do i=1+ip,jx-ip
+                    do i=1+ip,n1-ip
                         !
                         fg=.5*(r(i+1,j,kss)-r(i-1,j,kss))
                         f3(i,j,ks)=-f3(i,j,ks) &
@@ -5798,8 +5721,8 @@ contains
                         f3(i,j,ks)=-f3(i,j,ks) &
                             +annit(i,j,kss)*g31(i,j,ks)*fg
                         !
-                        i=jx
-                        fg=.5*(3.*r(jx,j,kss)-4.*r(jx-1,j,kss)+r(jx-2,j,kss))
+                        i=n1
+                        fg=.5*(3.*r(n1,j,kss)-4.*r(n1-1,j,kss)+r(n1-2,j,kss))
                         f3(i,j,ks)=-f3(i,j,ks) &
                             +annit(i,j,kss)*g31(i,j,ks)*fg
                     !
@@ -5809,16 +5732,16 @@ contains
             !
             end if
 
-            ks=jz
-            kss=jz+1
+            ks=n3
+            kss=n3+1
         !
         end do
         !
         !     into the field
         do k=kparastal,kparaendl
-            do j=1,jy
+            do j=1,n2
                 !
-                do i=1+ip,jx-ip
+                do i=1+ip,n1-ip
                     !
                     r1=.5*(r(i-1,j,k)+r(i-1,j,k+1))
                     r2=.5*(r(i+1,j,k)+r(i+1,j,k+1))
@@ -5840,10 +5763,10 @@ contains
                     an=.5*(annit(i,j,k)+annit(i,j,k+1))
                     f3(i,j,k)=-f3(i,j,k)+g31(i,j,k)*an*fg
                     !
-                    i=jx
-                    r0=.5*(r(jx  ,j,k)+r(jx  ,j,k+1))
-                    r1=.5*(r(jx-1,j,k)+r(jx-1,j,k+1))
-                    r2=.5*(r(jx-2,j,k)+r(jx-2,j,k+1))
+                    i=n1
+                    r0=.5*(r(n1  ,j,k)+r(n1  ,j,k+1))
+                    r1=.5*(r(n1-1,j,k)+r(n1-1,j,k+1))
+                    r2=.5*(r(n1-2,j,k)+r(n1-2,j,k+1))
                     fg=.5*(3.*r0-4.*r1+r2)
                     an=.5*(annit(i,j,k)+annit(i,j,k+1))
                     f3(i,j,k)=-f3(i,j,k)+g31(i,j,k)*an*fg
@@ -5865,9 +5788,9 @@ contains
 
             if (myid==(k-1)*(nproc-1)) then
 
-                do i=1,jx
+                do i=1,n1
                     !
-                    do j=1+jp,jy-jp
+                    do j=2,n2-1
                         !
                         fg=.5*(r(i,j+1,kss)-r(i,j-1,kss))
                         f3(i,j,ks)=f3(i,j,ks) &
@@ -5875,7 +5798,7 @@ contains
                     !
                     end do
                     !
-                    do jj=1,jp
+                    ! direction 2 is always not periodic
                         !
                         ! check derivative on sides back and front
                         !
@@ -5884,28 +5807,27 @@ contains
                         f3(i,j,ks)=f3(i,j,ks) &
                             +annit(i,j,kss)*g32(i,j,ks)*fg
                         !
-                        j=jy
-                        fg=.5*(3.*r(i,jy,kss)-4.*r(i,jy-1,kss)+r(i,jy-2,kss))
+                        j=n2
+                        fg=.5*(3.*r(i,n2,kss)-4.*r(i,n2-1,kss)+r(i,n2-2,kss))
                         f3(i,j,ks)=f3(i,j,ks) &
                             +annit(i,j,kss)*g32(i,j,ks)*fg
                     !
-                    end do
                 !
                 end do
             !
             end if
 
-            ks=jz
-            kss=jz+1
+            ks=n3
+            kss=n3+1
         !
         end do
 
         !
         !     into the field
         do k=kparastal,kparaendl
-            do i=1,jx
+            do i=1,n1
                 !
-                do j=1+jp,jy-jp
+                do j=2,n2-1
                     !
                     r1=.5*(r(i,j-1,k)+r(i,j-1,k+1))
                     r2=.5*(r(i,j+1,k)+r(i,j+1,k+1))
@@ -5915,7 +5837,7 @@ contains
                 !
                 end do
                 !
-                do jj=1,jp
+                ! direction 2 is always not periodic
                     !
                     ! check derivative on sides back and front
                     !
@@ -5927,27 +5849,26 @@ contains
                     an=.5*(annit(i,j,k)+annit(i,j,k+1))
                     f3(i,j,k)=f3(i,j,k)+g32(i,j,k)*an*fg
                     !
-                    j=jy
-                    r0=.5*(r(i,jy  ,k)+r(i,jy  ,k+1))
-                    r1=.5*(r(i,jy-1,k)+r(i,jy-1,k+1))
-                    r2=.5*(r(i,jy-2,k)+r(i,jy-2,k+1))
+                    j=n2
+                    r0=.5*(r(i,n2  ,k)+r(i,n2  ,k+1))
+                    r1=.5*(r(i,n2-1,k)+r(i,n2-1,k+1))
+                    r2=.5*(r(i,n2-2,k)+r(i,n2-2,k+1))
                     fg=.5*(3.*r0-4.*r1+r2)
                     an=.5*(annit(i,j,k)+annit(i,j,k+1))
                     f3(i,j,k)=f3(i,j,k)+g32(i,j,k)*an*fg
                 !
-                end do
             !
             end do
         end do
         !
 
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
                 do k=kparastal,kparaendl
                     !
                     if (bodyforce) then
                         if (tipo(i,j,k)==0)f3(i,j,k)=0.
-                        if (k<jz) then
+                        if (k<n3) then
                             if (tipo(i,j,k+1)==0)f3(i,j,k)=0.
                         end if
                     end if
@@ -5967,10 +5888,10 @@ contains
         end if
 
         if (rightpem/=MPI_PROC_NULL) then
-            call MPI_SEND(f3(1,1,kparaend),jx*jy,MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
+            call MPI_SEND(f3(1,1,kparaend),n1*n2,MPI_REAL_SD,rightpem,tagrs,MPI_COMM_WORLD,ierr)
         end if
         if (leftpem/=MPI_PROC_NULL) then
-            call MPI_RECV(f3(1,1,kparasta-1),jx*jy,MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
+            call MPI_RECV(f3(1,1,kparasta-1),n1*n2,MPI_REAL_SD,leftpem,taglr,MPI_COMM_WORLD,status,ierr)
         end if
 
         !     integral for f3
@@ -5986,7 +5907,7 @@ contains
         !
         !        !     make the value known to all procs
         !
-        !        call MPI_ALLREDUCE(bulk_loc,bulk3,1,MPI_DOUBLE_PRECISION, &
+        !        call MPI_ALLREDUCE(bulk_loc,bulk3,1,MPI_REAL_SD, &
         !            MPI_SUM, &
         !            MPI_COMM_WORLD,ierr)
         !

@@ -1,12 +1,11 @@
-!***********************************************************************
 subroutine courant(ktime)
-    !***********************************************************************
+
     ! compute the time step of the simulation or the max courant number
     ! depending on the simulation settings
     !
     use myarrays_metri3, only: annit, g11, g22, g33, giac
     use myarrays_velo3, only: uc, vc, wc
-    use mysending, only: kparasta,kparaend,nproc,myid,MPI_REAL_SD
+    use mysending, only: nproc,myid,MPI_REAL_SD
     use mysettings, only: ind_cou,cou,espl,i_rest
     !
     use scala3
@@ -44,8 +43,8 @@ subroutine courant(ktime)
             cou_loc=0.
 
             do k=kparasta,kparaend
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         auc=max( (abs(uc(i,j,k))) , (abs(uc(i-1,j,k))) )
                         avc=max( (abs(vc(i,j,k))) , (abs(vc(i,j-1,k))) )
@@ -164,8 +163,8 @@ subroutine courant(ktime)
                 dt_loc=0.01
 
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             auc=abs(uc(i,j,k))
                             avc=abs(vc(i,j,k))
                             awc=abs(wc(i,j,k))
@@ -188,8 +187,8 @@ subroutine courant(ktime)
                 dt_loc=cou*giac(1,1,kparasta)/den
 
                 do k=kparasta,kparaend
-                    do j=1,jy
-                        do i=1,jx
+                    do j=1,n2
+                        do i=1,n1
                             auc=abs(uc(i,j,k))
                             avc=abs(vc(i,j,k))
                             awc=abs(wc(i,j,k))
@@ -225,8 +224,8 @@ subroutine courant(ktime)
             !     (I don't want a too large difference between diff and conv
             !     to avoid errors, although the implicit is stable)
             do k=kparasta,kparaend
-                do j=1,jy
-                    do i=1,jx
+                do j=1,n2
+                    do i=1,n1
                         !
                         epp=0.000001
 

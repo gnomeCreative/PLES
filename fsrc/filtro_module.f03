@@ -185,8 +185,8 @@ contains
         !     initialize
         !
         do k=kparasta-1,kparaend+1
-            do j=0,jy+1
-                do i=0,jx+1
+            do j=0,n2+1
+                do i=0,n1+1
                     rf(i,j,k)=0.
                 enddo
             enddo
@@ -291,27 +291,27 @@ contains
         !-----------------------------------------------------------------------
 
         if (myid.ne.0) then
-            call MPI_SEND(r(0,0,kparasta),(jx+2)*(jy+2), &
+            call MPI_SEND(r(0,0,kparasta),(n1+2)*(n2+2), &
                 MPI_REAL_SD,leftpem,tagls, &
                 MPI_COMM_WORLD,ierr)
         !         call MPI_WAIT(req1,istatus,ierr)
         endif
       
         if (myid.ne.nproc-1) then
-            call MPI_RECV(r(0,0,kparaend+1),(jx+2)*(jy+2), &
+            call MPI_RECV(r(0,0,kparaend+1),(n1+2)*(n2+2), &
                 MPI_REAL_SD,rightpem,tagrr, &
                 MPI_COMM_WORLD,status,ierr)
         !         call MPI_WAIT(req2,istatus,ierr)
         endif
 
         if (myid.ne.nproc-1) then
-            call MPI_SEND(r(0,0,kparaend),(jx+2)*(jy+2), &
+            call MPI_SEND(r(0,0,kparaend),(n1+2)*(n2+2), &
                 MPI_REAL_SD,rightpem,tagrs, &
                 MPI_COMM_WORLD,ierr)
         !         call MPI_WAIT(req3,istatus,ierr)
         endif
         if (myid.ne.0) then
-            call MPI_RECV(r(0,0,kparasta-1),(jx+2)*(jy+2), &
+            call MPI_RECV(r(0,0,kparasta-1),(n1+2)*(n2+2), &
                 MPI_REAL_SD,leftpem,taglr, &
                 MPI_COMM_WORLD,status,ierr)
         !         call MPI_WAIT(req4,istatus,ierr)
@@ -320,14 +320,14 @@ contains
         !     if periodic
         do k=1,1-kp
 
-            call MPI_TYPE_VECTOR(jy+2,jx,jx+2,MPI_REAL_SD,plantype,ierr)
+            call MPI_TYPE_VECTOR(n2+2,n1,n1+2,MPI_REAL_SD,plantype,ierr)
             call MPI_TYPE_COMMIT(plantype,ierr)
 
 
             if (myid==nproc-1) then
-                call MPI_SENDRECV(r(1,0,jz),1, &
+                call MPI_SENDRECV(r(1,0,n3),1, &
                     plantype,0,11, &
-                    r(1,0,jz+1),1, &
+                    r(1,0,n3+1),1, &
                     plantype,0,12, &
                     MPI_COMM_WORLD,status,ierr)
 

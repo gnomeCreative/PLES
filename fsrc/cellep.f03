@@ -1,19 +1,16 @@
-!***********************************************************************
 subroutine cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
-   !***********************************************************************
+
    ! periodic points out of the domain
-   !
-   use myarrays_metri3, only: x, y, z
-   use mysending, only: kparaend, kparasta, myid, nproc
-   use scala3, only: jx, jy, jz, n1, n2, n3
-   !use period
+   use myarrays_metri3, only: x,y,z
+   use mysending, only:  myid,nproc
+   use scala3, only: n1,n2,n3,kparaend,kparasta
 
    implicit none
+
    !-----------------------------------------------------------------------
-   !     array declaration
-   integer i,j,k
-   integer kgridparasta
-   integer kgpsta,kgpend
+   integer :: i,j,k
+   integer :: kgridparasta
+   integer :: kgpsta,kgpend
 
    real :: xx1(-8:n1+8,-8:n2+8,n3-8:n3)
    real :: yy1(-8:n1+8,-8:n2+8,n3-8:n3)
@@ -22,35 +19,35 @@ subroutine cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
    real :: xx2(-8:n1+8,-8:n2+8,0:8)
    real :: yy2(-8:n1+8,-8:n2+8,0:8)
    real :: zz2(-8:n1+8,-8:n2+8,0:8)
-   !
+
    !-----------------------------------------------------------------------
    ! csi direction, adiacent blocks to faces sn and dx (1 and 2)
    !
    do i=1,8
-      do j=0,jy
+      do j=0,n2
          do k=kparasta-1,kparaend !+1 !0,jz
-            x(-i,j,k)=x(0,j,k)-(x(jx,j,k)-x(jx-i,j,k))
-            y(-i,j,k)=y(jx-i,j,k)
-            z(-i,j,k)=z(jx-i,j,k)
+            x(-i,j,k)=x(0,j,k)-(x(n1,j,k)-x(n1-i,j,k))
+            y(-i,j,k)=y(n1-i,j,k)
+            z(-i,j,k)=z(n1-i,j,k)
             !
-            x(jx+i,j,k)=x(jx,j,k)-(x(0,j,k)-x(i,j,k))
-            y(jx+i,j,k)=y(i,j,k)
-            z(jx+i,j,k)=z(i,j,k)
+            x(n1+i,j,k)=x(n1,j,k)-(x(0,j,k)-x(i,j,k))
+            y(n1+i,j,k)=y(i,j,k)
+            z(n1+i,j,k)=z(i,j,k)
          end do
       end do
    end do
 
    if(myid.eq.0)then
       do i=1,8
-         do j=0,jy
+         do j=0,n2
             do k=n3-8,n3
-               xx1(-i,j,k)=xx1(0,j,k)-(xx1(jx,j,k)-xx1(jx-i,j,k))
-               yy1(-i,j,k)=yy1(jx-i,j,k)
-               zz1(-i,j,k)=zz1(jx-i,j,k)
+               xx1(-i,j,k)=xx1(0,j,k)-(xx1(n1,j,k)-xx1(n1-i,j,k))
+               yy1(-i,j,k)=yy1(n1-i,j,k)
+               zz1(-i,j,k)=zz1(n1-i,j,k)
 
-               xx1(jx+i,j,k)=xx1(jx,j,k)-(xx1(0,j,k)-xx1(i,j,k))
-               yy1(jx+i,j,k)=yy1(i,j,k)
-               zz1(jx+i,j,k)=zz1(i,j,k)
+               xx1(n1+i,j,k)=xx1(n1,j,k)-(xx1(0,j,k)-xx1(i,j,k))
+               yy1(n1+i,j,k)=yy1(i,j,k)
+               zz1(n1+i,j,k)=zz1(i,j,k)
             end do
          end do
       end do
@@ -58,15 +55,15 @@ subroutine cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
 
    if(myid.eq.nproc-1)then
       do i=1,8
-         do j=0,jy
+         do j=0,n2
             do k=0,8
-               xx2(-i,j,k)=xx2(0,j,k)-(xx2(jx,j,k)-xx2(jx-i,j,k))
-               yy2(-i,j,k)=yy2(jx-i,j,k)
-               zz2(-i,j,k)=zz2(jx-i,j,k)
+               xx2(-i,j,k)=xx2(0,j,k)-(xx2(n1,j,k)-xx2(n1-i,j,k))
+               yy2(-i,j,k)=yy2(n1-i,j,k)
+               zz2(-i,j,k)=zz2(n1-i,j,k)
 
-               xx2(jx+i,j,k)=xx2(jx,j,k)-(xx2(0,j,k)-xx2(i,j,k))
-               yy2(jx+i,j,k)=yy2(i,j,k)
-               zz2(jx+i,j,k)=zz2(i,j,k)
+               xx2(n1+i,j,k)=xx2(n1,j,k)-(xx2(0,j,k)-xx2(i,j,k))
+               yy2(n1+i,j,k)=yy2(i,j,k)
+               zz2(n1+i,j,k)=zz2(i,j,k)
             end do
          end do
       end do
@@ -76,11 +73,11 @@ subroutine cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
    ! fill the corner
    if(myid.eq.0)then
       do k=1,8
-         do i=-8,jx+8
-            do j=0,jy
-               x(i,j,-k)=xx1(i,j,jz-k)
-               y(i,j,-k)=yy1(i,j,jz-k)
-               z(i,j,-k)=z(i,j,0)-(zz1(i,j,jz)-zz1(i,j,jz-k))
+         do i=-8,n1+8
+            do j=0,n2
+               x(i,j,-k)=xx1(i,j,n3-k)
+               y(i,j,-k)=yy1(i,j,n3-k)
+               z(i,j,-k)=z(i,j,0)-(zz1(i,j,n3)-zz1(i,j,n3-k))
             end do
          end do
       end do
@@ -88,11 +85,11 @@ subroutine cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
 
    if(myid.eq.nproc-1)then
       do k=1,8
-         do i=-8,jx+8
-            do j=0,jy
-               x(i,j,jz+k)=xx2(i,j,k)
-               y(i,j,jz+k)=yy2(i,j,k)
-               z(i,j,jz+k)=z(i,j,jz)-(zz2(i,j,0)-zz2(i,j,k))
+         do i=-8,n1+8
+            do j=0,n2
+               x(i,j,n3+k)=xx2(i,j,k)
+               y(i,j,n3+k)=yy2(i,j,k)
+               z(i,j,n3+k)=z(i,j,n3)-(zz2(i,j,0)-zz2(i,j,k))
             end do
          end do
       end do
@@ -115,15 +112,15 @@ subroutine cellep(xx1,yy1,zz1,xx2,yy2,zz2,kgridparasta)
 
 
    do j=1,8
-      do i=-8,jx+8
+      do i=-8,n1+8
          do k=kgpsta,kgpend  !-8,jz+8
-            x(i,-j,k)=x(i,jy-j,k)
-            y(i,-j,k)=y(i,0,k)-(y(i,jy,k)-y(i,jy-j,k))
-            z(i,-j,k)=z(i,jy-j,k)
+            x(i,-j,k)=x(i,n2-j,k)
+            y(i,-j,k)=y(i,0,k)-(y(i,n2,k)-y(i,n2-j,k))
+            z(i,-j,k)=z(i,n2-j,k)
             !
-            x(i,jy+j,k)=x(i,j,k)
-            y(i,jy+j,k)=y(i,jy,k)-(y(i,0,k)-y(i,j,k))
-            z(i,jy+j,k)=z(i,j,k)
+            x(i,n2+j,k)=x(i,j,k)
+            y(i,n2+j,k)=y(i,n2,k)-(y(i,0,k)-y(i,j,k))
+            z(i,n2+j,k)=z(i,j,k)
          end do
       end do
    end do

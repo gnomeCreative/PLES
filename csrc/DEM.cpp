@@ -9,50 +9,65 @@ using namespace std;
 // PUBLIC FUNCTIONS
 //////////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-void DEM::discreteElementGet(GetPot& demCfgFile, GetPot& command_line){
+void DEM::discreteElementGet(GetPot& config_file, GetPot& command_line){
 
-	PARSE_CLASS_MEMBER(demCfgFile, boundary[0], "boundary1",1);
-	PARSE_CLASS_MEMBER(demCfgFile, boundary[1], "boundary2",1);
-	PARSE_CLASS_MEMBER(demCfgFile, boundary[2], "boundary3",1);
-	PARSE_CLASS_MEMBER(demCfgFile, boundary[3], "boundary4",1);
-	PARSE_CLASS_MEMBER(demCfgFile, boundary[4], "boundary5",1);
-	PARSE_CLASS_MEMBER(demCfgFile, boundary[5], "boundary6",1);
+	if (!lesSolve) {
+		// domain size if LES is off
+		PARSE_CLASS_MEMBER(config_file, demSizeX, "demSizeX",0.0);
+		PARSE_CLASS_MEMBER(config_file, demSizeY, "demSizeY",0.0);
+		PARSE_CLASS_MEMBER(config_file, demSizeZ, "demSizeZ",0.0);
 
+		// time limit if LES is off
+		PARSE_CLASS_MEMBER(config_file, maxTime, "maxTime",0.0);
+		PARSE_CLASS_MEMBER(config_file, maxTimeSteps, "maxTimeSteps",0);
+	}
+
+
+
+	// boundary conditions
+	PARSE_CLASS_MEMBER(config_file, boundary[0], "boundary1",1);
+	PARSE_CLASS_MEMBER(config_file, boundary[1], "boundary2",1);
+	PARSE_CLASS_MEMBER(config_file, boundary[2], "boundary3",1);
+	PARSE_CLASS_MEMBER(config_file, boundary[3], "boundary4",1);
+	PARSE_CLASS_MEMBER(config_file, boundary[4], "boundary5",1);
+	PARSE_CLASS_MEMBER(config_file, boundary[5], "boundary6",1);
+
+	// forcing term (usually gravity)
 	double readForceX(0.0),readForceY(0.0), readForceZ(0.0);
-	PARSE_CLASS_MEMBER(demCfgFile, readForceX, "demFX",1.0);
-	PARSE_CLASS_MEMBER(demCfgFile, readForceY, "demFY",1.0);
-	PARSE_CLASS_MEMBER(demCfgFile, readForceZ, "demFZ",1.0);
+	PARSE_CLASS_MEMBER(config_file, readForceX, "demFX",1.0);
+	PARSE_CLASS_MEMBER(config_file, readForceY, "demFY",1.0);
+	PARSE_CLASS_MEMBER(config_file, readForceZ, "demFZ",1.0);
 	demF=tVect(readForceX,readForceY,readForceZ);
 
 	// getting time step
-	PARSE_CLASS_MEMBER(demCfgFile, deltat, "deltat",1.0);
+	PARSE_CLASS_MEMBER(config_file, deltat, "deltat",1.0);
 	ASSERT(deltat>=0.0);
 
 	// getting material properties
-	PARSE_CLASS_MEMBER(demCfgFile, sphereMat.density, "density",1.0);
+	PARSE_CLASS_MEMBER(config_file, sphereMat.density, "density",1.0);
 	ASSERT(sphereMat.density>0.0);
 
 	string contactModelString;
-	PARSE_CLASS_MEMBER(demCfgFile, contactModelString, "contactModel","none");
+	PARSE_CLASS_MEMBER(config_file, contactModelString, "contactModel","none");
 	if (contactModelString=="HERTZIAN") sphereMat.contactModel=HERTZIAN;
 	else if (contactModelString=="LINEAR") sphereMat.contactModel=LINEAR;
 
 
 	// Hertzian contact model /////////////
-	PARSE_CLASS_MEMBER(demCfgFile, sphereMat.youngMod, "youngMod",1.0);
+	PARSE_CLASS_MEMBER(config_file, sphereMat.youngMod, "youngMod",1.0);
 	ASSERT(sphereMat.youngMod>0.0);
-	PARSE_CLASS_MEMBER(demCfgFile, sphereMat.poisson, "poisson",1.0);
+	PARSE_CLASS_MEMBER(config_file, sphereMat.poisson, "poisson",1.0);
 	ASSERT(sphereMat.poisson>=0.0);
 	// normal stiffness (constant part, calculated here to avoid repetition)
 	sphereMat.knConst=2.0/3.0*sphereMat.youngMod/(1-sphereMat.poisson*sphereMat.poisson);
 	sphereMat.ksConst=2.0*sphereMat.youngMod/(2.0-sphereMat.poisson)*(1.0+sphereMat.poisson);
 
 	// linear contact model /////////////
-	PARSE_CLASS_MEMBER(demCfgFile, sphereMat.linearStiff, "linearStiff",1.0);
+	PARSE_CLASS_MEMBER(config_file, sphereMat.linearStiff, "linearStiff",1.0);
 	ASSERT(sphereMat.linearStiff>=0.0);
 
 	// normal damping ///////////////////////
-	PARSE_CLASS_MEMBER(demCfgFile, sphereMat.restitution, "restitution",1.0);
+	PARSE_CLASS_MEMBER(config_file, sphereMat.restitution, "restitution",1.0);
 	ASSERT(sphereMat.restitution>0.0);
 	ASSERT(sphereMat.restitution<=1.0);
 	// calculating coefficient for normal damping
@@ -70,27 +85,27 @@ void DEM::discreteElementGet(GetPot& demCfgFile, GetPot& command_line){
 	}
 
 	// tangential model //////////////////////
-	PARSE_CLASS_MEMBER(demCfgFile, sphereMat.viscTang, "viscTang",1.0);
+	PARSE_CLASS_MEMBER(config_file, sphereMat.viscTang, "viscTang",1.0);
 	ASSERT(sphereMat.viscTang>=0.0);
-	PARSE_CLASS_MEMBER(demCfgFile, sphereMat.frictionCoefPart, "frictionCoefPart",1.0);
+	PARSE_CLASS_MEMBER(config_file, sphereMat.frictionCoefPart, "frictionCoefPart",1.0);
 	ASSERT(sphereMat.frictionCoefPart>=0.0);
-	PARSE_CLASS_MEMBER(demCfgFile, sphereMat.frictionCoefWall, "frictionCoefWall",1.0);
+	PARSE_CLASS_MEMBER(config_file, sphereMat.frictionCoefWall, "frictionCoefWall",1.0);
 	ASSERT(sphereMat.frictionCoefWall>=0.0);
 
 
 
 	// particle initial state //////////////////////
 	string particleFile;
-	PARSE_CLASS_MEMBER(demCfgFile, particleFile, "particleFile","particles.dat");
+	PARSE_CLASS_MEMBER(config_file, particleFile, "particleFile","particles.dat");
 	double translateX(0.0), translateY(0.0), translateZ(0.0);
-	PARSE_CLASS_MEMBER(demCfgFile, translateX, "translateX",0.0);
-	PARSE_CLASS_MEMBER(demCfgFile, translateY, "translateY",0.0);
-	PARSE_CLASS_MEMBER(demCfgFile, translateZ, "translateZ",0.0);
+	PARSE_CLASS_MEMBER(config_file, translateX, "translateX",0.0);
+	PARSE_CLASS_MEMBER(config_file, translateY, "translateY",0.0);
+	PARSE_CLASS_MEMBER(config_file, translateZ, "translateZ",0.0);
 	tVect translate(translateX,translateY,translateZ);
 	double scaleX(1.0), scaleY(1.0), scaleZ(1.0);
-	PARSE_CLASS_MEMBER(demCfgFile, scaleX, "scaleX",1.0);
-	PARSE_CLASS_MEMBER(demCfgFile, scaleY, "scaleY",1.0);
-	PARSE_CLASS_MEMBER(demCfgFile, scaleZ, "scaleZ",1.0);
+	PARSE_CLASS_MEMBER(config_file, scaleX, "scaleX",1.0);
+	PARSE_CLASS_MEMBER(config_file, scaleY, "scaleY",1.0);
+	PARSE_CLASS_MEMBER(config_file, scaleZ, "scaleZ",1.0);
 	tVect scale(scaleX,scaleY,scaleZ);
 	double scaleMin=std::min(std::min(scaleX,scaleY),scaleZ); // FIX THIS!
 	//cout<<"scale factor="<<scaleMin<<endl;
@@ -125,7 +140,7 @@ void DEM::discreteElementGet(GetPot& demCfgFile, GetPot& command_line){
 
 	// objects initial state //////////////////////
 	string objectFile;
-	PARSE_CLASS_MEMBER(demCfgFile, objectFile, "objectFile","objects.dat");
+	PARSE_CLASS_MEMBER(config_file, objectFile, "objectFile","objects.dat");
 	ifstream objectFileID;
 	objectFileID.open(objectFile.c_str(),ios::in);
 	ASSERT(objectFileID.is_open());
@@ -155,7 +170,9 @@ void DEM::discreteElementGet(GetPot& demCfgFile, GetPot& command_line){
 	}
 
 	// numerical viscosity for stability
-	PARSE_CLASS_MEMBER(demCfgFile, numVisc, "numVisc",0.0);
+	PARSE_CLASS_MEMBER(config_file, numVisc, "numVisc",0.0);
+	// density of the fluid for coupling with LES
+	PARSE_CLASS_MEMBER(config_file, fluidDensity, "fluidDensity",0.0);
 
 }
 
@@ -171,21 +188,30 @@ void DEM::discreteElementInit(){
 	demTime=0.0;
 
 	// DEM domain
-	demSize[0]=alx;
-	demSize[1]=aly;
-	demSize[2]=alz;
+	if (lesSolve) {
+		// if LES is active, take domain from grid file
+		demSize[0]=alx;
+		demSize[1]=aly;
+		demSize[2]=alz;
+	}
+	else {
+		// use the value from input file
+		demSize[0]=demSizeX;
+		demSize[1]=demSizeY;
+		demSize[2]=demSizeZ;
+	}
 
 	// for the moment being, deltat is set to be equal to the one of LES
 	// DEM time step
 	// if multistep is 0, it should be calculated by the program here
-//	if (elmts.size()) {
-//		if (deltat==0) {
-//			// find critical deltaT
-//			const double crit=0.005*criticalTimeStep();
-//			deltat=crit;
-//		}
-//		// multistep can also be imposed by the user
-//	}
+	if (!lesSolve) {
+		if (deltat==0) {
+			// find critical deltaT
+			const double crit=0.01*criticalTimeStep();
+			deltat=crit;
+		}
+		// multistep can also be imposed by the user
+	}
 
 
 
@@ -250,7 +276,9 @@ void DEM::discreteElementInit(){
 	}
 
 	// send to Fortran!
-	communicateGeometry();
+	if (lesSolve) {
+		communicateGeometry();
+	}
 }
 
 void DEM::discreteElementStep1(){
@@ -268,13 +296,17 @@ void DEM::discreteElementStep1(){
 	// particles generation
 	updateParticlesPredicted();
 	// send to Fortran!
-	communicateGeometry();
+	if (lesSolve) {
+		communicateGeometry();
+	}
 }
 
 void DEM::discreteElementStep2(){
 
 	// hydrodynamic forces from Fortran
-	communicateForces();
+	if (lesSolve) {
+		communicateForces();
+	}
 	// force evaluation
 	evalForces();
 	// corrector step
@@ -712,9 +744,7 @@ void DEM::initializePbcs() {
 // communication with Fortran
 void DEM::communicateForces() {
 
-	const double fluidDensity=1000.0;
-
-
+	cout<<"communicate forces"<<endl;
 	int totpart=int(particles.size())+int(objects.size());
 
 	double sforx[totpart],sfory[totpart],sforz[totpart];
@@ -736,40 +766,60 @@ void DEM::communicateForces() {
 	// get from Fortran!
 	pass_forces(sforx,sfory,sforz,pforx,pfory,pforz,mforx,mfory,mforz);
 
-	double averageShearForce,averagePressureForce,averageMomentumForce;
-	averageShearForce=averagePressureForce=averageMomentumForce=0.0;
 
 	// assing to proper particles
 	for (int n=0; n<particles.size(); ++n) {
+
 		const unsigned int clusterIndexHere=particles[n].clusterIndex;
-		elmts[clusterIndexHere].FHydroShear=tVect(sforx[n],sfory[n],sforz[n])*fluidDensity;
-		elmts[clusterIndexHere].FHydroPressure=tVect(pforx[n],pfory[n],pforz[n])*fluidDensity;
-		elmts[clusterIndexHere].FHydroMomentum=tVect(mforx[n],mfory[n],mforz[n])*fluidDensity;
-		averageShearForce+=elmts[clusterIndexHere].FHydroShear.dot(X)/double(totpart);
-		averagePressureForce+=elmts[clusterIndexHere].FHydroPressure.dot(X)/double(totpart);
-		averageMomentumForce+=elmts[clusterIndexHere].FHydroMomentum.dot(X)/double(totpart);
+
+		const tVect FHydroShearHere=tVect(sforx[n],sfory[n],sforz[n])*fluidDensity;
+		const tVect FHydroPressureHere=tVect(pforx[n],pfory[n],pforz[n])*fluidDensity;
+		const tVect FHydroMomentumHere=tVect(mforx[n],mfory[n],mforz[n])*fluidDensity;
+
+		// it's incremental, because multiple particles can belong to same element
+		elmts[clusterIndexHere].FHydroShear+=FHydroShearHere;
+		elmts[clusterIndexHere].FHydroPressure+=FHydroPressureHere;
+		elmts[clusterIndexHere].FHydroMomentum+=FHydroMomentumHere;
 
 	}
 
+
+	double averageElmtShearForce,averageElmtPressureForce,averageElmtMomentumForce;
+
+	averageElmtShearForce=0.0;
+	averageElmtPressureForce=0.0;
+	averageElmtMomentumForce=0.0;
+
+	for (int n=0; n<elmts.size(); ++n) {
+
+		averageElmtShearForce+=averageElmtShearForce+elmts[n].FHydroShear.dot(X)/double(elmts.size());
+		averageElmtPressureForce+=averageElmtPressureForce+elmts[n].FHydroPressure.dot(X)/double(elmts.size());
+		averageElmtMomentumForce+=averageElmtMomentumForce+elmts[n].FHydroMomentum.dot(X)/double(elmts.size());
+
+	}
 
 	for (int n=particles.size(); n<totpart; ++n) {
 
-		// cout<<" Getting"<<orad[n]<<" "<<oposx[n]<<" "<<oposy[n]<<" "<<oposz[n];
-		objects[n].FHydroShear=tVect(sforx[n],sfory[n],sforz[n])*fluidDensity;
-		objects[n].FHydroPressure=tVect(pforx[n],pfory[n],pforz[n])*fluidDensity;
-		objects[n].FHydroMomentum=tVect(mforx[n],mfory[n],mforz[n])*fluidDensity;
-		averageShearForce+=objects[n].FHydroShear.dot(X)/double(totpart);
-		averagePressureForce+=objects[n].FHydroPressure.dot(X)/double(totpart);
-		averageMomentumForce+=objects[n].FHydroMomentum.dot(X)/double(totpart);
+		const unsigned int objectIndex=n-particles.size();
+
+		const tVect FHydroShearHere=tVect(sforx[n],sfory[n],sforz[n])*fluidDensity;
+		const tVect FHydroPressureHere=tVect(pforx[n],pfory[n],pforz[n])*fluidDensity;
+		const tVect FHydroMomentumHere=tVect(mforx[n],mfory[n],mforz[n])*fluidDensity;
+
+		objects[objectIndex].FHydroShear=FHydroShearHere;
+		objects[objectIndex].FHydroPressure=FHydroPressureHere;
+		objects[objectIndex].FHydroMomentum=FHydroMomentumHere;
+
 	}
 
 	if (myid==0) {
-		cout<<" Force | (S): "<<averageShearForce<<" | (P): "<<averagePressureForce<<" | (M): "<<averageMomentumForce<<endl;
+		cout<<" Force | (S): "<<averageElmtShearForce<<
+				    " | (P): "<<averageElmtPressureForce<<
+				    " | (M): "<<averageElmtMomentumForce<<endl;
 	}
 
 }
 
-// communication with Fortran
 void DEM::communicateGeometry() {
 
 	int totpart=int(particles.size())+int(objects.size());
@@ -794,11 +844,11 @@ void DEM::communicateGeometry() {
 		prad[n]=particles[n].r;
 		pmoves[n]=true;
 		//if (myid==0) {
-		//	cout<<" Passing particle with "<<prad[n]<<" "<<pposx[n]<<" "<<pposy[n]<<" "<<pposz[n]<<endl;
+		//	cout<<" Passing particle "<<n<<" with r="<<prad[n]<<" p=("<<pposx[n]<<" "<<pposy[n]<<" "<<pposz[n]<<")"<<endl;
 		//}
 	}
 
-	for (int n=particles.size(); n<particles.size()+objects.size(); ++n) {
+	for (int n=particles.size(); n<totpart; ++n) {
 		pposx[n]=objects[n].x0.dot(X);
 		pposy[n]=objects[n].x0.dot(Y);
 		pposz[n]=objects[n].x0.dot(Z);
@@ -848,8 +898,10 @@ void DEM::evalForces() {
 	for (int n=0; n<elmts.size(); ++n) {
 		elmts[n].FParticle.reset();
 		elmts[n].FWall.reset();
+		elmts[n].FObject.reset();
 		elmts[n].MParticle.reset();
 		elmts[n].MWall.reset();
+		elmts[n].MObject.reset();
 	}
 
 	for (int w=0; w<walls.size(); ++w) {
@@ -883,7 +935,7 @@ void DEM::evalForces() {
 		// translational motion
 		// double massCoeff=(elmts[n].m-elmts[n].fluidMass)/elmts[n].m;
 		// acceleration
-		elmts[n].x2=(FVisc+elmts[n].FParticle+elmts[n].FWall+elmts[n].FHydroShear)/elmts[n].m+demF; //(sphereMat.density-1000.0)/sphereMat.density*
+		elmts[n].x2=(FVisc+elmts[n].FParticle+elmts[n].FWall+elmts[n].FObject+elmts[n].FHydroShear+elmts[n].FHydroPressure)/elmts[n].m+demF; //(sphereMat.density-1000.0)/sphereMat.density*
 
 		// rotational motion
 		// adjoint of orientation quaternion
@@ -891,7 +943,7 @@ void DEM::evalForces() {
 		// rotational velocity (body-fixed reference frame)
 		const tVect wBf=2.0*quat2vec( q0adj.multiply( elmts[n].q1 ) );
 		// moment in global reference frame
-		tVect moment=MVisc+elmts[n].MParticle+elmts[n].MWall;
+		tVect moment=MVisc+elmts[n].MParticle+elmts[n].MWall+elmts[n].MObject;
 		// moment in body-fixed reference frame
 		moment=project(moment,elmts[n].q0.adjoint());
 		// rotational acceleration (body-fixed reference frame) (Newton equation for principal system)
@@ -1777,10 +1829,10 @@ inline void DEM::objectParticleCollision(object *objectI, const particle *partJ,
 	const tVect centerDistJ=vecRadJ+(partJ->x0-elmtJ->xp0);
 
 	// force updating
-	elmtJ->FWall=elmtJ->FWall+normalForce;
+	elmtJ->FObject=elmtJ->FObject+normalForce;
 	objectI->FParticle=objectI->FParticle-normalForce;
 	// torque updating
-	elmtJ->MWall=elmtJ->MWall+centerDistJ.cross(normalForce);
+	elmtJ->MObject=elmtJ->MObject+centerDistJ.cross(normalForce);
 
 	// TANGENTIAL FORCE ///////////////////////////////////////////////////////////////////
 
@@ -1802,9 +1854,9 @@ inline void DEM::objectParticleCollision(object *objectI, const particle *partJ,
 		const tVect tangForce=normTangForce*et;
 
 		// torque updating
-		elmtJ->MWall=elmtJ->MWall-centerDistJ.cross(tangForce);
+		elmtJ->MObject=elmtJ->MObject-centerDistJ.cross(tangForce);
 		// force updating
-		elmtJ->FWall=elmtJ->FWall-tangForce;
+		elmtJ->FObject=elmtJ->FObject-tangForce;
 		objectI->FParticle = objectI->FParticle+tangForce;
 	}
 

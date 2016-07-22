@@ -1,9 +1,8 @@
-!***********************************************************************
 module mysettings
-    !***********************************************************************
-    !     contains settings for the simulation not already define in other
-    !     module or include file.h
-    !
+
+    ! contains settings for the simulation not already define in other
+    ! module or include file.h
+
     use iso_c_binding
 
     implicit none
@@ -46,4 +45,3 @@ module mysettings
     real(kind=c_double),bind(C) :: latitude
 
 end module mysettings
-!***********************************************************************

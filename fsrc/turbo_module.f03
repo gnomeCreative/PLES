@@ -1,5 +1,8 @@
 module turbo_module
 
+    use scala3, only: n1,n2,n3,nscal,kparasta,kparaend,re
+    use mysending, only: myid,nproc
+
     !  array for turbulence model
     !-----------------------------------------------------------------------
 
@@ -137,11 +140,14 @@ module turbo_module
     !      real,allocatable :: piano3dp(:,:)
     !      real,allocatable :: piano4dp(:,:)
 
-    ! THIS IS THE OLD TURBO3BIS
-
+    ! shear rate magnitude
     real,allocatable :: smod(:,:,:)
     real,allocatable :: smodV(:,:,:)
     real,allocatable :: smodH(:,:,:)
+
+    ! q criterion
+    real,allocatable :: q_crit(:,:,:)
+
 
     real,allocatable :: s11(:,:,:)
     real,allocatable :: s12(:,:,:)
@@ -210,11 +216,12 @@ contains
 
     subroutine initialize_turbo()
 
-        use scala3, only: n1,n2,n3,nscal
-        use mysending, only: kparasta,kparaend,myid,nproc
         use mysettings, only: inmod,inmodrho,nsgs
+        use myarrays_metri3
 
         implicit none
+
+        integer :: i,j,k
 
         if (myid==0) write(*,*) myid,'start allocation for turbo_statico'
 
@@ -337,6 +344,7 @@ contains
         allocate(smod(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
         allocate(smodV(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
         allocate(smodH(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
+        allocate(q_crit(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
         !
 
         allocate (apcsx(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
@@ -578,10 +586,8 @@ contains
             allocate (piano28(0:n1+1,0:n2+1))
             allocate (piano29(0:n1+1,0:n2+1))
             allocate (piano30(0:n1+1,0:n2+1))
-            !
-            !
+
             !     allocation for turbo3bis:
-            !
             allocate (s11(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (s12(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (s13(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
@@ -591,7 +597,6 @@ contains
             allocate (s31(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (s32(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (s33(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
-            !
             !      allocate (rhofl(0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (rho11(nscal,0:n1+1,0:n2+1,kparasta-1:kparaend+1))
             allocate (rho22(nscal,0:n1+1,0:n2+1,kparasta-1:kparaend+1))
@@ -602,13 +607,29 @@ contains
 
         end if ! dynamic
 
+        ! compute constant quantities
+        do k=kparasta,kparaend
+            do j=1,n2
+                do i=1,n1
+                    apcsx(i,j,k)=0.5*(csx(i,j,k)+csx(i-1,j,k))
+                    apcsy(i,j,k)=0.5*(csy(i,j,k)+csy(i-1,j,k))
+                    apcsz(i,j,k)=0.5*(csz(i,j,k)+csz(i-1,j,k))
+                    apetx(i,j,k)=0.5*(etx(i,j,k)+etx(i,j-1,k))
+                    apety(i,j,k)=0.5*(ety(i,j,k)+ety(i,j-1,k))
+                    apetz(i,j,k)=0.5*(etz(i,j,k)+etz(i,j-1,k))
+                    apztx(i,j,k)=0.5*(ztx(i,j,k)+ztx(i,j,k-1))
+                    apzty(i,j,k)=0.5*(zty(i,j,k)+zty(i,j,k-1))
+                    apztz(i,j,k)=0.5*(ztz(i,j,k)+ztz(i,j,k-1))
+                end do
+            end do
+        end do
+
+
     end subroutine initialize_turbo
 
     subroutine execute_turbo(ktime,i_rest,in_dx1,in_sn1,in_sp1,in_st1,in_av1,in_in1,kpstamg,kpendmg)
 
         use mysettings, only: nsgs,pran,prsc
-        use scala3, only: re,jx,jy,n1,n2,nscal
-        use mysending, only: kparasta,kparaend,myid,nproc
         use myarrays_metri3, only: annit,annitV,annit_piano,annitV_piano
         use myarrays_velo3, only: akapt,akaptV,akapt_piano,akaptV_piano
 
@@ -643,8 +664,8 @@ contains
         else if (nsgs==0) then
             ! if DNS:
             do k=kparasta-1,kparaend+1 !0,jz+1
-                do j=0,jy+1
-                    do i=0,jx+1
+                do j=0,n2+1
+                    do i=0,n1+1
                         ! eddy viscosity
                         annit(i,j,k) =1./re
                         annitV(i,j,k)=1./re
@@ -656,79 +677,43 @@ contains
                     end do
                 end do
             end do
-            if (myid==0 .or. myid==nproc-1) then
-                annit_piano  = 1./re
-                annitV_piano = 1./re
-            end if
-
-            if (myid==0 .or. myid==nproc-1) then
-                do isc=1,nscal
-                    akapt_piano  = 1./re/pran(isc)
-                    akaptV_piano = 1./re/pran(isc)
-                end do
-            end if
-
         end if
 
     end subroutine execute_turbo
 
-subroutine periodic(r1,r2,r3)
-    !***********************************************************************
-    ! set periodic boundary condition on model matrix
-    !
-    use scala3
-    use period
-    use mysending, only: kparasta,kparaend
-    !
-    use mpi
+    subroutine periodic(r1,r2,r3)
 
-    implicit none
-    !
-    !-----------------------------------------------------------------------
-    !     array declaration
-    integer i,j,k
+        ! set periodic boundary condition on model matrix
+        !
+        use period
 
-    real r1(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
-    real r2(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
-    real r3(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
-    !-----------------------------------------------------------------------
-    !
-    !      periodicity on csi
-    !
-    if (ip==0) then
-        do k=kparasta,kparaend
-            do j=1,jy
-                r1(0,j,k)=r1(jx,j,k)
-                r2(0,j,k)=r2(jx,j,k)
-                r3(0,j,k)=r3(jx,j,k)
-                !
-                r1(jx+1,j,k)=r1(1,j,k)
-                r2(jx+1,j,k)=r2(1,j,k)
-                r3(jx+1,j,k)=r3(1,j,k)
+        implicit none
+
+        !-----------------------------------------------------------------------
+        integer i,j,k
+        real r1(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+        real r2(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+        real r3(0:n1+1,0:n2+1,kparasta-1:kparaend+1)
+        !-----------------------------------------------------------------------
+
+        !      periodicity on csi
+        if (ip==0) then
+            do k=kparasta,kparaend
+                do j=1,n2
+                    r1(0,j,k)=r1(n1,j,k)
+                    r2(0,j,k)=r2(n1,j,k)
+                    r3(0,j,k)=r3(n1,j,k)
+                    !
+                    r1(n1+1,j,k)=r1(1,j,k)
+                    r2(n1+1,j,k)=r2(1,j,k)
+                    r3(n1+1,j,k)=r3(1,j,k)
+                end do
             end do
-        end do
-    end if
-    !
-    !      periodicity on eta
-    !
-    if (jp==0) then
-        do k=kparasta,kparaend
-            do i=1,jx
-                r1(i,0,k)=r1(i,jy,k)
-                r2(i,0,k)=r2(i,jy,k)
-                r3(i,0,k)=r3(i,jy,k)
-                !
-                r1(i,jy+1,k)=r1(i,1,k)
-                r2(i,jy+1,k)=r2(i,1,k)
-                r3(i,jy+1,k)=r3(i,1,k)
-            end do
-        end do
-    end if
-    !
-    !      periodicity on zeta made in a next step
-    !
-    return
-end
+        end if
+        !      periodicity on eta not implemented
+        !      periodicity on zeta made in a next step
+        return
+    end
 
 !***********************************************************************
 end module turbo_module

@@ -34,10 +34,14 @@ extern int myid;
 
 class IO{
 public:
+    // time at invocation
+    struct tm *now;
     // dem config file
-    string demConfigFile;
+    string demConfigFileName;
+    GetPot demCfgFile;
     // les files
-    string lesConfigFile,lesGridFile,lesRestartFile;
+    string lesConfigFileName,lesGridFile,lesRestartFile;
+    GetPot lesCfgFile;
     string restartFormatString;
     // time integration
     unsigned int currentTimeStep;

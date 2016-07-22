@@ -94,8 +94,9 @@ public:
     // predicted angular velocities
     tVect wpGlobal,wpLocal;
     // force and moment
-    tVect FParticle,FWall,FGrav,FHydroShear,FHydroPressure,FHydroMomentum;
-    tVect MParticle,MWall;
+    tVect FParticle,FWall,FGrav,FObject;
+	tVect FHydroShear,FHydroPressure,FHydroMomentum;
+    tVect MParticle,MWall,MObject;
 
     // default constructor
     elmt() {
@@ -115,12 +116,14 @@ public:
         radius=1.0;
         I=tVect(1.0,1.0,1.0);
         FWall=tVect(0.0,0.0,0.0);
+        FObject=tVect(0.0,0.0,0.0);
         FHydroShear=tVect(0.0,0.0,0.0);
         FHydroPressure=tVect(0.0,0.0,0.0);
         FHydroMomentum=tVect(0.0,0.0,0.0);
         FParticle=tVect(0.0,0.0,0.0);
         MParticle=tVect(0.0,0.0,0.0);
         MWall=tVect(0.0,0.0,0.0);
+        MObject=tVect(0.0,0.0,0.0);
         components.resize(size);
     }
     void elmtShow()const;

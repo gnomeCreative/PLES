@@ -23,6 +23,7 @@
 using namespace std;
 extern ProblemName problemName;
 extern double alx,aly,alz;
+extern bool lesSolve;
 
 // stuff from Fortran
 extern "C" {
@@ -35,6 +36,8 @@ class DEM{
 private:
 	// domain size: DEM grid is orthogonal
 	doubleList demSize;
+	// domain size from imput file in case LES is off
+	double demSizeX,demSizeY,demSizeZ;
 	// boundaries
 	unsIntList boundary;
 	// neighbor list (here COMMENTS are needed)
@@ -53,12 +56,16 @@ private:
 	// hydrodynamic forces stabilization: number of time step for average
 	// numerical viscosity to avoid energy problems
 	double numVisc;
-
 	// prototype shape collection
 	std::vector <vecList> prototypes;
+	// density of fluid for coupling with LES
+	double fluidDensity;
 public:
 	// time step
 	double deltat;
+	// time limit in case LES is off
+	double maxTime;
+	int maxTimeSteps;
 	// force field (if not constant need to be calculated inside cycle) // should not be here!!!!!
 	tVect demF;
 	// material for elements // should not be here!!!
@@ -88,6 +95,9 @@ public:
 		newNeighborList=false;
 		demSize.resize(3);
 		demSize[0]=demSize[1]=demSize[2]=1.0;
+		demSizeX=demSizeY=demSizeZ=0.0;
+		maxTime=0.0;
+		maxTimeSteps=0;
 		boundary.resize(6);
 		boundary[0]=boundary[1]=boundary[2]=boundary[3]=boundary[4]=boundary[5]=1;
 		demTime=0.0;
@@ -114,10 +124,10 @@ public:
 		prototypes.clear();
 		//
 		numVisc=0.0;
-	}
+		fluidDensity=0.0;	}
 	void discreteElementStep1();
 	void discreteElementStep2();
-	void discreteElementGet(GetPot& lbmCfgFile, GetPot& command_line);
+	void discreteElementGet(GetPot& config_file, GetPot& command_line);
 	void discreteElementInit();
 	void evolveBoundaries();
 	void reset();

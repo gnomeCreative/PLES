@@ -7,7 +7,6 @@ subroutine fmassa(bcsi,beta,bzet,ktime)
     use myarrays_velo3, only: u,v,w,rhov
     !
     use scala3
-    use mysending, only: myid,nproc,kparasta,kparaend,MPI_REAL_SD
     use mysettings, only: bbx,bby,bbz,rich,latitude
     !
     use mpi
@@ -49,13 +48,10 @@ subroutine fmassa(bcsi,beta,bzet,ktime)
         smooth=(real(ktime)/50.0)
     end if
 
-    if (myid==0) then
-        write(*,*)'smooth',smooth
-    end if
-      
+
     do k=kparasta,kparaend
-        do j=1,jy
-            do i=1,jx
+        do j=1,n2
+            do i=1,n1
 
                 bcsi(i,j,k) = bbx+omega2*w(i,j,k)-omega3*v(i,j,k)
 
